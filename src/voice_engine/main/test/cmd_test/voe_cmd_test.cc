@@ -15,8 +15,6 @@
 #include <unistd.h>
 #endif
 
-#include "gtest/gtest.h"
-
 #include "voe_errors.h"
 #include "voe_base.h"
 #include "voe_codec.h"
@@ -38,7 +36,9 @@
 // it could be useful in repeat tests.
 //#define DEBUG
 
-// #define EXTERNAL_TRANSPORT
+//#define EXTERNAL_TRANSPORT
+
+#define ERROR_CALLBACK
 
 using namespace webrtc;
 
@@ -91,6 +91,26 @@ my_transportation my_transport;
 
 #endif
 
+#ifdef ERROR_CALLBACK
+// ERROR_CALLBACK is Typing Detection for MAC only
+
+class my_observer : public VoiceEngineObserver
+{
+public:
+	virtual void CallbackOnError(const int channel, const int errCode);
+};
+
+void my_observer::CallbackOnError(const int channel, const int errCode)
+{
+	if (errCode == VE_TYPING_NOISE_WARNING) {
+		printf("  TYPING NOISE DETECTED \n");	
+	}
+}
+
+my_observer my_observerInstance;
+
+#endif  // ERROR_CALLBACK
+
 int main() {
   int res = 0;
   int cnt = 0;
@@ -116,14 +136,28 @@ int main() {
   VoiceEngine::SetTraceFilter(kTraceAll);
   res = VoiceEngine::SetTraceFile("webrtc_trace.txt");
   VALIDATE;
+  
+  res = VoiceEngine::SetTraceCallback(NULL);
+  VALIDATE;
+  
 
   printf("Init\n");
   res = base1->Init();
   if (res != 0) {
     printf("\nError calling Init: %d\n", base1->LastError());
     fflush(NULL);
-    exit(1);
+    exit(0);
   }
+  
+#ifdef ERROR_CALLBACK
+  printf("\nRegistering VE observer to enable error callbacks \n");
+  res = base1->RegisterVoiceEngineObserver(my_observerInstance);
+  if (res != 0) {
+    printf("\nError calling RegisterVoiceEngineObserver \n");
+    fflush(NULL);
+    exit(0);
+  }
+#endif //ERROR_CALLBACK
 
   cnt++;
   printf("Version\n");
@@ -136,6 +170,10 @@ int main() {
   run_test();
 
   printf("Terminate \n");
+  
+#ifdef ERROR_CALLBACK
+  base1->DeRegisterVoiceEngineObserver();
+#endif  
 
   res = base1->Terminate();
   VALIDATE;
@@ -185,7 +223,7 @@ int main() {
 }
 
 void run_test() {
-  int chan, cnt, res;
+  int chan, cnt, error, res;
   CodecInst cinst;
   cnt = 0;
   int i;
@@ -196,20 +234,23 @@ void run_test() {
   bool VAD = false;
   bool NS = false;
   bool NS1 = false;
+  bool TD1 = false;
+  bool MM = false;
+  bool OH = false;	
 
   chan = base1->CreateChannel();
   if (chan < 0) {
     printf("Error at position %i\n", cnt);
     printf("************ Error code = %i\n", base1->LastError());
     fflush(NULL);
+    error = 1;
   }
   cnt++;
 
-  int j = 0;
 #ifdef EXTERNAL_TRANSPORT
   my_transportation ch0transport;
   printf("Enabling external transport \n");
-  netw->RegisterExternalTransport(0, ch0transport);
+  netw->SetExternalTransport(0, true, &ch0transport);
 #else
   char ip[64];
 #ifdef DEBUG
@@ -221,17 +262,16 @@ void run_test() {
 
   printf("1. 127.0.0.1 \n");
   printf("2. Specify IP \n");
-  ASSERT_EQ(1, scanf("%i", &i));
-
+  scanf("%i", &i);
   if (1 == i)
     strcpy(ip, "127.0.0.1");
   else {
     printf("Specify remote IP: ");
-    ASSERT_EQ(1, scanf("%s", ip));
+    scanf("%s", ip);
   }
 #endif
 
-  int colons(0);
+  int colons(0), j(0);
   while (ip[j] != '\0' && j < 64 && !(colons = (ip[j++] == ':')))
     ;
   if (colons) {
@@ -245,7 +285,7 @@ void run_test() {
   rPort=8500;
 #else
   printf("Specify remote port (1=1234): ");
-  ASSERT_EQ(1, scanf("%i", &rPort));
+  scanf("%i", &rPort);
   if (1 == rPort)
     rPort = 1234;
   printf("Set Send port \n");
@@ -260,7 +300,7 @@ void run_test() {
   lPort=8500;
 #else
   printf("Specify local port (1=1234): ");
-  ASSERT_EQ(1, scanf("%i", &lPort));
+  scanf("%i", &lPort);
   if (1 == lPort)
     lPort = 1234;
   printf("Set Rec Port \n");
@@ -286,7 +326,7 @@ void run_test() {
   codecinput=0;
 #else
   printf("Select send codec: ");
-  ASSERT_EQ(1, scanf("%i", &codecinput));
+  scanf("%i", &codecinput);
 #endif
   codec->GetCodec(codecinput, cinst);
 
@@ -322,11 +362,11 @@ void run_test() {
     }
 
     printf("Select playout device: ");
-    ASSERT_EQ(1, scanf("%d", &pd));
+    scanf("%d", &pd);
     res = hardware->SetPlayoutDevice(pd);
     VALIDATE;
     printf("Select recording device: ");
-    ASSERT_EQ(1, scanf("%d", &rd));
+    scanf("%d", &rd);
     printf("Setting sound devices \n");
     res = hardware->SetRecordingDevice(rd);
     VALIDATE;
@@ -342,7 +382,7 @@ void run_test() {
     VALIDATE;
 
     res = apm->SetNsStatus(NS);
-    VALIDATE;
+    VALIDATE;          
 
 #ifdef DEBUG
     i = 1;
@@ -351,7 +391,7 @@ void run_test() {
     printf("2. Send only \n");
     printf("3. Listen and playout only \n");
     printf("Select transfer mode: ");
-    ASSERT_EQ(1, scanf("%i", &i));
+    scanf("%i", &i);
 #endif
     const bool send = !(3 == i);
     const bool receive = !(2 == i);
@@ -434,10 +474,27 @@ void run_test() {
       i++;
       printf("\t%i. AGC status \n", i);
       i++;
+      printf("\t%i. Toggle microphone mute\n", i);
+      i++;
+      printf("\t%i. Toggle On Hold status\n", i);
+      i++;
+
+#ifdef ERROR_CALLBACK      
+      printf("\t%i. Get Last Error Code \n", i);
+      i++;
+
+      
+#ifdef WEBRTC_MAC_INTEL        
+      printf("\t%i. Toggle Typing Detect for Mac only \n", i);
+      i++;  
+#endif // WEBRTC_MAC_INTEL
+
+#endif // ERROR_CALLBACK     
+      
       printf("\t%i. Stop call \n", i);
 
       printf("Select action or %i to stop the call: ", i);
-      ASSERT_EQ(1, scanf("%i", &codecinput));
+      scanf("%i", &codecinput);
 
       if (codecinput < codec->NumOfCodecs()) {
         res = codec->GetCodec(codecinput, cinst);
@@ -509,7 +566,7 @@ void run_test() {
       }
       else if (codecinput == (noCodecs + 8)) {
         printf("Level: ");
-        ASSERT_EQ(1, scanf("%i", &i));
+        scanf("%i", &i);
         res = volume->SetSpeakerVolume(i);
         VALIDATE;
       }
@@ -521,7 +578,7 @@ void run_test() {
       }
       else if (codecinput == (noCodecs + 10)) {
         printf("Level: ");
-        ASSERT_EQ(1, scanf("%i", &i));
+        scanf("%i", &i);
         res = volume->SetMicVolume(i);
         VALIDATE;
       }
@@ -544,7 +601,7 @@ void run_test() {
           printf("  %d: %s \n", j, dn);
         }
         printf("Select playout device: ");
-        ASSERT_EQ(1, scanf("%d", &num_pd));
+        scanf("%d", &num_pd);
         // Will use plughw for hardware devices
         res = hardware->SetPlayoutDevice(num_pd);
         VALIDATE;
@@ -567,7 +624,7 @@ void run_test() {
         }
 
         printf("Select recording device: ");
-        ASSERT_EQ(1, scanf("%d", &num_rd));
+        scanf("%d", &num_rd);
         printf("Setting sound devices \n");
         // Will use plughw for hardware devices
         res = hardware->SetRecordingDevice(num_rd);
@@ -598,8 +655,79 @@ void run_test() {
         bool enable;
         res = apm->GetAgcStatus(enable, agcmode);
         VALIDATE
-            printf("\n AGC enale is %d , mode is %d \n", enable, agcmode);
+            printf("\n AGC enable is %d , mode is %d \n", enable, agcmode);
       }
+      else if (codecinput == (noCodecs + 17)) {
+        // Toggle Mute on Microphone
+        res = volume->GetInputMute(chan, MM);
+        VALIDATE;
+        if (MM)
+          printf("\n Microphone was on Mute! \n");
+        else
+          printf("\n Microphone was not on Mute! \n");
+
+        MM = !MM;
+
+        res = volume->SetInputMute(chan, MM);
+        VALIDATE;
+        if (MM)
+          printf("\n Microphone is now on Mute! \n");
+        else
+          printf("\n Microphone is no longer on Mute! \n");
+
+      }
+      else if (codecinput == (noCodecs + 18)) {
+        // Toggle the call on hold
+      OnHoldModes mode1;
+      OnHoldModes setmode = kHoldSendAndPlay;
+
+      res = base1->GetOnHoldStatus(chan, OH, mode1);
+      VALIDATE;
+      if (OH)
+        printf("\n Call was on hold. \n");
+      else
+        printf("\n Call was not on hold. \n");
+
+      OH = !OH;
+
+      res = base1->SetOnHoldStatus(chan, OH, setmode);
+
+      if (OH)
+        printf("\n Call now on hold! \n");
+      else
+        printf("\n Call now not on hold! \n");
+
+
+      }
+
+
+#ifdef ERROR_CALLBACK
+      else if (codecinput == (noCodecs + 19)) {
+      // Get the last error code and print to screen
+        int errcode = 0;
+        errcode = base1->LastError();
+        
+        if (errcode != -1)
+          printf("\n The last error code was %i. \n", errcode);
+        
+      }
+#ifdef WEBRTC_MAC_INTEL
+      else if (codecinput == (noCodecs + 20)) {
+        TD1 = !TD1;
+        
+        res = apm->SetTypingDetectionStatus(TD1);
+        VALIDATE;
+        
+        if (TD1)
+          printf("\n Typing detection is now on! \n");
+        else
+          printf("\n Typing detection is now off! \n");
+        
+      }
+#endif  //WEBRTC_MAC_INTEL
+            
+      
+#endif  //ERROR_CALLBACK      
       else
         break;
     }
@@ -625,7 +753,7 @@ void run_test() {
     printf("\n1. New call \n");
     printf("2. Quit \n");
     printf("Select action: ");
-    ASSERT_EQ(1, scanf("%i", &i));
+    scanf("%i", &i);
     newcall = (1 == i);
     // Call loop
   }
