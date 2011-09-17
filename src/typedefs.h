@@ -75,7 +75,10 @@
 #error Please add support for your architecture in typedefs.h
 #endif
 
-#if defined(__SSE2__) || defined(_MSC_VER)
+// TODO(ajm): SSE2 is disabled on Windows for the moment, because AEC
+// optimization is broken. Enable it as soon as AEC is fixed.
+//#if defined(__SSE2__) || defined(_MSC_VER)
+#if defined(__SSE2__)
 #define WEBRTC_USE_SSE2
 #endif
 

@@ -27,7 +27,6 @@
         '../../../../common_audio/signal_processing_library/main/source/spl.gyp:spl',
         '../../../../common_audio/vad/main/source/vad.gyp:vad',
         '../../../../system_wrappers/source/system_wrappers.gyp:system_wrappers',
-        '../../codecs/speex/main/source/speex.gyp:speex',
       ],
       'include_dirs': [
         '../interface',
