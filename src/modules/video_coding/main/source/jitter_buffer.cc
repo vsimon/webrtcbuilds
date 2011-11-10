@@ -741,6 +741,9 @@ VCMJitterBuffer::GetCompleteFrameForDecoding(WebRtc_UWord32 maxWaitTimeMS)
     CleanUpOldFrames();
     CleanUpSizeZeroFrames();
 
+    if (_lastDecodedSeqNum == -1 && WaitForNack()) {
+      _waitingForKeyFrame = true;
+    }
     VCMFrameListItem* oldestFrameListItem = FindOldestCompleteContinuousFrame();
     VCMFrameBuffer* oldestFrame = NULL;
     if (oldestFrameListItem != NULL)
@@ -1100,6 +1103,11 @@ VCMJitterBuffer::GetFrameForDecodingNACK()
     CleanUpSizeZeroFrames();
 
     // First look for a complete _continuous_ frame.
+    // When waiting for nack, wait for a key frame, if a continuous frame cannot
+    // be determined (i.e. lastDecodedSeqNum = -1)
+    if (_lastDecodedSeqNum == -1) {
+      _waitingForKeyFrame = true;
+    }
     VCMFrameListItem* oldestFrameListItem = FindOldestCompleteContinuousFrame();
     VCMFrameBuffer* oldestFrame = NULL;
     if (oldestFrameListItem != NULL)
