@@ -300,7 +300,7 @@ VCMJitterBuffer::ReleaseFrameInternal(VCMFrameBuffer* frame)
 // Doing it here increases the degree of freedom for e.g. future
 // reconstructability of separate layers. Must be called under the
 // critical section _critSect.
-void
+VCMFrameBufferEnum
 VCMJitterBuffer::UpdateFrameState(VCMFrameBuffer* frame)
 {
     if (frame == NULL)
@@ -308,7 +308,7 @@ VCMJitterBuffer::UpdateFrameState(VCMFrameBuffer* frame)
         WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceVideoCoding,
                      VCMId(_vcmId, _receiverId), "JB(0x%x) FB(0x%x): "
                          "UpdateFrameState NULL frame pointer", this, frame);
-        return;
+        return kNoError;
     }
 
     int length = frame->Length();
@@ -352,11 +352,11 @@ VCMJitterBuffer::UpdateFrameState(VCMFrameBuffer* frame)
                      _dropCount, _numConsecutiveOldFrames);
         // Flush() if this happens consistently.
         _numConsecutiveOldFrames++;
-        if (_numConsecutiveOldFrames > kMaxConsecutiveOldFrames)
-        {
-            FlushInternal();
+        if (_numConsecutiveOldFrames > kMaxConsecutiveOldFrames) {
+          FlushInternal();
+          return kFlushIndicator;
         }
-        return;
+        return kNoError;
     }
     _numConsecutiveOldFrames = 0;
     frame->SetState(kStateComplete);
@@ -406,6 +406,7 @@ VCMJitterBuffer::UpdateFrameState(VCMFrameBuffer* frame)
     {
         _frameEvent.Set();
     }
+    return kNoError;
 }
 
 // Get received key and delta frames
@@ -452,6 +453,8 @@ VCMJitterBuffer::GetFrame(const VCMPacket& packet, VCMEncodedFrame*& frame)
         if (_numConsecutiveOldPackets > kMaxConsecutiveOldPackets)
         {
             FlushInternal();
+            _critSect.Leave();
+            return VCM_FLUSH_INDICATOR;
         }
         _critSect.Leave();
         return VCM_OLD_PACKET_ERROR;
@@ -1687,7 +1690,9 @@ VCMJitterBuffer::InsertPacket(VCMEncodedFrame* buffer, const VCMPacket& packet)
         }
     case kCompleteSession:
         {
-            UpdateFrameState(frame);
+            // Only update return value for a JB flush indicator.
+            if (UpdateFrameState(frame) == kFlushIndicator)
+              ret = kFlushIndicator;
             // Signal that we have a received packet
             _packetEvent.Set();
             break;
@@ -1708,8 +1713,7 @@ VCMJitterBuffer::InsertPacket(VCMEncodedFrame* buffer, const VCMPacket& packet)
             assert(!"JitterBuffer::InsertPacket: Undefined value");
         }
     }
-
-    return ret;
+   return ret;
 }
 
 // Must be called from within _critSect
