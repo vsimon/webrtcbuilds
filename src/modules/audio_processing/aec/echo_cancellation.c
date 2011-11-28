@@ -23,8 +23,10 @@
 #include "aec_core.h"
 #include "resampler.h"
 #include "ring_buffer.h"
+#include "typedefs.h"
 
-#define BUF_SIZE_FRAMES 50 // buffer size (frames)
+#define EST_BEFORE_PROCESS
+//#define EST_AFTER_PROCESS
 // Maximum length of resampled signal. Must be an integer multiple of frames
 // (ceil(1/(1 + MIN_SKEW)*2) + 1)*FRAME_LEN
 // The factor of 2 handles wb, and the + 1 is as a safety margin
@@ -48,12 +50,10 @@ typedef struct {
     short autoOnOff;
     short activity;
     short skewMode;
-    short bufSizeStart;
+    int bufSizeStart;
     //short bufResetCtr;  // counts number of noncausal frames
     int knownDelay;
 
-    // Stores the last frame added to the farend buffer
-    short farendOld[2][FRAME_LEN];
     short initFlag; // indicates if AEC has been initialized
 
     // Variables used for averaging far end buffer size
@@ -68,7 +68,6 @@ typedef struct {
     int timeForDelayChange;
     int ECstartup;
     int checkBuffSize;
-    int delayChange;
     short lastDelayDiff;
 
 #ifdef AEC_DEBUG
@@ -80,7 +79,6 @@ typedef struct {
 #endif // AEC_DEBUG
 
     // Structures
-    void *farendBuf;
     void *resampler;
 
     int skewFrCtr;
@@ -114,12 +112,6 @@ WebRtc_Word32 WebRtcAec_Create(void **aecInst)
     }
 
     if (WebRtcAec_CreateAec(&aecpc->aec) == -1) {
-        WebRtcAec_Free(aecpc);
-        aecpc = NULL;
-        return -1;
-    }
-
-    if (WebRtcApm_CreateBuffer(&aecpc->farendBuf, bufSizeSamp) == -1) {
         WebRtcAec_Free(aecpc);
         aecpc = NULL;
         return -1;
@@ -172,7 +164,6 @@ WebRtc_Word32 WebRtcAec_Free(void *aecInst)
 #endif // AEC_DEBUG
 
     WebRtcAec_FreeAec(aecpc->aec);
-    WebRtcApm_FreeBuffer(aecpc->farendBuf);
     WebRtcAec_FreeResampler(aecpc->resampler);
     free(aecpc);
 
@@ -206,12 +197,6 @@ WebRtc_Word32 WebRtcAec_Init(void *aecInst, WebRtc_Word32 sampFreq, WebRtc_Word3
         return -1;
     }
 
-    // Initialize farend buffer
-    if (WebRtcApm_InitBuffer(aecpc->farendBuf) == -1) {
-        aecpc->lastError = AEC_UNSPECIFIED_ERROR;
-        return -1;
-    }
-
     if (WebRtcAec_InitResampler(aecpc->resampler, aecpc->scSampFreq) == -1) {
         aecpc->lastError = AEC_UNSPECIFIED_ERROR;
         return -1;
@@ -229,7 +214,6 @@ WebRtc_Word32 WebRtcAec_Init(void *aecInst, WebRtc_Word32 sampFreq, WebRtc_Word3
     aecpc->skewFrCtr = 0;
     aecpc->activity = 0;
 
-    aecpc->delayChange = 1;
     aecpc->delayCtr = 0;
 
     aecpc->sum = 0;
@@ -249,8 +233,6 @@ WebRtc_Word32 WebRtcAec_Init(void *aecInst, WebRtc_Word32 sampFreq, WebRtc_Word3
     aecpc->resample = kAecFalse;
     aecpc->highSkewCtr = 0;
     aecpc->sampFactor = (aecpc->scSampFreq * 1.0f) / aecpc->splitSampFreq;
-
-    memset(&aecpc->farendOld[0][0], 0, 160);
 
     // Default settings.
     aecConfig.nlpMode = kAecNlpModerate;
@@ -272,9 +254,11 @@ WebRtc_Word32 WebRtcAec_BufferFarend(void *aecInst, const WebRtc_Word16 *farend,
 {
     aecpc_t *aecpc = aecInst;
     WebRtc_Word32 retVal = 0;
-    short newNrOfSamples;
+    int newNrOfSamples = (int) nrOfSamples;
     short newFarend[MAX_RESAMP_LEN];
+    const int16_t* farend_ptr = farend;
     float skew;
+    int available_elements = 0;
 
     if (aecpc == NULL) {
         return -1;
@@ -299,6 +283,11 @@ WebRtc_Word32 WebRtcAec_BufferFarend(void *aecInst, const WebRtc_Word16 *farend,
     skew = aecpc->skew;
 
     // TODO: Is this really a good idea?
+    // TODO(bjornv): If the soundcard delay is too large compared to the
+    //               internal buffer we prevent moving the read pointer by
+    //               artificially adding old values to the soundcard buffer.
+    //               Investigate the loss in performance (if any) if we remove
+    //               this.
     if (!aecpc->ECstartup) {
         DelayComp(aecpc);
     }
@@ -310,17 +299,24 @@ WebRtc_Word32 WebRtcAec_BufferFarend(void *aecInst, const WebRtc_Word16 *farend,
                                                   nrOfSamples,
                                                   skew,
                                                   newFarend);
-        WebRtcApm_WriteBuffer(aecpc->farendBuf, newFarend, newNrOfSamples);
+        farend_ptr = (const int16_t*) newFarend;
 
 #ifdef AEC_DEBUG
         fwrite(farend, 2, nrOfSamples, aecpc->preCompFile);
         fwrite(newFarend, 2, newNrOfSamples, aecpc->postCompFile);
 #endif
     }
-    else {
-        WebRtcApm_WriteBuffer(aecpc->farendBuf, farend, nrOfSamples);
+    available_elements = (int) WebRtc_available_write(aecpc->aec->farend_buf);
+    if (available_elements < newNrOfSamples) {
+      // Make room for new data by flushing the oldest ones.
+      aecpc->aec->system_delay -= WebRtc_MoveReadPtr(aecpc->aec->farend_buf,
+                                                     newNrOfSamples -
+                                                     available_elements);
     }
-
+    aecpc->aec->system_delay +=
+        (int) WebRtc_WriteBuffer(aecpc->aec->farend_buf,
+                                 (const void*) farend_ptr,
+                                 (size_t) newNrOfSamples);
     return retVal;
 }
 
@@ -331,8 +327,8 @@ WebRtc_Word32 WebRtcAec_Process(void *aecInst, const WebRtc_Word16 *nearend,
     aecpc_t *aecpc = aecInst;
     WebRtc_Word32 retVal = 0;
     short i;
-    short farend[FRAME_LEN];
-    short nmbrOfFilledBuffers;
+    int nmbrOfFilledBuffers;
+    int buf_change = 0;
     short nBlocks10ms;
     short nFrames;
 #ifdef AEC_DEBUG
@@ -427,7 +423,8 @@ WebRtc_Word32 WebRtcAec_Process(void *aecInst, const WebRtc_Word16 *nearend,
             // Only needed if they don't already point to the same place.
             memcpy(out, nearend, sizeof(short) * nrOfSamples);
         }
-        nmbrOfFilledBuffers = WebRtcApm_get_buffer_size(aecpc->farendBuf) / FRAME_LEN;
+
+        nmbrOfFilledBuffers = aecpc->aec->system_delay / FRAME_LEN;
 
         // The AEC is in the start up mode
         // AEC is disabled until the soundcard buffer and farend buffers are OK
@@ -455,7 +452,7 @@ WebRtc_Word32 WebRtcAec_Process(void *aecInst, const WebRtc_Word16 *nearend,
                 aecpc->counter = 0;
             }
 
-            if (aecpc->counter*nBlocks10ms >= 6) {
+            if (aecpc->counter * nBlocks10ms >= 6) {
                 // The farend buffer size is determined in blocks of 80 samples
                 // Use 75% of the average value of the soundcard buffer
                 aecpc->bufSizeStart = WEBRTC_SPL_MIN((int) (0.75 * (aecpc->sum *
@@ -474,57 +471,65 @@ WebRtc_Word32 WebRtcAec_Process(void *aecInst, const WebRtc_Word16 *nearend,
 
         // if checkBuffSize changed in the if-statement above
         if (!aecpc->checkBuffSize) {
-            // soundcard buffer is now reasonably stable
-            // When the far end buffer is filled with approximately the same amount of
-            // data as the amount on the sound card we end the start up phase and start
-            // to cancel echoes.
-
-            if (nmbrOfFilledBuffers == aecpc->bufSizeStart) {
-                aecpc->ECstartup = 0;  // Enable the AEC
-            }
-            else if (nmbrOfFilledBuffers > aecpc->bufSizeStart) {
-                WebRtcApm_FlushBuffer(aecpc->farendBuf, WebRtcApm_get_buffer_size(aecpc->farendBuf) -
-                    aecpc->bufSizeStart * FRAME_LEN);
-                aecpc->ECstartup = 0;
-            }
+          // soundcard buffer is now reasonably stable
+          // When the far end buffer is filled with approximately the same amount of
+          // data as the amount on the sound card we end the start up phase and start
+          // to cancel echoes.
+          if (nmbrOfFilledBuffers == aecpc->bufSizeStart) {
+            // Enable the AEC
+            aecpc->ECstartup = 0;
+          } else if (nmbrOfFilledBuffers > aecpc->bufSizeStart) {
+            buf_change = WebRtc_MoveReadPtr(aecpc->aec->farend_buf,
+                                            aecpc->aec->system_delay -
+                                            aecpc->bufSizeStart * FRAME_LEN);
+            aecpc->aec->system_delay -= buf_change;
+            aecpc->ECstartup = 0;
+          }
         }
-
-    }
-    else {
+    } else {
         // AEC is enabled
+        int size = 0;
+        int16_t* out_ptr = NULL;
+        int16_t outFr[FRAME_LEN];
 
-        // Note only 1 block supported for nb and 2 blocks for wb
-        for (i = 0; i < nFrames; i++) {
-            nmbrOfFilledBuffers = WebRtcApm_get_buffer_size(aecpc->farendBuf) / FRAME_LEN;
+      EstBufDelay(aecpc, aecpc->msInSndCardBuf);
+      // Note only 1 block supported for nb and 2 blocks for wb
+      for (i = 0; i < nFrames; i++) {
+        // Call the AEC
+        WebRtcAec_ProcessFrame(aecpc->aec,
+                               &nearend[FRAME_LEN * i],
+                               &nearendH[FRAME_LEN * i],
+                               aecpc->knownDelay);
 
-            // Check that there is data in the far end buffer
-            if (nmbrOfFilledBuffers > 0) {
-                // Get the next 80 samples from the farend buffer
-                WebRtcApm_ReadBuffer(aecpc->farendBuf, farend, FRAME_LEN);
-
-                // Always store the last frame for use when we run out of data
-                memcpy(&(aecpc->farendOld[i][0]), farend, FRAME_LEN * sizeof(short));
-            }
-            else {
-                // We have no data so we use the last played frame
-                memcpy(farend, &(aecpc->farendOld[i][0]), FRAME_LEN * sizeof(short));
-            }
-
-            // Call buffer delay estimator when all data is extracted,
-            // i.e. i = 0 for NB and i = 1 for WB or SWB
-            if ((i == 0 && aecpc->splitSampFreq == 8000) ||
-                    (i == 1 && (aecpc->splitSampFreq == 16000))) {
-                EstBufDelay(aecpc, aecpc->msInSndCardBuf);
-            }
-
-            // Call the AEC
-           WebRtcAec_ProcessFrame(aecpc->aec, farend, &nearend[FRAME_LEN * i], &nearendH[FRAME_LEN * i],
-               &out[FRAME_LEN * i], &outH[FRAME_LEN * i], aecpc->knownDelay);
+        // Stuff the out buffer if we have less than a frame to output.
+        // This should only happen for the first frame.
+        size = (int) WebRtc_available_read(aecpc->aec->outFrBuf);
+        if (size < FRAME_LEN) {
+          WebRtc_MoveReadPtr(aecpc->aec->outFrBuf, size - FRAME_LEN);
+          if (aecpc->sampFreq == 32000) {
+            WebRtc_MoveReadPtr(aecpc->aec->outFrBufH, size - FRAME_LEN);
+          }
         }
+
+        // Obtain an output frame.
+        WebRtc_ReadBuffer(aecpc->aec->outFrBuf,
+                          (void**) &out_ptr,
+                          outFr,
+                          FRAME_LEN);
+        memcpy(&out[FRAME_LEN * i], out_ptr, sizeof(int16_t) * FRAME_LEN);
+        // For H band
+        if (aecpc->sampFreq == 32000) {
+          WebRtc_ReadBuffer(aecpc->aec->outFrBufH,
+                            (void**) &out_ptr,
+                            outFr,
+                            FRAME_LEN);
+          memcpy(&outH[FRAME_LEN * i], out_ptr, sizeof(int16_t) * FRAME_LEN);
+        }
+      }
     }
 
 #ifdef AEC_DEBUG
-    msInAECBuf = WebRtcApm_get_buffer_size(aecpc->farendBuf) / (sampMsNb*aecpc->aec->mult);
+    msInAECBuf = aecpc->aec->system_delay / (sampMsNb*aecpc->aec->mult);
     fwrite(&msInAECBuf, 2, 1, aecpc->bufFile);
     fwrite(&(aecpc->knownDelay), sizeof(aecpc->knownDelay), 1, aecpc->delayFile);
 #endif
@@ -824,21 +829,27 @@ WebRtc_Word32 WebRtcAec_get_error_code(void *aecInst)
 
 static int EstBufDelay(aecpc_t *aecpc, short msInSndCardBuf)
 {
-    short delayNew, nSampFar, nSampSndCard;
+    short nSampSndCard = msInSndCardBuf * sampMsNb * aecpc->aec->mult;
+    short nSampFar = (short) aecpc->aec->system_delay;
+    short delayNew = nSampSndCard - nSampFar;
     short diff;
 
-    nSampFar = WebRtcApm_get_buffer_size(aecpc->farendBuf);
-    nSampSndCard = msInSndCardBuf * sampMsNb * aecpc->aec->mult;
-
-    delayNew = nSampSndCard - nSampFar;
-
+    // TODO(bjornv): This is actually not completely correct, since it may be
+    //               possible to read one FRAME_LEN of two in (s)wb.
+    if (nSampFar >= FRAME_LEN * aecpc->aec->mult) {
+      // Compensating for the frame(s) that will be read
+      delayNew += FRAME_LEN * aecpc->aec->mult;
+    }
     // Account for resampling frame delay
     if (aecpc->skewMode == kAecTrue && aecpc->resample == kAecTrue) {
         delayNew -= kResamplingDelay;
     }
 
     if (delayNew < FRAME_LEN) {
-        WebRtcApm_FlushBuffer(aecpc->farendBuf, FRAME_LEN);
+        // TODO(bjornv): This is to make sure we can read the last frame
+        //               without doing something non-causal. Previously, the
+        //               flushing was here.
+        aecpc->aec->flush_a_frame = 1;
         delayNew += FRAME_LEN;
     }
 
@@ -874,27 +885,28 @@ static int EstBufDelay(aecpc_t *aecpc, short msInSndCardBuf)
 
 static int DelayComp(aecpc_t *aecpc)
 {
-    int nSampFar, nSampSndCard, delayNew, nSampAdd;
+    int nSampFar = aecpc->aec->system_delay;
+    int nSampSndCard = aecpc->msInSndCardBuf * sampMsNb * aecpc->aec->mult;
+    int delayNew = nSampSndCard - nSampFar;
+    int nSampAdd = 0;
     const int maxStuffSamp = 10 * FRAME_LEN;
-
-    nSampFar = WebRtcApm_get_buffer_size(aecpc->farendBuf);
-    nSampSndCard = aecpc->msInSndCardBuf * sampMsNb * aecpc->aec->mult;
-    delayNew = nSampSndCard - nSampFar;
 
     // Account for resampling frame delay
     if (aecpc->skewMode == kAecTrue && aecpc->resample == kAecTrue) {
         delayNew -= kResamplingDelay;
     }
 
+    // TODO(bjornv): In practice we may allow for larger delays since we have
+    //               concatenated more buffers into one.
     if (delayNew > FAR_BUF_LEN - FRAME_LEN*aecpc->aec->mult) {
-        // The difference of the buffersizes is larger than the maximum
+        // The difference of the buffer sizes is larger than the maximum
         // allowed known delay. Compensate by stuffing the buffer.
-        nSampAdd = (int)(WEBRTC_SPL_MAX((int)(0.5 * nSampSndCard - nSampFar),
-                    FRAME_LEN));
+        nSampAdd = WEBRTC_SPL_MAX((int) (0.5 * nSampSndCard - nSampFar),
+                                  FRAME_LEN);
         nSampAdd = WEBRTC_SPL_MIN(nSampAdd, maxStuffSamp);
 
-        WebRtcApm_StuffBuffer(aecpc->farendBuf, nSampAdd);
-        aecpc->delayChange = 1; // the delay needs to be updated
+        aecpc->aec->system_delay -= WebRtc_MoveReadPtr(aecpc->aec->farend_buf,
+                                                       -nSampAdd);
     }
 
     return 0;

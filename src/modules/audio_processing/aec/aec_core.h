@@ -22,6 +22,7 @@
 
 //#define AEC_DEBUG // for recording files
 
+#define BUF_SIZE_FRAMES 50 // buffer size (frames)
 #define FRAME_LEN 80
 #define PART_LEN 64 // Length of partition
 #define PART_LEN1 (PART_LEN + 1) // Unique fft coefficients
@@ -77,7 +78,7 @@ typedef struct {
     int inSamples, outSamples;
     int delayEstCtr;
 
-    void *farFrBuf, *nearFrBuf, *outFrBuf;
+    void *nearFrBuf, *outFrBuf;
 
     void *nearFrBufH;
     void *outFrBufH;
@@ -115,7 +116,10 @@ typedef struct {
 
     int xfBufBlockPos;
 
-    short farBuf[FILT_LEN2 * 2];
+    void* farend_buf;
+    int system_delay; // Current size on the sound card buffered in AEC.
+    // TODO(bjornv:) Temporary variables, that later may be removed.
+    int flush_a_frame;
 
     short mult; // sampling frequency multiple
     int sampFreq;
@@ -172,9 +176,8 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq);
 void WebRtcAec_InitAec_SSE2(void);
 
 void WebRtcAec_InitMetrics(aec_t *aec);
-void WebRtcAec_ProcessFrame(aec_t *aec, const short *farend,
+void WebRtcAec_ProcessFrame(aec_t *aec,
                        const short *nearend, const short *nearendH,
-                       short *out, short *outH,
                        int knownDelay);
 
 #endif // WEBRTC_MODULES_AUDIO_PROCESSING_AEC_MAIN_SOURCE_AEC_CORE_H_

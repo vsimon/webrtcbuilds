@@ -15,6 +15,7 @@
 #include "aec_core.h"
 
 #include <math.h>
+#include <stddef.h>  // size_t
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,6 +23,12 @@
 #include "delay_estimator_float.h"
 #include "ring_buffer.h"
 #include "system_wrappers/interface/cpu_features_wrapper.h"
+#include "typedefs.h"
+
+// Buffer size (samples)
+// TODO(bjornv): Simplify, but for now it's easier to see where the sizes come
+//               from.
+static const size_t kBufSizeSamp = BUF_SIZE_FRAMES * FRAME_LEN + FAR_BUF_LEN + FRAME_LEN + PART_LEN;
 
 // Noise suppression
 static const int converged = 250;
@@ -99,12 +106,7 @@ const float WebRtcAec_overDriveCurve[65] = {
 };
 
 // "Private" function prototypes.
-static void ProcessBlock(aec_t *aec, const short *farend,
-                              const short *nearend, const short *nearendH,
-                              short *out, short *outH);
-
-static void BufferFar(aec_t *aec, const short *farend, int farLen);
-static void FetchFar(aec_t *aec, short *farend, int farLen, int knownDelay);
+static void ProcessBlock(aec_t* aec);
 
 static void NonLinearProcessing(aec_t *aec, short *output, short *outputH);
 
@@ -146,31 +148,41 @@ int WebRtcAec_CreateAec(aec_t **aecInst)
         return -1;
     }
 
-    if (WebRtcApm_CreateBuffer(&aec->farFrBuf, FRAME_LEN + PART_LEN) == -1) {
+    if (WebRtc_CreateBuffer(&aec->nearFrBuf,
+                            FRAME_LEN + PART_LEN,
+                            sizeof(int16_t)) == -1) {
         WebRtcAec_FreeAec(aec);
         aec = NULL;
         return -1;
     }
 
-    if (WebRtcApm_CreateBuffer(&aec->nearFrBuf, FRAME_LEN + PART_LEN) == -1) {
+    if (WebRtc_CreateBuffer(&aec->outFrBuf,
+                            FRAME_LEN + PART_LEN,
+                            sizeof(int16_t)) == -1) {
         WebRtcAec_FreeAec(aec);
         aec = NULL;
         return -1;
     }
 
-    if (WebRtcApm_CreateBuffer(&aec->outFrBuf, FRAME_LEN + PART_LEN) == -1) {
+    if (WebRtc_CreateBuffer(&aec->nearFrBufH,
+                            FRAME_LEN + PART_LEN,
+                            sizeof(int16_t)) == -1) {
         WebRtcAec_FreeAec(aec);
         aec = NULL;
         return -1;
     }
 
-    if (WebRtcApm_CreateBuffer(&aec->nearFrBufH, FRAME_LEN + PART_LEN) == -1) {
+    if (WebRtc_CreateBuffer(&aec->outFrBufH,
+                            FRAME_LEN + PART_LEN,
+                            sizeof(int16_t)) == -1) {
         WebRtcAec_FreeAec(aec);
         aec = NULL;
         return -1;
     }
 
-    if (WebRtcApm_CreateBuffer(&aec->outFrBufH, FRAME_LEN + PART_LEN) == -1) {
+    if (WebRtc_CreateBuffer(&aec->farend_buf,
+                            kBufSizeSamp,
+                            sizeof(int16_t)) == -1) {
         WebRtcAec_FreeAec(aec);
         aec = NULL;
         return -1;
@@ -194,12 +206,13 @@ int WebRtcAec_FreeAec(aec_t *aec)
         return -1;
     }
 
-    WebRtcApm_FreeBuffer(aec->farFrBuf);
-    WebRtcApm_FreeBuffer(aec->nearFrBuf);
-    WebRtcApm_FreeBuffer(aec->outFrBuf);
+    WebRtc_FreeBuffer(aec->nearFrBuf);
+    WebRtc_FreeBuffer(aec->outFrBuf);
 
-    WebRtcApm_FreeBuffer(aec->nearFrBufH);
-    WebRtcApm_FreeBuffer(aec->outFrBufH);
+    WebRtc_FreeBuffer(aec->nearFrBufH);
+    WebRtc_FreeBuffer(aec->outFrBufH);
+
+    WebRtc_FreeBuffer(aec->farend_buf);
 
     WebRtc_FreeDelayEstimatorFloat(aec->delay_estimator);
 
@@ -364,25 +377,28 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq)
         aec->errThresh = 1.5e-6f;
     }
 
-    if (WebRtcApm_InitBuffer(aec->farFrBuf) == -1) {
+    if (WebRtc_InitBuffer(aec->nearFrBuf) == -1) {
         return -1;
     }
 
-    if (WebRtcApm_InitBuffer(aec->nearFrBuf) == -1) {
+    if (WebRtc_InitBuffer(aec->outFrBuf) == -1) {
         return -1;
     }
 
-    if (WebRtcApm_InitBuffer(aec->outFrBuf) == -1) {
+    if (WebRtc_InitBuffer(aec->nearFrBufH) == -1) {
         return -1;
     }
 
-    if (WebRtcApm_InitBuffer(aec->nearFrBufH) == -1) {
+    if (WebRtc_InitBuffer(aec->outFrBufH) == -1) {
         return -1;
     }
 
-    if (WebRtcApm_InitBuffer(aec->outFrBufH) == -1) {
+    // Initialize farend buffer
+    if (WebRtc_InitBuffer(aec->farend_buf) == -1) {
         return -1;
     }
+    aec->flush_a_frame = 0;
+    aec->system_delay = 0;
 
     if (WebRtc_InitDelayEstimatorFloat(aec->delay_estimator) != 0) {
       return -1;
@@ -411,7 +427,6 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq)
     aec->knownDelay = 0;
 
     // Initialize buffers
-    memset(aec->farBuf, 0, sizeof(aec->farBuf));
     memset(aec->xBuf, 0, sizeof(aec->xBuf));
     memset(aec->dBuf, 0, sizeof(aec->dBuf));
     memset(aec->eBuf, 0, sizeof(aec->eBuf));
@@ -500,78 +515,48 @@ void WebRtcAec_InitMetrics(aec_t *aec)
 }
 
 
-void WebRtcAec_ProcessFrame(aec_t *aec, const short *farend,
-                       const short *nearend, const short *nearendH,
-                       short *out, short *outH,
-                       int knownDelay)
+void WebRtcAec_ProcessFrame(aec_t *aec,
+                            const short *nearend,
+                            const short *nearendH,
+                            int knownDelay)
 {
-    short farBl[PART_LEN], nearBl[PART_LEN], outBl[PART_LEN];
-    short farFr[FRAME_LEN];
-    // For H band
-    short nearBlH[PART_LEN], outBlH[PART_LEN];
+    // TODO(bjornv): We update the buffer size for entire frames instead of
+    //               partitions. This is to be exact with the previous way of
+    //               determining the buffer size.
+    int buf_change = FRAME_LEN; // Account for this frame
 
-    int size = 0;
-
-    // initialize: only used for SWB
-    memset(nearBlH, 0, sizeof(nearBlH));
-    memset(outBlH, 0, sizeof(outBlH));
-
-    // Buffer the current frame.
-    // Fetch an older one corresponding to the delay.
-    BufferFar(aec, farend, FRAME_LEN);
-    FetchFar(aec, farFr, FRAME_LEN, knownDelay);
+    // Move the read pointer 10 ms if we have less than 10 ms to read.
+    if (aec->system_delay < FRAME_LEN) {
+      // We have no data so we rewind 10 ms
+      buf_change += WebRtc_MoveReadPtr(aec->farend_buf, -FRAME_LEN * aec->mult);
+    }
+    // Delay compensation.
+    // TODO(bjornv): Add a sanity check to make sure we move the pointer the
+    //               same amount as expected.
+    WebRtc_MoveReadPtr(aec->farend_buf, aec->knownDelay - knownDelay);
+    aec->knownDelay = knownDelay;
+    if (aec->flush_a_frame == 1) {
+      buf_change += WebRtc_MoveReadPtr(aec->farend_buf, FRAME_LEN);
+      aec->flush_a_frame = 0;
+    }
+    // Update sound card size.
+    aec->system_delay -= buf_change;
 
     // Buffer the synchronized far and near frames,
     // to pass the smaller blocks individually.
-    WebRtcApm_WriteBuffer(aec->farFrBuf, farFr, FRAME_LEN);
-    WebRtcApm_WriteBuffer(aec->nearFrBuf, nearend, FRAME_LEN);
+    WebRtc_WriteBuffer(aec->nearFrBuf, nearend, FRAME_LEN);
     // For H band
     if (aec->sampFreq == 32000) {
-        WebRtcApm_WriteBuffer(aec->nearFrBufH, nearendH, FRAME_LEN);
+        WebRtc_WriteBuffer(aec->nearFrBufH, nearendH, FRAME_LEN);
     }
 
     // Process as many blocks as possible.
-    while (WebRtcApm_get_buffer_size(aec->farFrBuf) >= PART_LEN) {
-
-        WebRtcApm_ReadBuffer(aec->farFrBuf, farBl, PART_LEN);
-        WebRtcApm_ReadBuffer(aec->nearFrBuf, nearBl, PART_LEN);
-
-        // For H band
-        if (aec->sampFreq == 32000) {
-            WebRtcApm_ReadBuffer(aec->nearFrBufH, nearBlH, PART_LEN);
-        }
-
-        ProcessBlock(aec, farBl, nearBl, nearBlH, outBl, outBlH);
-
-        WebRtcApm_WriteBuffer(aec->outFrBuf, outBl, PART_LEN);
-        // For H band
-        if (aec->sampFreq == 32000) {
-            WebRtcApm_WriteBuffer(aec->outFrBufH, outBlH, PART_LEN);
-        }
-    }
-
-    // Stuff the out buffer if we have less than a frame to output.
-    // This should only happen for the first frame.
-    size = WebRtcApm_get_buffer_size(aec->outFrBuf);
-    if (size < FRAME_LEN) {
-        WebRtcApm_StuffBuffer(aec->outFrBuf, FRAME_LEN - size);
-        if (aec->sampFreq == 32000) {
-            WebRtcApm_StuffBuffer(aec->outFrBufH, FRAME_LEN - size);
-        }
-    }
-
-    // Obtain an output frame.
-    WebRtcApm_ReadBuffer(aec->outFrBuf, out, FRAME_LEN);
-    // For H band
-    if (aec->sampFreq == 32000) {
-        WebRtcApm_ReadBuffer(aec->outFrBufH, outH, FRAME_LEN);
+    while (WebRtc_available_read(aec->nearFrBuf) >= PART_LEN) {
+        ProcessBlock(aec);
     }
 }
 
-static void ProcessBlock(aec_t *aec, const short *farend,
-                         const short *nearend, const short *nearendH,
-                         short *output, short *outputH)
-{
+static void ProcessBlock(aec_t* aec) {
     int i;
     float d[PART_LEN], y[PART_LEN], e[PART_LEN], dH[PART_LEN];
     short eInt16[PART_LEN];
@@ -593,24 +578,36 @@ static void ProcessBlock(aec_t *aec, const short *farend,
     const float ramp = 1.0002f;
     const float gInitNoise[2] = {0.999f, 0.001f};
 
-#ifdef AEC_DEBUG
-    fwrite(farend, sizeof(short), PART_LEN, aec->farFile);
-    fwrite(nearend, sizeof(short), PART_LEN, aec->nearFile);
-#endif
+    short farend[PART_LEN], nearend[PART_LEN];
+    int16_t* farend_ptr = NULL;
+    int16_t* nearend_ptr = NULL;
+    int16_t output[PART_LEN];
+    int16_t outputH[PART_LEN];
 
     memset(dH, 0, sizeof(dH));
+    if (aec->sampFreq == 32000) {
+      // Get the upper band first so we can reuse |nearend|.
+      WebRtc_ReadBuffer(aec->nearFrBufH,
+                        (void**) &nearend_ptr,
+                        nearend,
+                        PART_LEN);
+      for (i = 0; i < PART_LEN; i++) {
+          dH[i] = (float) (nearend_ptr[i]);
+      }
+    }
+    WebRtc_ReadBuffer(aec->nearFrBuf, (void**) &nearend_ptr, nearend, PART_LEN);
+    WebRtc_ReadBuffer(aec->farend_buf, (void**) &farend_ptr, farend, PART_LEN);
+
+#ifdef AEC_DEBUG
+    fwrite(farend_ptr, sizeof(int16_t), PART_LEN, aec->farFile);
+    fwrite(nearend_ptr, sizeof(int16_t), PART_LEN, aec->nearFile);
+#endif
 
     // ---------- Ooura fft ----------
     // Concatenate old and new farend blocks.
     for (i = 0; i < PART_LEN; i++) {
-        aec->xBuf[i + PART_LEN] = (float)farend[i];
-        d[i] = (float)nearend[i];
-    }
-
-    if (aec->sampFreq == 32000) {
-        for (i = 0; i < PART_LEN; i++) {
-            dH[i] = (float)nearendH[i];
-        }
+        aec->xBuf[i + PART_LEN] = (float) (farend_ptr[i]);
+        d[i] = (float) (nearend_ptr[i]);
     }
 
     memcpy(fft, aec->xBuf, sizeof(float) * PART_LEN2);
@@ -775,11 +772,18 @@ static void ProcessBlock(aec_t *aec, const short *farend,
         }
 
         // Update power levels and echo metrics
-        UpdateLevel(&aec->farlevel, farend);
-        UpdateLevel(&aec->nearlevel, nearend);
+        UpdateLevel(&aec->farlevel, farend_ptr);
+        UpdateLevel(&aec->nearlevel, nearend_ptr);
         UpdateLevel(&aec->linoutlevel, eInt16);
         UpdateLevel(&aec->nlpoutlevel, output);
         UpdateMetrics(aec);
+    }
+
+    // Store the output block.
+    WebRtc_WriteBuffer(aec->outFrBuf, output, PART_LEN);
+    // For H band
+    if (aec->sampFreq == 32000) {
+        WebRtc_WriteBuffer(aec->outFrBufH, outputH, PART_LEN);
     }
 
 #ifdef AEC_DEBUG
@@ -1227,60 +1231,6 @@ static void ComfortNoise(aec_t *aec, float efw[2][PART_LEN1],
     }
 }
 
-// Buffer the farend to account for knownDelay
-static void BufferFar(aec_t *aec, const short *farend, int farLen)
-{
-    int writeLen = farLen, writePos = 0;
-
-    // Check if the write position must be wrapped.
-    while (aec->farBufWritePos + writeLen > FAR_BUF_LEN) {
-
-        // Write to remaining buffer space before wrapping.
-        writeLen = FAR_BUF_LEN - aec->farBufWritePos;
-        memcpy(aec->farBuf + aec->farBufWritePos, farend + writePos,
-            sizeof(short) * writeLen);
-        aec->farBufWritePos = 0;
-        writePos = writeLen;
-        writeLen = farLen - writeLen;
-    }
-
-    memcpy(aec->farBuf + aec->farBufWritePos, farend + writePos,
-        sizeof(short) * writeLen);
-    aec->farBufWritePos +=  writeLen;
-}
-
-static void FetchFar(aec_t *aec, short *farend, int farLen, int knownDelay)
-{
-    int readLen = farLen, readPos = 0, delayChange = knownDelay - aec->knownDelay;
-
-    aec->farBufReadPos -= delayChange;
-
-    // Check if delay forces a read position wrap.
-    while(aec->farBufReadPos < 0) {
-        aec->farBufReadPos += FAR_BUF_LEN;
-    }
-    while(aec->farBufReadPos > FAR_BUF_LEN - 1) {
-        aec->farBufReadPos -= FAR_BUF_LEN;
-    }
-
-    aec->knownDelay = knownDelay;
-
-    // Check if read position must be wrapped.
-    while (aec->farBufReadPos + readLen > FAR_BUF_LEN) {
-
-        // Read from remaining buffer space before wrapping.
-        readLen = FAR_BUF_LEN - aec->farBufReadPos;
-        memcpy(farend + readPos, aec->farBuf + aec->farBufReadPos,
-            sizeof(short) * readLen);
-        aec->farBufReadPos = 0;
-        readPos = readLen;
-        readLen = farLen - readLen;
-    }
-    memcpy(farend + readPos, aec->farBuf + aec->farBufReadPos,
-        sizeof(short) * readLen);
-    aec->farBufReadPos += readLen;
-}
-
 static void WebRtcAec_InitLevel(power_level_t *level)
 {
     const float bigFloat = 1E17f;
@@ -1463,4 +1413,22 @@ static void UpdateMetrics(aec_t *aec)
         aec->stateCounter = 0;
     }
 }
+
+#ifdef F_DOMAIN_BUF
+void WebRtcAec_TimeToFrequency(float* time_data, float* freq_data) {
+  int i = 0;
+  // Convert from time domain to frequency domain.
+  aec_rdft_forward_128(time_data);
+  // Reorder
+  // TODO(bjornv): Is this necessary, or can we keep the data interleaved?
+  freq_data[PART_LEN1] = 0;
+  freq_data[PART_LEN1 + PART_LEN] = 0;
+  freq_data[0] = time_data[0];
+  freq_data[PART_LEN] = time_data[1];
+  for (i = 1; i < PART_LEN; i++) {
+    freq_data[i] = time_data[2 * i];
+    freq_data[PART_LEN1 + i] = time_data[2 * i + 1];
+  }
+}
+#endif
 
