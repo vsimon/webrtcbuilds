@@ -19,7 +19,7 @@
 #include <string.h>
 
 #include "aec_rdft.h"
-#include "delay_estimator_float.h"
+#include "delay_estimator_wrapper.h"
 #include "ring_buffer.h"
 #include "system_wrappers/interface/cpu_features_wrapper.h"
 
@@ -176,10 +176,10 @@ int WebRtcAec_CreateAec(aec_t **aecInst)
         return -1;
     }
 
-    if (WebRtc_CreateDelayEstimatorFloat(&aec->delay_estimator,
-                                         PART_LEN1,
-                                         kMaxDelay,
-                                         0) == -1) {
+    if (WebRtc_CreateDelayEstimator(&aec->delay_estimator,
+                                    PART_LEN1,
+                                    kMaxDelayBlocks,
+                                    kLookaheadBlocks) == -1) {
       WebRtcAec_FreeAec(aec);
       aec = NULL;
       return -1;
@@ -201,7 +201,7 @@ int WebRtcAec_FreeAec(aec_t *aec)
     WebRtcApm_FreeBuffer(aec->nearFrBufH);
     WebRtcApm_FreeBuffer(aec->outFrBufH);
 
-    WebRtc_FreeDelayEstimatorFloat(aec->delay_estimator);
+    WebRtc_FreeDelayEstimator(aec->delay_estimator);
 
     free(aec);
     return 0;
@@ -384,7 +384,7 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq)
         return -1;
     }
 
-    if (WebRtc_InitDelayEstimatorFloat(aec->delay_estimator) != 0) {
+    if (WebRtc_InitDelayEstimator(aec->delay_estimator) != 0) {
       return -1;
     }
     aec->delay_logging_enabled = 0;
@@ -701,7 +701,7 @@ static void ProcessBlock(aec_t *aec, const short *farend,
                                                          PART_LEN1,
                                                          aec->echoState);
       if (delay_estimate >= 0) {
-        // Update delay estimate buffer
+        // Update delay estimate buffer.
         aec->delay_histogram[delay_estimate]++;
       }
     }

@@ -14,7 +14,7 @@
 #include <stdlib.h>
 
 #include "echo_control_mobile.h"
-#include "delay_estimator.h"
+#include "delay_estimator_wrapper.h"
 #include "ring_buffer.h"
 #include "typedefs.h"
 
@@ -112,6 +112,62 @@ static void ComfortNoise(AecmCore_t* aecm,
 
 static WebRtc_Word16 CalcSuppressionGain(AecmCore_t * const aecm);
 
+// Moves the pointer to the next entry and inserts |far_spectrum| and
+// corresponding Q-domain in its buffer.
+//
+// Inputs:
+//      - self          : Pointer to the delay estimation instance
+//      - far_spectrum  : Pointer to the far end spectrum
+//      - far_q         : Q-domain of far end spectrum
+//
+static void UpdateFarHistory(AecmCore_t* self,
+                             uint16_t* far_spectrum,
+                             int far_q) {
+  // Get new buffer position
+  self->far_history_pos++;
+  if (self->far_history_pos >= MAX_DELAY) {
+    self->far_history_pos = 0;
+  }
+  // Update Q-domain buffer
+  self->far_q_domains[self->far_history_pos] = far_q;
+  // Update far end spectrum buffer
+  memcpy(&(self->far_history[self->far_history_pos * PART_LEN1]),
+         far_spectrum,
+         sizeof(uint16_t) * PART_LEN1);
+}
+
+// Returns a pointer to the far end spectrum aligned to current near end
+// spectrum. The function WebRtc_DelayEstimatorProcessFix(...) should have been
+// called before AlignedFarend(...). Otherwise, you get the pointer to the
+// previous frame. The memory is only valid until the next call of
+// WebRtc_DelayEstimatorProcessFix(...).
+//
+// Inputs:
+//      - self              : Pointer to the AECM instance.
+//      - delay             : Current delay estimate.
+//
+// Output:
+//      - far_q             : The Q-domain of the aligned far end spectrum
+//
+// Return value:
+//      - far_spectrum      : Pointer to the aligned far end spectrum
+//                            NULL - Error
+//
+static const uint16_t* AlignedFarend(AecmCore_t* self, int* far_q, int delay) {
+  int buffer_position = 0;
+  assert(self != NULL);
+  buffer_position = self->far_history_pos - delay;
+
+  // Check buffer position
+  if (buffer_position < 0) {
+    buffer_position += MAX_DELAY;
+  }
+  // Get Q-domain
+  *far_q = self->far_q_domains[buffer_position];
+  // Return far end spectrum
+  return &(self->far_history[buffer_position * PART_LEN1]);
+}
+
 #ifdef ARM_WINM_LOG
 HANDLE logFile = NULL;
 #endif
@@ -156,7 +212,7 @@ int WebRtcAecm_CreateCore(AecmCore_t **aecmInst)
     if (WebRtc_CreateDelayEstimator(&aecm->delay_estimator,
                                     PART_LEN1,
                                     MAX_DELAY,
-                                    1) == -1) {
+                                    0) == -1) {
       WebRtcAecm_FreeCore(aecm);
       aecm = NULL;
       return -1;
@@ -247,9 +303,10 @@ int WebRtcAecm_InitCore(AecmCore_t * const aecm, int samplingFreq)
     if (WebRtc_InitDelayEstimator(aecm->delay_estimator) != 0) {
       return -1;
     }
-
-    // Initialize to reasonable values
-    aecm->currentDelay = 8;
+    // Set far end histories to zero
+    memset(aecm->far_history, 0, sizeof(uint16_t) * PART_LEN1 * MAX_DELAY);
+    memset(aecm->far_q_domains, 0, sizeof(int) * MAX_DELAY);
+    aecm->far_history_pos = MAX_DELAY;
 
     aecm->nlpFlag = 1;
     aecm->fixedDelay = -1;
@@ -1155,7 +1212,7 @@ int WebRtcAecm_ProcessBlock(AecmCore_t * aecm,
     WebRtc_Word16 hnl[PART_LEN1];
     WebRtc_Word16 numPosCoef = 0;
     WebRtc_Word16 nlpGain = ONE_Q14;
-    WebRtc_Word16 delay;
+    int delay;
     WebRtc_Word16 tmp16no1;
     WebRtc_Word16 tmp16no2;
     WebRtc_Word16 mu;
@@ -1245,15 +1302,22 @@ int WebRtcAecm_ProcessBlock(AecmCore_t * aecm,
 
     // Get the delay
     // Save far-end history and estimate delay
-    delay = WebRtc_DelayEstimatorProcess(aecm->delay_estimator,
-                                         xfa,
-                                         dfaNoisy,
-                                         PART_LEN1,
-                                         far_q,
-                                         aecm->currentVADValue);
-    if (delay < 0)
+    UpdateFarHistory(aecm, xfa, far_q);
+    delay = WebRtc_DelayEstimatorProcessFix(aecm->delay_estimator,
+                                            xfa,
+                                            dfaNoisy,
+                                            PART_LEN1,
+                                            far_q,
+                                            aecm->currentVADValue);
+    if (delay == -1)
     {
         return -1;
+    }
+    else if (delay == -2)
+    {
+        // If the delay is unknown, we assume zero.
+        // NOTE: this will have to be adjusted if we ever add lookahead.
+        delay = 0;
     }
 
     if (aecm->fixedDelay >= 0)
@@ -1261,8 +1325,6 @@ int WebRtcAecm_ProcessBlock(AecmCore_t * aecm,
         // Use fixed delay
         delay = aecm->fixedDelay;
     }
-
-    aecm->currentDelay = delay;
 
 #ifdef ARM_WINM_LOG_
     // measure tick end
@@ -1274,9 +1336,7 @@ int WebRtcAecm_ProcessBlock(AecmCore_t * aecm,
     QueryPerformanceCounter((LARGE_INTEGER*)&start);
 #endif
     // Get aligned far end spectrum
-    far_spectrum_ptr = WebRtc_AlignedFarend(aecm->delay_estimator,
-                                            PART_LEN1,
-                                            &far_q);
+    far_spectrum_ptr = AlignedFarend(aecm, &far_q, delay);
     zerosXBuf = (WebRtc_Word16) far_q;
     if (far_spectrum_ptr == NULL)
     {

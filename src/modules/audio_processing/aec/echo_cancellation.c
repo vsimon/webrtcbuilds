@@ -383,6 +383,7 @@ WebRtc_Word32 WebRtcAec_Process(void *aecInst, const WebRtc_Word16 *nearend,
         aecpc->lastError = AEC_BAD_PARAMETER_WARNING;
         retVal = -1;
     }
+    // TODO(andrew): we need to investigate if this +10 is really wanted.
     msInSndCardBuf += 10;
     aecpc->msInSndCardBuf = msInSndCardBuf;
 
@@ -761,11 +762,13 @@ int WebRtcAec_GetDelayMetrics(void* handle, int* median, int* std) {
   }
 
   // Get number of delay values since last update
-  for (i = 0; i < kMaxDelay; i++) {
+  for (i = 0; i < kHistorySizeBlocks; i++) {
     num_delay_values += self->aec->delay_histogram[i];
   }
   if (num_delay_values == 0) {
-    // We have no new delay value data
+    // We have no new delay value data. Even though -1 is a valid estimate, it
+    // will practically never be used since multiples of |kMsPerBlock| will
+    // always be returned.
     *median = -1;
     *std = -1;
     return 0;
@@ -773,17 +776,18 @@ int WebRtcAec_GetDelayMetrics(void* handle, int* median, int* std) {
 
   delay_values = num_delay_values >> 1; // Start value for median count down
   // Get median of delay values since last update
-  for (i = 0; i < kMaxDelay; i++) {
+  for (i = 0; i < kHistorySizeBlocks; i++) {
     delay_values -= self->aec->delay_histogram[i];
     if (delay_values < 0) {
       my_median = i;
       break;
     }
   }
-  *median = my_median * kMsPerBlock;
+  // Account for lookahead.
+  *median = (my_median - kLookaheadBlocks) * kMsPerBlock;
 
   // Calculate the L1 norm, with median value as central moment
-  for (i = 0; i < kMaxDelay; i++) {
+  for (i = 0; i < kHistorySizeBlocks; i++) {
     l1_norm += (float) (fabs(i - my_median) * self->aec->delay_histogram[i]);
   }
   *std = (int) (l1_norm / (float) num_delay_values + 0.5f) * kMsPerBlock;
