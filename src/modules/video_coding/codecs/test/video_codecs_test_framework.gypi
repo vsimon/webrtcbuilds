@@ -57,7 +57,7 @@
             '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
             '<(webrtc_root)/common_video/common_video.gyp:webrtc_vplib',
             '<(webrtc_root)/../testing/gmock.gyp:gmock',    
-            '<(webrtc_root)/../test/test.gyp:test_support_main',
+            '<(webrtc_root)/../test/test.gyp:test_support',
           ],
           'include_dirs': [
              '<(webrtc_root)/common_video/interface',               

@@ -20,7 +20,7 @@
           'target_name': 'common_audio_unittests',
           'type': 'executable',
           'dependencies': [
-            '<(webrtc_root)/../test/test.gyp:test_support_main',
+            '<(webrtc_root)/../test/test.gyp:test_support',
             '<(webrtc_root)/../testing/gtest.gyp:gtest',
             'resampler',
             'vad',
