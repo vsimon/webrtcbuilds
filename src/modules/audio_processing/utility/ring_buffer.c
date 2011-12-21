@@ -51,7 +51,7 @@ static size_t GetBufferReadRegions(buf_t* buf,
                                    void** data_ptr_2,
                                    size_t* data_ptr_bytes_2) {
 
-  const size_t readable_elements = WebRtc_get_available_read(buf);
+  const size_t readable_elements = WebRtc_available_read(buf);
   const size_t read_elements = (readable_elements < element_count ?
       readable_elements : element_count);
   const size_t margin = buf->element_count - buf->read_pos;
@@ -388,7 +388,7 @@ size_t WebRtc_WriteBuffer(void* handle,
   }
 
   {
-    const size_t free_elements = WebRtc_get_available_write(handle);
+    const size_t free_elements = WebRtc_available_write(handle);
     const size_t write_elements = (free_elements < element_count ? free_elements
         : element_count);
     size_t n = write_elements;
@@ -422,8 +422,8 @@ int WebRtc_MoveReadPtr(void* handle, int element_count) {
   {
     // We need to be able to take care of negative changes, hence use "int"
     // instead of "size_t".
-    const int free_elements = (int) WebRtc_get_available_write(handle);
-    const int readable_elements = (int) WebRtc_get_available_read(handle);
+    const int free_elements = (int) WebRtc_available_write(handle);
+    const int readable_elements = (int) WebRtc_available_read(handle);
     int read_pos = (int) self->read_pos;
 
     if (element_count > readable_elements) {
@@ -451,7 +451,7 @@ int WebRtc_MoveReadPtr(void* handle, int element_count) {
   }
 }
 
-size_t WebRtc_get_available_read(const void* handle) {
+size_t WebRtc_available_read(const void* handle) {
   const buf_t* self = (buf_t*) handle;
 
   if (self == NULL) {
@@ -465,12 +465,12 @@ size_t WebRtc_get_available_read(const void* handle) {
   }
 }
 
-size_t WebRtc_get_available_write(const void* handle) {
+size_t WebRtc_available_write(const void* handle) {
   const buf_t* self = (buf_t*) handle;
 
   if (self == NULL) {
     return 0;
   }
 
-  return self->element_count - WebRtc_get_available_read(handle);
+  return self->element_count - WebRtc_available_read(handle);
 }

@@ -74,9 +74,9 @@ size_t WebRtc_WriteBuffer(void* handle, const void* data, size_t element_count);
 int WebRtc_MoveReadPtr(void* handle, int element_count);
 
 // Returns number of available elements to read.
-size_t WebRtc_get_available_read(const void* handle);
+size_t WebRtc_available_read(const void* handle);
 
 // Returns number of available elements for write.
-size_t WebRtc_get_available_write(const void* handle);
+size_t WebRtc_available_write(const void* handle);
 
 #endif // WEBRTC_MODULES_AUDIO_PROCESSING_UTILITY_RING_BUFFER_H_

@@ -20,11 +20,10 @@
 #include "resampler.h"
 #include "aec_core.h"
 
-enum { kFrameBufferSize = FRAME_LEN * 4 };
 enum { kEstimateLengthFrames = 400 };
 
 typedef struct {
-    short buffer[kFrameBufferSize];
+    short buffer[kResamplerBufferSize];
     float position;
 
     int deviceSampleRateHz;
@@ -127,7 +126,7 @@ int WebRtcAec_ResampleLinear(void *resampInst,
     // Shift buffer
     memmove(obj->buffer,
             &obj->buffer[size],
-            (kFrameBufferSize - size) * sizeof(short));
+            (kResamplerBufferSize - size) * sizeof(short));
 
     return outsize;
 }

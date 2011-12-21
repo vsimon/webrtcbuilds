@@ -22,18 +22,13 @@
 
 //#define AEC_DEBUG // for recording files
 
-#define BUF_SIZE_FRAMES 50 // buffer size (frames)
 #define FRAME_LEN 80
 #define PART_LEN 64 // Length of partition
 #define PART_LEN1 (PART_LEN + 1) // Unique fft coefficients
 #define PART_LEN2 (PART_LEN * 2) // Length of partition * 2
-#define NR_PART 12 // Number of partitions
-#define FILT_LEN (PART_LEN * NR_PART) // Filter length
-#define FILT_LEN2 (FILT_LEN * 2) // Double filter length
-#define FAR_BUF_LEN (FILT_LEN2 * 2)
+#define NR_PART 12  // Number of partitions in filter.
 #define PREF_BAND_SIZE 24
 
-#define BLOCKL_MAX FRAME_LEN
 // Maximum delay in fixed point delay estimator, used for logging
 enum {kMaxDelay = 100};
 
@@ -83,7 +78,6 @@ typedef struct {
     void *nearFrBufH;
     void *outFrBufH;
 
-    float xBuf[PART_LEN2]; // farend
     float dBuf[PART_LEN2]; // nearend
     float eBuf[PART_LEN2]; // error
 
@@ -116,12 +110,11 @@ typedef struct {
 
     int xfBufBlockPos;
 
-    void* farend_buf;
-    int system_delay; // Current size on the sound card buffered in AEC.
-    // TODO(bjornv:) Temporary variables, that later may be removed.
-    int flush_a_frame;
+    void* far_buf;
+    void* far_buf_windowed;
+    int system_delay;  // Current system delay buffered in AEC.
 
-    short mult; // sampling frequency multiple
+    int mult;  // sampling frequency multiple
     int sampFreq;
     WebRtc_UWord32 seed;
 
@@ -152,6 +145,7 @@ typedef struct {
     void* delay_estimator;
 
 #ifdef AEC_DEBUG
+    void* far_time_buf;
     FILE *farFile;
     FILE *nearFile;
     FILE *outFile;
@@ -176,9 +170,10 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq);
 void WebRtcAec_InitAec_SSE2(void);
 
 void WebRtcAec_InitMetrics(aec_t *aec);
-void WebRtcAec_ProcessFrame(aec_t *aec,
-                       const short *nearend, const short *nearendH,
-                       int knownDelay);
+void WebRtcAec_BufferFarendPartition(aec_t *aec, const float* farend);
+void WebRtcAec_ProcessFrame(aec_t* aec,
+                            const short *nearend,
+                            const short *nearendH,
+                            int knownDelay);
 
-#endif // WEBRTC_MODULES_AUDIO_PROCESSING_AEC_MAIN_SOURCE_AEC_CORE_H_
-
+#endif  // WEBRTC_MODULES_AUDIO_PROCESSING_AEC_MAIN_SOURCE_AEC_CORE_H_
