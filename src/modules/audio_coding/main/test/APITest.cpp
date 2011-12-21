@@ -9,29 +9,41 @@
  */
 
 #include <cctype>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include <iostream>
 #include <ostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "APITest.h"
-#include "thread_wrapper.h"
-#include "event_wrapper.h"
-#include "tick_util.h"
-#include "trace.h"
-#include "utility.h"
 #include "common_types.h"
 #include "engine_configurations.h"
+#include "event_wrapper.h"
+#include "gtest/gtest.h"
+#include "thread_wrapper.h"
+#include "tick_util.h"
+#include "testsupport/fileutils.h"
+#include "trace.h"
+#include "utility.h"
+
+namespace webrtc {
 
 #define TEST_DURATION_SEC 600
 
 #define NUMBER_OF_SENDER_TESTS 6
 
 #define MAX_FILE_NAME_LENGTH_BYTE 500
-#define CHECK_THREAD_NULLITY(myThread, S) if(myThread != NULL){unsigned int i; (myThread)->Start(i);}else{throw S; exit(1);}
+#define CHECK_THREAD_NULLITY(myThread, S)                                      \
+    if(myThread != NULL)                                                       \
+    {                                                                          \
+        unsigned int i;                                                        \
+        (myThread)->Start(i);                                                  \
+    }                                                                          \
+    else                                                                       \
+    {                                                                          \
+      ADD_FAILURE() << S;                                                      \
+    }
 
-using namespace webrtc;
 
 void
 APITest::Wait(WebRtc_UWord32 waitLengthMs)
@@ -259,7 +271,8 @@ APITest::SetUp()
     _inFileA.Open(fileName, frequencyHz, "rb", true);
 
     //--- Output A
-    strcpy(fileName, "./src/modules/audio_coding/main/test/outA.pcm");
+    std::string outputFileA = webrtc::test::OutputPath() + "outA.pcm";
+    strcpy(fileName, outputFileA.c_str());
     printf("Enter output file at side A [%s]: ", fileName);
     PCMFile::ChooseFile(fileName, 499, &frequencyHz);
     _outFileA.Open(fileName, frequencyHz, "wb");
@@ -271,7 +284,8 @@ APITest::SetUp()
     _inFileB.Open(fileName, frequencyHz, "rb", true);
 
     //--- Output B
-    strcpy(fileName, "./src/modules/audio_coding/main/test/outB.pcm");
+    std::string outputFileB = webrtc::test::OutputPath() + "outB.pcm";
+    strcpy(fileName, outputFileB.c_str());
     printf("Enter output file at side B [%s]: ", fileName);
     PCMFile::ChooseFile(fileName, 499, &frequencyHz);
     _outFileB.Open(fileName, frequencyHz, "wb");
@@ -310,7 +324,7 @@ APITest::SetUp()
     char print[11];
 
     printf("\nRandom Test (y/n)?");
-    fgets(print, 10, stdin); 
+    EXPECT_TRUE(fgets(print, 10, stdin) != NULL);
     print[10] = '\0';
     if(strstr(print, "y") != NULL)
     {
@@ -327,11 +341,11 @@ APITest::SetUp()
         Trace::SetTraceFile("ACMAPITest.txt", true);
         _randomTest = false;
         printf("\nPrint Tests (y/n)? ");
-        fgets(print, 10, stdin); 
+        EXPECT_TRUE(fgets(print, 10, stdin) != NULL);
         print[10] = '\0';
         if(strstr(print, "y") == NULL)
         {
-            freopen("APITest_log.txt", "w", stdout);
+            EXPECT_TRUE(freopen("APITest_log.txt", "w", stdout) != 0);
             _verbose = false;
         }
     }
@@ -883,16 +897,12 @@ APITest::TestDelay(char side)
     WebRtc_UWord32 inTimestamp = 0;
     WebRtc_UWord32 outTimestamp = 0;
     double estimDelay = 0;    
-    WebRtc_UWord16 delay = 0;
 
     double averageEstimDelay = 0;
     double averageDelay = 0;
 
     CircularBuffer estimDelayCB(100);
-    CircularBuffer delayCB(100);
     estimDelayCB.SetArithMean(true);
-    delayCB.SetArithMean(true);
-
 
     if(side == 'A')
     {
@@ -913,7 +923,6 @@ APITest::TestDelay(char side)
 
     inTimestamp = myChannel->LastInTimestamp();        
     CHECK_ERROR_MT(myACM->PlayoutTimestamp(outTimestamp));
-    CHECK_ERROR_MT(myACM->Delay(delay));
 
     if(!_randomTest)
     {
@@ -936,10 +945,6 @@ APITest::TestDelay(char side)
             estimDelayCB.ArithMean(averageEstimDelay);
             //printf("\n %6.1f \n", estimDelay);
             //std::cout << " " << std::flush;
-
-            CHECK_ERROR_MT(myACM->Delay(delay));
-            delayCB.Update(delay);
-            delayCB.ArithMean(averageDelay);
 
             if(_verbose)
             {
@@ -964,9 +969,7 @@ APITest::TestDelay(char side)
 
     *myMinDelay = (rand() % 1000) + 1;
   
-    ACMJitterStatistics jitterStat;
     ACMNetworkStatistics networkStat;
-    CHECK_ERROR_MT(myACM->JitterStatistics(jitterStat));
     CHECK_ERROR_MT(myACM->NetworkStatistics(networkStat));
 
     if(!_randomTest)
@@ -980,31 +983,6 @@ APITest::TestDelay(char side)
         fprintf(stdout, "expand rate............. %d\n", networkStat.currentExpandRate);    
         fprintf(stdout, "Preemptive rate......... %d\n", networkStat.currentPreemptiveRate);
         fprintf(stdout, "Accelerate rate......... %d\n", networkStat.currentAccelerateRate);
-
-        fprintf(stdout, "\n\nJitter Statistics at side %c\n", side);
-        fprintf(stdout, "--------------------------------------\n");
-        fprintf(stdout, "Jitter buffer min size....... %d\n",   jitterStat.jbMinSize);              
-        fprintf(stdout, "Jitter buffer Max size....... %d\n",    jitterStat.jbMaxSize);              
-        fprintf(stdout, "Jitter buffer Average size... %d\n",    jitterStat.jbAvgSize);              
-        fprintf(stdout, "Change Count................. %d ms\n", jitterStat.jbChangeCount);          
-        fprintf(stdout, "Late Loss.................... %d ms\n", jitterStat.lateLossMs);             
-        fprintf(stdout, "Accelerate................... %d ms\n", jitterStat.accelerateMs);           
-        fprintf(stdout, "Flushed...................... %d ms\n", jitterStat.flushedMs);              
-        fprintf(stdout, "Generated Silence............ %d ms\n", jitterStat.generatedSilentMs);      
-        fprintf(stdout, "Interpolated Voice........... %d ms\n", jitterStat.interpolatedVoiceMs);    
-        fprintf(stdout, "Interpolated Silence......... %d ms\n", jitterStat.interpolatedSilentMs);   
-        fprintf(stdout, "No tiny expand............... %d\n",    jitterStat.numExpandTiny);          
-        fprintf(stdout, "No small expand.............. %d\n",    jitterStat.numExpandSmall);         
-        fprintf(stdout, "No Medium expand............. %d\n",    jitterStat.numExpandMedium);        
-        fprintf(stdout, "No long expand............... %d\n",    jitterStat.numExpandLong);          
-        fprintf(stdout, "longest expand............... %d ms\n", jitterStat.longestExpandDurationMs);
-        fprintf(stdout, "No IAT 500................... %d ms\n", jitterStat.countIAT500ms);          
-        fprintf(stdout, "No IAT 1000.................. %d ms\n", jitterStat.countIAT1000ms);         
-        fprintf(stdout, "No IAT 2000.................. %d ms\n", jitterStat.countIAT2000ms);         
-        fprintf(stdout, "longest IAT.................. %d ms\n", jitterStat.longestIATms);           
-        fprintf(stdout, "Min packet delay............. %d ms\n", jitterStat.minPacketDelayMs);       
-        fprintf(stdout, "Max packet delay............. %d ms\n", jitterStat.maxPacketDelayMs);       
-        fprintf(stdout, "Average packet delay......... %d ms\n", jitterStat.avgPacketDelayMs);       
     }
 
     CHECK_ERROR_MT(myACM->SetMinimumPlayoutDelay(*myMinDelay));
@@ -1166,8 +1144,8 @@ void
 APITest::TestPlayout(char receiveSide)
 {
     AudioCodingModule* receiveACM;
-    AudioPlayoutMode* playoutMode;
-    ACMBackgroundNoiseMode* bgnMode;
+    AudioPlayoutMode* playoutMode = NULL;
+    ACMBackgroundNoiseMode* bgnMode = NULL;
     switch(receiveSide)
     {
         case 'A':
@@ -1267,7 +1245,7 @@ void
 APITest::TestReceiverVAD(char side)
 {
     AudioCodingModule* myACM;
-    WebRtc_UWord64* myReceiveVADActivity;
+    int* myReceiveVADActivity;
 
     if(side == 'A')
     {
@@ -1280,7 +1258,6 @@ APITest::TestReceiverVAD(char side)
         myReceiveVADActivity = _receiveVADActivityB;
     }
 
-    bool vadStatus = myACM->ReceiveVADStatus();
     ACMVADMode mode = myACM->ReceiveVADMode();
 
     CHECK_ERROR_MT(mode);
@@ -1289,50 +1266,35 @@ APITest::TestReceiverVAD(char side)
     {
         fprintf(stdout, "\n\nCurrent Receive VAD at side %c\n", side);
         fprintf(stdout, "----------------------------------\n");
-        fprintf(stdout, "Status........ %s\n", vadStatus? "ON":"OFF");
         fprintf(stdout, "mode.......... %d\n", (int)mode);
-        fprintf(stdout, "VAD Active.... %lu\n", myReceiveVADActivity[0]);
-        fprintf(stdout, "VAD Passive... %lu\n", myReceiveVADActivity[1]);
-        fprintf(stdout, "VAD Unknown... %lu\n", myReceiveVADActivity[2]);
+        fprintf(stdout, "VAD Active.... %d\n", myReceiveVADActivity[0]);
+        fprintf(stdout, "VAD Passive... %d\n", myReceiveVADActivity[1]);
+        fprintf(stdout, "VAD Unknown... %d\n", myReceiveVADActivity[2]);
     }
 
-    if(vadStatus)
+    if(!_randomTest)
     {
-        if(!_randomTest)
-        {
-            fprintf(stdout, "\nChange Receive VAD at side %c\n\n", side);
-        }
-
-        switch(mode)
-        {
-        case VADNormal:
-            mode = VADAggr;
-            break;
-        case VADLowBitrate:
-            mode = VADVeryAggr;
-            break;
-        case VADAggr:
-            mode = VADLowBitrate;
-            break;
-        case VADVeryAggr:
-            vadStatus = false;
-            mode = VADNormal;
-            break;
-        default:
-            mode = VADNormal;
-        }
-       
-        CHECK_ERROR_MT(myACM->SetReceiveVADMode(mode));
-        CHECK_ERROR_MT(myACM->SetReceiveVADStatus(vadStatus));
+        fprintf(stdout, "\nChange Receive VAD at side %c\n\n", side);
     }
-    else
+
+    switch(mode)
     {
-        if(!_randomTest)
-        {
-            fprintf(stdout, "\nTurn on Receive VAD at side %c\n\n", side);
-        }
-        CHECK_ERROR_MT(myACM->SetReceiveVADStatus(true));
-        CHECK_ERROR_MT(myACM->SetReceiveVADMode(VADNormal));
+      case VADNormal:
+          mode = VADAggr;
+          break;
+      case VADLowBitrate:
+          mode = VADVeryAggr;
+          break;
+      case VADAggr:
+          mode = VADLowBitrate;
+          break;
+      case VADVeryAggr:
+          mode = VADNormal;
+          break;
+      default:
+          mode = VADNormal;
+
+          CHECK_ERROR_MT(myACM->SetReceiveVADMode(mode));
     }
     for(int n = 0; n < 3; n++)
     {
@@ -1596,3 +1558,6 @@ APITest::LookForDTMF(char side)
         _acmB->RegisterIncomingMessagesCallback(NULL);
     }
 }
+
+} // namespace webrtc
+

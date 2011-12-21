@@ -39,6 +39,12 @@ enum RTPAliveType
     kRtpAlive  = 2
 };
 
+enum RTPExtensionType
+{
+   NONE,
+   TRANSMISSION_TIME_OFFSET
+};
+
 enum RTCPAppSubTypes
 {
     kAppSubtypeBwe     = 0x00
@@ -60,7 +66,8 @@ enum RTCPPacketType
     kRtcpApp            = 0x0800,
     kRtcpSli            = 0x4000,
     kRtcpRpsi           = 0x8000,
-    kRtcpRemb           = 0x10000
+    kRtcpRemb           = 0x10000,
+    kRtcpTransmissionTimeOffset = 0x20000
 };
 
 enum KeyFrameRequestMethod
@@ -222,6 +229,22 @@ public:
 protected:
     virtual ~RtpVideoFeedback() {}
 };
+
+// A clock interface that allows reading of absolute and relative
+// timestamps in an RTP/RTCP module.
+class RtpRtcpClock {
+public:
+    // Return a timestamp in milliseconds relative to some arbitrary
+    // source; the source is fixed for this clock.
+    virtual WebRtc_UWord32 GetTimeInMS() = 0;
+
+    // Retrieve an NTP absolute timestamp.
+    virtual void CurrentNTP(WebRtc_UWord32& secs, WebRtc_UWord32& frac) = 0;
+
+protected:
+    virtual ~RtpRtcpClock() {}
+};
+
 } // namespace webrtc
 
 #endif // WEBRTC_MODULES_RTP_RTCP_INTERFACE_RTP_RTCP_DEFINES_H_

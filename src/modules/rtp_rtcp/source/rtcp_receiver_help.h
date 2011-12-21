@@ -57,6 +57,8 @@ public:
     WebRtc_UWord32  lastReceivedExtendedHighSeqNum;
     WebRtc_UWord32  jitter;
 
+    WebRtc_UWord32  interArrivalJitter;
+
     WebRtc_UWord8   sliPictureId;
     WebRtc_UWord64  rpsiPictureId;
     WebRtc_UWord32  receiverEstimatedMaxBitrate;
@@ -93,12 +95,14 @@ public:
     void VerifyAndAllocateTMMBRSet(const WebRtc_UWord32 minimumSize);
 
     void InsertTMMBRItem(const WebRtc_UWord32 senderSSRC,
-                         const RTCPUtility::RTCPPacketRTPFBTMMBRItem& TMMBRItem);
+                         const RTCPUtility::RTCPPacketRTPFBTMMBRItem& TMMBRItem,
+                         const WebRtc_UWord32 currentTimeMS);
 
     // get
     WebRtc_Word32 GetTMMBRSet(const WebRtc_UWord32 sourceIdx,
-                            const WebRtc_UWord32 targetIdx,
-                            TMMBRSet* candidateSet);
+                              const WebRtc_UWord32 targetIdx,
+                              TMMBRSet* candidateSet,
+                              const WebRtc_UWord32 currentTimeMS);
 
     WebRtc_UWord32    lastTimeReceived;
 

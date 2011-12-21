@@ -15,7 +15,6 @@
 #include "module_common_types.h"
 #include "typedefs.h"
 #include "list_wrapper.h"
-#include <stdio.h>
 
 //#define DEBUG_FILE
 
@@ -40,14 +39,15 @@ class OverUseDetector
 public:
     OverUseDetector();
     ~OverUseDetector();
-    bool Update(const WebRtcRTPHeader& rtpHeader, const WebRtc_UWord16 packetSize);
+    bool Update(const WebRtcRTPHeader& rtpHeader,
+                const WebRtc_UWord16 packetSize,
+                const WebRtc_Word64 nowMS);
     BandwidthUsage State() const;
     void Reset();
     double NoiseVar() const;
     void SetRateControlRegion(RateControlRegion region);
 
 private:
-    static bool OldTimestamp(WebRtc_UWord32 newTimestamp, WebRtc_UWord32 existingTimestamp, bool& wrapped);
     void CompensatedTimeDelta(const FrameSample& currentFrame, const FrameSample& prevFrame, WebRtc_Word64& tDelta,
                                 double& tsDelta, bool wrapped);
     void UpdateKalman(WebRtc_Word64 tDelta, double tsDelta, WebRtc_UWord32 frameSize, WebRtc_UWord32 prevFrameSize);

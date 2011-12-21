@@ -38,28 +38,15 @@
 #define DEBUG_PRINT(exp)        ((void)0)
 #endif  // defined(_DEBUG) && defined(_WIN32)
 
-namespace
-{
-    const float FRAC = 4.294967296E9;
-}
-
 namespace webrtc {
-// PLATFORM SPECIFIC [BEGIN]
+
+/*
+ * Time routines.
+ */
+
 #if defined(_WIN32)
-    #include <Windows.h>
-
-    namespace ModuleRTPUtility
-    {
-        WebRtc_UWord32 GetTimeInMS()
-        {
-            return timeGetTime();
-        }
-        bool StringCompare(const WebRtc_Word8* str1 , const WebRtc_Word8* str2, const WebRtc_UWord32 length)
-        {
-            return (_strnicmp(str1, str2, length) == 0)?true: false;
-        }
-
-        class HelpTimer
+    namespace ModuleRTPUtility {
+        class WindowsHelpTimer
         {
         public:
             struct reference_point
@@ -68,7 +55,7 @@ namespace webrtc {
                 LARGE_INTEGER counterMS;
             };
 
-            HelpTimer()
+            WindowsHelpTimer()
             {
                 // set timer accuracy to 1 ms
                 timeBeginPeriod(1);
@@ -78,7 +65,7 @@ namespace webrtc {
                 synchronize();
             };
 
-            virtual ~HelpTimer()
+            virtual ~WindowsHelpTimer()
             {
                 timeEndPeriod(1);
             };
@@ -143,30 +130,212 @@ namespace webrtc {
             reference_point         _ref_point;
         };
 
-        static HelpTimer helpTimer;
+        // A clock reading times from the Windows API.
+        class WindowsSystemClock : public RtpRtcpClock {
+        public:
+            WindowsSystemClock()
+                : _helpTimer() {}
 
-    }; // end namespace
+            virtual ~WindowsSystemClock() {}
+
+            virtual WebRtc_UWord32 GetTimeInMS();
+
+            virtual void CurrentNTP(WebRtc_UWord32& secs, WebRtc_UWord32& frac);
+
+        private:
+            WindowsHelpTimer _helpTimer;
+        };
+    }; // namespace ModuleRTPUtility
 
 #elif defined(WEBRTC_LINUX) || defined(WEBRTC_MAC)
-    #include <sys/time.h> // gettimeofday
-    #include <time.h> // nanosleep, gettimeofday
 
-    WebRtc_UWord32
-    ModuleRTPUtility::GetTimeInMS()
-    {
-        struct timeval tv;
-        struct timezone tz;
-        WebRtc_UWord32 val;
+    namespace ModuleRTPUtility {
+        // A clock reading times from the POSIX API.
+        class UnixSystemClock : public RtpRtcpClock {
+        public:
+            UnixSystemClock() {}
+            virtual ~UnixSystemClock() {}
 
-        gettimeofday(&tv, &tz);
-        val = (WebRtc_UWord32)(tv.tv_sec*1000 + tv.tv_usec/1000);
-        return val;
-    }
-    bool ModuleRTPUtility::StringCompare(const WebRtc_Word8* str1 , const WebRtc_Word8* str2, const WebRtc_UWord32 length)
+            virtual WebRtc_UWord32 GetTimeInMS();
+
+            virtual void CurrentNTP(WebRtc_UWord32& secs, WebRtc_UWord32& frac);
+        };
+    }; // namespace ModuleRTPUtility
+#endif
+
+namespace ModuleRTPUtility {
+
+#if defined(_WIN32)
+WebRtc_UWord32 WindowsSystemClock::GetTimeInMS()
+{
+    return timeGetTime();
+}
+
+// Use the system time (roughly synchronised to the tick, and
+// extrapolated using the system performance counter.
+void WindowsSystemClock::CurrentNTP(WebRtc_UWord32& secs, WebRtc_UWord32& frac)
+{
+    const WebRtc_UWord64 FILETIME_1970 = 0x019db1ded53e8000;
+
+    FILETIME StartTime;
+    WebRtc_UWord64 Time;
+    struct timeval tv;
+
+    // we can't use query performance counter since they can change depending on speed steping
+    _helpTimer.get_time(StartTime);
+
+    Time = (((WebRtc_UWord64) StartTime.dwHighDateTime) << 32) +
+        (WebRtc_UWord64) StartTime.dwLowDateTime;
+
+    // Convert the hecto-nano second time to tv format
+    Time -= FILETIME_1970;
+
+    tv.tv_sec = (WebRtc_UWord32) ( Time / (WebRtc_UWord64)10000000);
+    tv.tv_usec = (WebRtc_UWord32) (( Time % (WebRtc_UWord64)10000000) / 10);
+
+    double dtemp;
+
+    secs = tv.tv_sec + NTP_JAN_1970;
+    dtemp = tv.tv_usec / 1e6;
+
+    if (dtemp >= 1)
     {
-        return (strncasecmp(str1, str2, length) == 0)?true: false;
+        dtemp -= 1;
+        secs++;
+    } else if (dtemp < -1)
+    {
+        dtemp += 1;
+        secs--;
     }
-#endif // PLATFORM SPECIFIC [END]
+    dtemp *= NTP_FRAC;
+    frac = (WebRtc_UWord32)dtemp;
+}
+
+#elif ((defined WEBRTC_LINUX) || (defined WEBRTC_MAC))
+
+WebRtc_UWord32 UnixSystemClock::GetTimeInMS()
+{
+    struct timeval tv;
+    struct timezone tz;
+    WebRtc_UWord32 val;
+
+    gettimeofday(&tv, &tz);
+    val = (WebRtc_UWord32)(tv.tv_sec*1000 + tv.tv_usec/1000);
+    return val;
+}
+
+// Use the system time.
+void UnixSystemClock::CurrentNTP(WebRtc_UWord32& secs, WebRtc_UWord32& frac)
+{
+    double dtemp;
+    struct timeval tv;
+    struct timezone tz;
+    tz.tz_minuteswest  = 0;
+    tz.tz_dsttime = 0;
+    gettimeofday(&tv,&tz);
+
+    secs = tv.tv_sec + NTP_JAN_1970;
+    dtemp = tv.tv_usec / 1e6;
+    if (dtemp >= 1)
+    {
+        dtemp -= 1;
+        secs++;
+    } else if (dtemp < -1)
+    {
+        dtemp += 1;
+        secs--;
+    }
+    dtemp *= NTP_FRAC;
+    frac = (WebRtc_UWord32)dtemp;
+}
+#endif
+
+RtpRtcpClock* GetSystemClock()
+{
+    // TODO(hellner): violates the style guide (non-POD static instance).
+#if defined(_WIN32)
+    static WindowsSystemClock system_clock;
+#elif defined(WEBRTC_LINUX) || defined(WEBRTC_MAC)
+    static UnixSystemClock system_clock;
+#endif
+    return &system_clock;
+}
+
+WebRtc_UWord32 GetCurrentRTP(RtpRtcpClock* clock, WebRtc_UWord32 freq)
+{
+    if (clock == NULL)
+        clock = GetSystemClock();
+    WebRtc_UWord32 secs = 0, frac = 0;
+    clock->CurrentNTP(secs, frac);
+    return ConvertNTPTimeToRTP(secs, frac, freq);
+}
+
+WebRtc_UWord32 ConvertNTPTimeToRTP(WebRtc_UWord32 NTPsec,
+                                   WebRtc_UWord32 NTPfrac,
+                                   WebRtc_UWord32 freq)
+{
+    float ftemp = (float)NTPfrac/(float)NTP_FRAC;
+    WebRtc_UWord32 tmp = (WebRtc_UWord32)(ftemp * freq);
+    return NTPsec*freq + tmp;
+}
+
+WebRtc_UWord32 ConvertNTPTimeToMS(WebRtc_UWord32 NTPsec,
+                                  WebRtc_UWord32 NTPfrac)
+{
+    int freq = 1000;
+    float ftemp = (float)NTPfrac/(float)NTP_FRAC;
+    WebRtc_UWord32 tmp = (WebRtc_UWord32)(ftemp * freq);
+    WebRtc_UWord32 MStime= NTPsec*freq + tmp;
+    return MStime;
+}
+
+bool OldTimestamp(uint32_t newTimestamp,
+                  uint32_t existingTimestamp,
+                  bool* wrapped)
+{
+    bool tmpWrapped =
+        (newTimestamp < 0x0000ffff && existingTimestamp > 0xffff0000) ||
+        (newTimestamp > 0xffff0000 && existingTimestamp < 0x0000ffff);
+    *wrapped = tmpWrapped;
+    if (existingTimestamp > newTimestamp && !tmpWrapped)
+    {
+        return true;
+    }
+    else if (existingTimestamp <= newTimestamp && !tmpWrapped)
+    {
+        return false;
+    }
+    else if (existingTimestamp < newTimestamp && tmpWrapped)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+} // namespace ModuleRTPUtility
+
+/*
+ * Misc utility routines
+ */
+
+#if defined(_WIN32)
+bool ModuleRTPUtility::StringCompare(const WebRtc_Word8* str1,
+                                     const WebRtc_Word8* str2,
+                                     const WebRtc_UWord32 length)
+{
+    return (_strnicmp(str1, str2, length) == 0)?true: false;
+}
+#elif defined(WEBRTC_LINUX) || defined(WEBRTC_MAC)
+bool ModuleRTPUtility::StringCompare(const WebRtc_Word8* str1,
+                                     const WebRtc_Word8* str2,
+                                     const WebRtc_UWord32 length)
+{
+    return (strncasecmp(str1, str2, length) == 0)?true: false;
+}
+#endif
 
 #if !defined(WEBRTC_LITTLE_ENDIAN) && !defined(WEBRTC_BIG_ENDIAN)
     #error Either WEBRTC_LITTLE_ENDIAN or WEBRTC_BIG_ENDIAN must be defined
@@ -249,101 +418,6 @@ ModuleRTPUtility::pow2(WebRtc_UWord8 exp)
     return 1 << exp;
 }
 
-WebRtc_Word32
-ModuleRTPUtility::CurrentNTP(WebRtc_UWord32& secs, WebRtc_UWord32& frac)
-{
-    /*
-    *  Use the system time (roughly synchronised to the tick, and
-    *  extrapolated using the system performance counter.
-    */
-    const  WebRtc_UWord32 JAN_1970 = 2208988800UL; // NTP seconds
-
-#if defined(_WIN32)
-    const WebRtc_UWord64 FILETIME_1970 = 0x019db1ded53e8000;
-
-    FILETIME StartTime;
-    WebRtc_UWord64 Time;
-    struct timeval tv;
-
-    // we can't use query performance counter since they can change depending on speed steping
-    helpTimer.get_time(StartTime);
-
-    Time = (((WebRtc_UWord64) StartTime.dwHighDateTime) << 32) +
-        (WebRtc_UWord64) StartTime.dwLowDateTime;
-
-    // Convert the hecto-nano second time to tv format
-    Time -= FILETIME_1970;
-
-    tv.tv_sec = (WebRtc_UWord32) ( Time / (WebRtc_UWord64)10000000);
-    tv.tv_usec = (WebRtc_UWord32) (( Time % (WebRtc_UWord64)10000000) / 10);
-
-    double dtemp;
-
-    secs = tv.tv_sec + JAN_1970;
-    dtemp = tv.tv_usec / 1e6;
-
-    if (dtemp >= 1)
-    {
-        dtemp -= 1;
-        secs++;
-    } else if (dtemp < -1)
-    {
-        dtemp += 1;
-        secs--;
-    }
-    dtemp *= FRAC;
-    frac = (WebRtc_UWord32)dtemp;
-    return 0;
-#endif
-
-#if ((defined WEBRTC_LINUX) || (defined WEBRTC_MAC))
-
-    double dtemp;
-    struct timeval tv;
-    struct timezone tz;
-    tz.tz_minuteswest  = 0;
-    tz.tz_dsttime = 0;
-    gettimeofday(&tv,&tz);
-
-    secs = tv.tv_sec + JAN_1970;
-    dtemp = tv.tv_usec / 1e6;
-    if (dtemp >= 1)
-    {
-        dtemp -= 1;
-        secs++;
-    } else if (dtemp < -1)
-    {
-        dtemp += 1;
-        secs--;
-    }
-    dtemp *= FRAC;
-    frac = (WebRtc_UWord32)dtemp;
-
-    return(0);
-#endif
-}
-
-WebRtc_UWord32
-ModuleRTPUtility::ConvertNTPTimeToMS(WebRtc_UWord32 NTPsec, WebRtc_UWord32 NTPfrac)
-{
-    int freq = 1000;
-    float ftemp = (float)NTPfrac/(float)FRAC;
-    WebRtc_UWord32 tmp = (WebRtc_UWord32)(ftemp * freq);
-    WebRtc_UWord32 MStime= NTPsec*freq + tmp;
-    return MStime;
-}
-
-WebRtc_UWord32
-ModuleRTPUtility::CurrentRTP(WebRtc_UWord32 freq)
-{
-    WebRtc_UWord32 NTPsec = 0;
-    WebRtc_UWord32 NTPfrac = 0;
-    CurrentNTP( NTPsec, NTPfrac);
-    float ftemp = (float)NTPfrac/(float)FRAC;
-    WebRtc_UWord32 tmp = (WebRtc_UWord32)(ftemp * freq);
-    return NTPsec*freq + tmp;
-}
-
 void
 ModuleRTPUtility::RTPPayload::SetType(RtpVideoCodecTypes videoType)
 {
@@ -382,9 +456,13 @@ ModuleRTPUtility::RTPPayload::SetType(RtpVideoCodecTypes videoType)
         info.VP8.hasPictureID = false;
         info.VP8.hasTl0PicIdx = false;
         info.VP8.hasTID = false;
+        info.VP8.hasKeyIdx = false;
         info.VP8.pictureID = -1;
         info.VP8.tl0PicIdx = -1;
         info.VP8.tID = -1;
+        info.VP8.layerSync = false;
+        info.VP8.frameWidth = 0;
+        info.VP8.frameHeight = 0;
         break;
     }
     default:
@@ -455,10 +533,10 @@ ModuleRTPUtility::RTPHeaderParser::RTCP() const
         RTCP = true;
         break;
     case 193:
-    case 195:
         // not supported
         // pass through and check for a potential RTP packet
         break;
+    case 195:
     case 200:
     case 201:
     case 202:
@@ -474,7 +552,8 @@ ModuleRTPUtility::RTPHeaderParser::RTCP() const
 }
 
 bool
-ModuleRTPUtility::RTPHeaderParser::Parse(WebRtcRTPHeader& parsedPacket) const
+ModuleRTPUtility::RTPHeaderParser::Parse(
+    WebRtcRTPHeader& parsedPacket, RtpHeaderExtensionMap* ptrExtensionMap) const
 {
     const ptrdiff_t length = _ptrRTPDataEnd - _ptrRTPDataBegin;
 
@@ -536,8 +615,22 @@ ModuleRTPUtility::RTPHeaderParser::Parse(WebRtcRTPHeader& parsedPacket) const
     parsedPacket.type.Audio.numEnergy = parsedPacket.header.numCSRCs;
 
     parsedPacket.header.headerLength   = 12 + CSRCocts;
+
+    // If in effect, MAY be omitted for those packets for which the offset
+    // is zero.
+    parsedPacket.extension.transmissionTimeOffset = 0;
+
     if (X)
     {
+        /* RTP header extension, RFC 3550.
+         0                   1                   2                   3
+         0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |      defined by profile       |           length              |
+        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        |                        header extension                       |
+        |                             ....                              |
+        */
         const ptrdiff_t remain = _ptrRTPDataEnd - ptr;
         if (remain < 4)
         {
@@ -557,32 +650,119 @@ ModuleRTPUtility::RTPHeaderParser::Parse(WebRtcRTPHeader& parsedPacket) const
         {
             return false;
         }
-        if(definedByProfile == RTP_AUDIO_LEVEL_UNIQUE_ID && XLen == 4)
+        if (definedByProfile == RTP_ONE_BYTE_HEADER_EXTENSION)
         {
-            // --- Only used for debugging ---
-
-            /*
-            0                   1                   2                   3
-            0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-            |      0xBE     |      0xDE     |            length=1           |
-            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-            |  ID   | len=0 |V|   level     |      0x00     |      0x00     |
-            +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-            */
-
-            // Parse out the fields but only use it for debugging for now.
-            //const WebRtc_UWord8 ID = (*ptr & 0xf0) >> 4;
-            //const WebRtc_UWord8 len = (*ptr & 0x0f);
-            ptr++;
-            //const WebRtc_UWord8 V = (*ptr & 0x80) >> 7;
-            //const WebRtc_UWord8 level = (*ptr & 0x7f);
-            // DEBUG_PRINT("RTP_AUDIO_LEVEL_UNIQUE_ID: ID=%u, len=%u, V=%u, level=%u", ID, len, V, level);
+            const WebRtc_UWord8* ptrRTPDataExtensionEnd = ptr + XLen;
+            ParseOneByteExtensionHeader(parsedPacket,
+                                        ptrExtensionMap,
+                                        ptrRTPDataExtensionEnd,
+                                        ptr);
         }
         parsedPacket.header.headerLength += XLen;
     }
 
     return true;
+}
+
+void ModuleRTPUtility::RTPHeaderParser::ParseOneByteExtensionHeader(
+    WebRtcRTPHeader& parsedPacket,
+    const RtpHeaderExtensionMap* ptrExtensionMap,
+    const WebRtc_UWord8* ptrRTPDataExtensionEnd,
+    const WebRtc_UWord8* ptr) const
+{
+    if (!ptrExtensionMap) {
+        WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, -1, "No extension map.");
+      return;
+    }
+
+    while (ptrRTPDataExtensionEnd - ptr > 0)
+    {
+      //  0
+      //  0 1 2 3 4 5 6 7
+      // +-+-+-+-+-+-+-+-+
+      // |  ID   |  len  |
+      // +-+-+-+-+-+-+-+-+
+
+      const WebRtc_UWord8 id = (*ptr & 0xf0) >> 4;
+      const WebRtc_UWord8 len = (*ptr & 0x0f);
+      ptr++;
+
+      if (id == 15) {
+        WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, -1,
+            "Ext id: 15 encountered, parsing terminated.");
+        return;
+      }
+
+      RTPExtensionType type;
+      if (ptrExtensionMap->GetType(id, &type) != 0) {
+        WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, -1,
+            "Failed to find extension id: %d", id);
+        return;
+      }
+
+      switch (type)
+      {
+      case TRANSMISSION_TIME_OFFSET:
+      {
+        if (len != 2)
+        {
+          WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, -1,
+              "Incorrect transmission time offset len: %d", len);
+          return;
+        }
+        //  0                   1                   2                   3
+        //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+        // |  ID   | len=2 |              transmission offset              |
+        // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+        WebRtc_Word32 transmissionTimeOffset = *ptr++ << 16;
+        transmissionTimeOffset += *ptr++ << 8;
+        transmissionTimeOffset += *ptr++;
+        parsedPacket.extension.transmissionTimeOffset = transmissionTimeOffset;
+        break;
+      }
+      //case RTP_AUDIO_LEVEL_ID;
+      //{
+      //   --- Only used for debugging ---
+      //  0                   1                   2                   3
+      //  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      // |  ID   | len=0 |V|   level     |      0x00     |      0x00     |
+      // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      //
+
+      // Parse out the fields but only use it for debugging for now.
+      //const WebRtc_UWord8 V = (*ptr & 0x80) >> 7;
+      //const WebRtc_UWord8 level = (*ptr & 0x7f);
+      //DEBUG_PRINT("RTP_AUDIO_LEVEL_UNIQUE_ID: ID=%u, len=%u, V=%u, level=%u",
+      //    ID, len, V, level);
+      //}
+      default:
+      {
+        WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, -1,
+            "Extension type not implemented.");
+        return;
+      }
+      }
+      WebRtc_UWord8 num_bytes = ParsePaddingBytes(ptrRTPDataExtensionEnd, ptr);
+      ptr += num_bytes;
+    }
+}
+
+WebRtc_UWord8 ModuleRTPUtility::RTPHeaderParser::ParsePaddingBytes(
+    const WebRtc_UWord8* ptrRTPDataExtensionEnd,
+    const WebRtc_UWord8* ptr) const {
+
+  WebRtc_UWord8 num_zero_bytes = 0;
+  while (ptrRTPDataExtensionEnd - ptr > 0) {
+    if (*ptr != 0) {
+      return num_zero_bytes;
+    }
+    ptr++;
+    num_zero_bytes++;
+  }
+  return num_zero_bytes;
 }
 
 // RTP payload parser
@@ -806,26 +986,26 @@ ModuleRTPUtility::RTPPayloadParser::ParseMPEG4(
 // VP8 format:
 //
 // Payload descriptor
-//     0 1 2 3 4 5 6 7
-//    +-+-+-+-+-+-+-+-+
-//    |X|R|N|S|PartID | (REQUIRED)
-//    +-+-+-+-+-+-+-+-+
-// X: |I|L|T|  RSV-A  | (OPTIONAL)
-//    +-+-+-+-+-+-+-+-+
-// I: |   PictureID   | (OPTIONAL)
-//    +-+-+-+-+-+-+-+-+
-// L: |   TL0PICIDX   | (OPTIONAL)
-//    +-+-+-+-+-+-+-+-+
-// T: | TID |  RSV-B  | (OPTIONAL)
-//    +-+-+-+-+-+-+-+-+
+//       0 1 2 3 4 5 6 7
+//      +-+-+-+-+-+-+-+-+
+//      |X|R|N|S|PartID | (REQUIRED)
+//      +-+-+-+-+-+-+-+-+
+// X:   |I|L|T|K|  RSV  | (OPTIONAL)
+//      +-+-+-+-+-+-+-+-+
+// I:   |   PictureID   | (OPTIONAL)
+//      +-+-+-+-+-+-+-+-+
+// L:   |   TL0PICIDX   | (OPTIONAL)
+//      +-+-+-+-+-+-+-+-+
+// T/K: |TID:Y| KEYIDX  | (OPTIONAL)
+//      +-+-+-+-+-+-+-+-+
 //
 // Payload header (considered part of the actual payload, sent to decoder)
-//     0 1 2 3 4 5 6 7
-//    +-+-+-+-+-+-+-+-+
-//    |Size0|H| VER |P|
-//    +-+-+-+-+-+-+-+-+
-//    |      ...      |
-//    +               +
+//       0 1 2 3 4 5 6 7
+//      +-+-+-+-+-+-+-+-+
+//      |Size0|H| VER |P|
+//      +-+-+-+-+-+-+-+-+
+//      |      ...      |
+//      +               +
 
 bool
 ModuleRTPUtility::RTPPayloadParser::ParseVP8(RTPPayload& parsedPacket) const
@@ -868,15 +1048,38 @@ ModuleRTPUtility::RTPPayloadParser::ParseVP8(RTPPayload& parsedPacket) const
     {
         parsedPacket.frameType = kPFrame;
     }
-
+    if (0 != ParseVP8FrameSize(parsedPacket, dataPtr, dataLength))
+    {
+        return false;
+    }
     parsedPacket.info.VP8.data       = dataPtr;
     parsedPacket.info.VP8.dataLength = dataLength;
-
     return true;
 }
 
-int
-ModuleRTPUtility::RTPPayloadParser::ParseVP8Extension(
+int ModuleRTPUtility::RTPPayloadParser::ParseVP8FrameSize(
+      RTPPayload &parsedPacket,
+      const WebRtc_UWord8 *dataPtr,
+      int dataLength) const
+{
+    if (parsedPacket.frameType != kIFrame)
+    {
+        // Included in payload header for I-frames.
+        return 0;
+    }
+    if (dataLength < 10)
+    {
+        // For an I-frame we should always have the uncompressed VP8 header
+        // in the beginning of the partition.
+        return -1;
+    }
+    RTPPayloadVP8 *vp8 = &parsedPacket.info.VP8;
+    vp8->frameWidth = ((dataPtr[7] << 8) + dataPtr[6]) & 0x3FFF;
+    vp8->frameHeight = ((dataPtr[9] << 8) + dataPtr[8]) & 0x3FFF;
+    return 0;
+}
+
+int ModuleRTPUtility::RTPPayloadParser::ParseVP8Extension(
         RTPPayloadVP8 *vp8,
         const WebRtc_UWord8 *dataPtr,
         int dataLength) const
@@ -887,6 +1090,7 @@ ModuleRTPUtility::RTPPayloadParser::ParseVP8Extension(
     vp8->hasPictureID = (*dataPtr & 0x80) ? true : false; // I bit
     vp8->hasTl0PicIdx = (*dataPtr & 0x40) ? true : false; // L bit
     vp8->hasTID =       (*dataPtr & 0x20) ? true : false; // T bit
+    vp8->hasKeyIdx =    (*dataPtr & 0x10) ? true : false; // K bit
 
     // Advance dataPtr and decrease remaining payload size
     dataPtr++;
@@ -909,9 +1113,9 @@ ModuleRTPUtility::RTPPayloadParser::ParseVP8Extension(
         }
     }
 
-    if (vp8->hasTID)
+    if (vp8->hasTID || vp8->hasKeyIdx)
     {
-        if (ParseVP8TID(vp8, &dataPtr, &dataLength, &parsedBytes) != 0)
+        if (ParseVP8TIDAndKeyIdx(vp8, &dataPtr, &dataLength, &parsedBytes) != 0)
         {
             return -1;
         }
@@ -957,14 +1161,22 @@ ModuleRTPUtility::RTPPayloadParser::ParseVP8Tl0PicIdx(
     return 0;
 }
 
-int ModuleRTPUtility::RTPPayloadParser::ParseVP8TID(
+int ModuleRTPUtility::RTPPayloadParser::ParseVP8TIDAndKeyIdx(
         RTPPayloadVP8 *vp8,
         const WebRtc_UWord8 **dataPtr,
         int *dataLength,
         int *parsedBytes) const
 {
     if (*dataLength <= 0) return -1;
-    vp8->tID = ((**dataPtr >> 5) & 0x07);
+    if (vp8->hasTID)
+    {
+        vp8->tID = ((**dataPtr >> 6) & 0x03);
+        vp8->layerSync = (**dataPtr & 0x20) ? true : false;  // Y bit
+    }
+    if (vp8->hasKeyIdx)
+    {
+        vp8->keyIdx = (**dataPtr & 0x1F);
+    }
     (*dataPtr)++;
     (*parsedBytes)++;
     (*dataLength)--;

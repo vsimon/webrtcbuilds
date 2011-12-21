@@ -22,13 +22,25 @@ class RtpRtcp : public Module
 {
 public:
     /*
-    *   create a RTP/RTCP module object
+    *   create a RTP/RTCP module object using the system clock
     *
     *   id      - unique identifier of this RTP/RTCP module object
     *   audio   - true for a audio version of the RTP/RTCP module object false will create a video version
     */
     static RtpRtcp* CreateRtpRtcp(const WebRtc_Word32 id,
                                   const bool audio);
+
+    /*
+    *   create a RTP/RTCP module object
+    *
+    *   id      - unique identifier of this RTP/RTCP module object
+    *   audio   - true for a audio version of the RTP/RTCP module object
+    *             false will create a video version
+    *   clock   - the clock to use to read time; must not be NULL
+    */
+    static RtpRtcp* CreateRtpRtcp(const WebRtc_Word32 id,
+                                  const bool audio,
+                                  RtpRtcpClock* clock);
 
     /*
     *   destroy a RTP/RTCP module object
@@ -195,7 +207,7 @@ public:
         WebRtc_Word8* plType) = 0;
 
     /*
-    *   Remove a registerd payload type from list of accepted payloads
+    *   Remove a registered payload type from list of accepted payloads
     *
     *   payloadType - payload type of codec
     *
@@ -203,6 +215,18 @@ public:
     */
     virtual WebRtc_Word32 DeRegisterReceivePayload(
         const WebRtc_Word8 payloadType) = 0;
+
+   /*
+    *   (De)register RTP header extension type and id.
+    *
+    *   return -1 on failure else 0
+    */
+    virtual WebRtc_Word32 RegisterReceiveRtpHeaderExtension(
+        const RTPExtensionType type,
+        const WebRtc_UWord8 id) = 0;
+
+    virtual WebRtc_Word32 DeregisterReceiveRtpHeaderExtension(
+        const RTPExtensionType type) = 0;
 
     /*
     *   Get last received remote timestamp
@@ -394,6 +418,18 @@ public:
     *   return -1 on failure else 0
     */
     virtual WebRtc_Word32 DeRegisterSendPayload(const WebRtc_Word8 payloadType) = 0;
+
+   /*
+    *   (De)register RTP header extension type and id.
+    *
+    *   return -1 on failure else 0
+    */
+    virtual WebRtc_Word32 RegisterSendRtpHeaderExtension(
+        const RTPExtensionType type,
+        const WebRtc_UWord8 id) = 0;
+
+    virtual WebRtc_Word32 DeregisterSendRtpHeaderExtension(
+        const RTPExtensionType type) = 0;
 
     /*
     *   get start timestamp
@@ -723,17 +759,25 @@ public:
     /*
     *  (REMB) Receiver Estimated Max Bitrate
     */
-    virtual bool REMB() const = 0;;
+    virtual bool REMB() const = 0;
 
     virtual WebRtc_Word32 SetREMBStatus(const bool enable) = 0;
 
     virtual WebRtc_Word32 SetREMBData(const WebRtc_UWord32 bitrate,
                                       const WebRtc_UWord8 numberOfSSRC,
                                       const WebRtc_UWord32* SSRC) = 0;
+
+    /*
+    *   (IJ) Extended jitter report.
+    */
+    virtual bool IJ() const = 0;
+
+    virtual WebRtc_Word32 SetIJStatus(const bool enable) = 0;
+
     /*
     *   (TMMBR) Temporary Max Media Bit Rate
     */
-    virtual bool TMMBR() const  = 0;
+    virtual bool TMMBR() const = 0;
 
     /*
     *

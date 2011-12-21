@@ -5,7 +5,6 @@
 {
   'variables': {
     'no_libjingle_logging%': 0,
-    'peer_connection_dev%': 0,
     'libjingle_orig': '../../third_party/libjingle',
     'libjingle_mods': '../../third_party_mods/libjingle',
     'conditions': [
@@ -44,6 +43,9 @@
     ],
     'export_dependent_settings': [
       '<(libjingle_orig)/../expat/expat.gyp:expat',
+    ],
+    'include_dirs': [
+      '../../third_party/libyuv/include/',
     ],
     'direct_dependent_settings': {
       'defines': [
@@ -109,11 +111,6 @@
       },
     },
     'conditions': [
-      ['peer_connection_dev==1', {
-        'include_dirs': [
-          '<(libjingle_mods)/source',
-        ],
-      }],
       ['inside_chromium_build==1', {
         'defines': [
           'NO_SOUND_SYSTEM',
@@ -281,6 +278,8 @@
         '<(libjingle_orig)/source/talk/base/httpcommon.h',
         '<(libjingle_orig)/source/talk/base/httprequest.cc',
         '<(libjingle_orig)/source/talk/base/httprequest.h',
+        '<(libjingle_orig)/source/talk/base/ipaddress.cc',
+        '<(libjingle_orig)/source/talk/base/ipaddress.h',
         '<(libjingle_orig)/source/talk/base/json.cc',
         '<(libjingle_orig)/source/talk/base/json.h',
         '<(libjingle_orig)/source/talk/base/linked_ptr.h',
@@ -538,6 +537,8 @@
         '<(libjingle_orig)/source/talk/session/phone/audiomonitor.h',
         '<(libjingle_orig)/source/talk/session/phone/call.cc',
         '<(libjingle_orig)/source/talk/session/phone/call.h',
+        '<(libjingle_orig)/source/talk/session/phone/channel.cc',
+        '<(libjingle_orig)/source/talk/session/phone/channel.h',
         '<(libjingle_orig)/source/talk/session/phone/channelmanager.cc',
         '<(libjingle_orig)/source/talk/session/phone/channelmanager.h',
         '<(libjingle_orig)/source/talk/session/phone/codec.cc',
@@ -556,6 +557,8 @@
         '<(libjingle_orig)/source/talk/session/phone/mediamessages.h',
         '<(libjingle_orig)/source/talk/session/phone/mediamonitor.cc',
         '<(libjingle_orig)/source/talk/session/phone/mediamonitor.h',
+        '<(libjingle_orig)/source/talk/session/phone/mediasession.cc',
+        '<(libjingle_orig)/source/talk/session/phone/mediasession.h',
         '<(libjingle_orig)/source/talk/session/phone/mediasessionclient.cc',
         '<(libjingle_orig)/source/talk/session/phone/mediasessionclient.h',
         '<(libjingle_orig)/source/talk/session/phone/mediasink.h',
@@ -569,10 +572,19 @@
         '<(libjingle_orig)/source/talk/session/phone/soundclip.h',
         '<(libjingle_orig)/source/talk/session/phone/srtpfilter.cc',
         '<(libjingle_orig)/source/talk/session/phone/srtpfilter.h',
+        '<(libjingle_orig)/source/talk/session/phone/ssrcmuxfilter.cc',
+        '<(libjingle_orig)/source/talk/session/phone/ssrcmuxfilter.h',
+        '<(libjingle_orig)/source/talk/session/phone/videocapturer.cc',
+        '<(libjingle_orig)/source/talk/session/phone/videocapturer.h',
+        '<(libjingle_orig)/source/talk/session/phone/videocommon.cc',
         '<(libjingle_orig)/source/talk/session/phone/videocommon.h',
-        '<(libjingle_orig)/source/talk/session/phone/webrtcpassthroughrender.cc',
+        '<(libjingle_orig)/source/talk/session/phone/videoframe.cc',
+        '<(libjingle_orig)/source/talk/session/phone/videoframe.h',
         '<(libjingle_orig)/source/talk/session/phone/voicechannel.h',
+        '<(libjingle_orig)/source/talk/session/phone/webrtcpassthroughrender.cc',
         '<(libjingle_orig)/source/talk/session/phone/webrtccommon.h',
+        '<(libjingle_orig)/source/talk/session/phone/webrtcvideocapturer.cc',
+        '<(libjingle_orig)/source/talk/session/phone/webrtcvideocapturer.h',
         '<(libjingle_orig)/source/talk/session/phone/webrtcvideoengine.cc',
         '<(libjingle_orig)/source/talk/session/phone/webrtcvideoengine.h',
         '<(libjingle_orig)/source/talk/session/phone/webrtcvideoframe.cc',
@@ -591,14 +603,19 @@
           'sources': [
             '<(libjingle_orig)/source/talk/session/phone/gdivideorenderer.cc',
             '<(libjingle_orig)/source/talk/session/phone/gdivideorenderer.h',
+            '<(libjingle_orig)/source/talk/session/phone/win32devicemanager.cc',
+            '<(libjingle_orig)/source/talk/session/phone/win32devicemanager.h',
           ],
         }],   
         ['OS=="linux"', {
           'sources': [
             '<(libjingle_orig)/source/talk/session/phone/gtkvideorenderer.cc',
+            '<(libjingle_orig)/source/talk/session/phone/gtkvideorenderer.cc',
             '<(libjingle_orig)/source/talk/session/phone/gtkvideorenderer.h', 
             '<(libjingle_orig)/source/talk/session/phone/libudevsymboltable.cc',
             '<(libjingle_orig)/source/talk/session/phone/libudevsymboltable.h',
+            '<(libjingle_orig)/source/talk/session/phone/linuxdevicemanager.cc',
+            '<(libjingle_orig)/source/talk/session/phone/linuxdevicemanager.h',
             '<(libjingle_orig)/source/talk/session/phone/v4llookup.cc',
             '<(libjingle_orig)/source/talk/session/phone/v4llookup.h',
           ],
@@ -630,22 +647,6 @@
             'libjingle',
           ],
         } ],  # inside_chromium_build
-        ['peer_connection_dev==1', {
-          'sources': [
-            '<(libjingle_mods)/source/talk/base/refcount.h',
-            '<(libjingle_mods)/source/talk/base/scoped_refptr.h',
-            '<(libjingle_mods)/source/talk/p2p/client/fakeportallocator.h',
-            '<(libjingle_mods)/source/talk/session/phone/channel.cc',
-            '<(libjingle_mods)/source/talk/session/phone/channel.h',
-            '<(libjingle_mods)/source/talk/session/phone/mediasession.cc',            
-          ],
-        },{
-          'sources': [
-            '<(libjingle_orig)/source/talk/session/phone/channel.cc',
-            '<(libjingle_orig)/source/talk/session/phone/channel.h',
-            '<(libjingle_orig)/source/talk/session/phone/mediasession.cc',
-          ],
-        }], # peer_connection_dev
       ],  # conditions
     },
     # seperate project for app
@@ -687,106 +688,8 @@
             '../../src/system_wrappers/source/system_wrappers.gyp:system_wrappers',
             'libjingle_p2p',
           ],          
-        } ],  # inside_chromium_build        
-         ['peer_connection_dev==1', {
-          'include_dirs': [
-            '<(libjingle_mods)/source',
-          ],
-          # sources= empties the list of source file and start new.
-          # peer_connection_dev is independent of the main branch.          
-          'sources=': [
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/audiotrackimpl.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/audiotrackimpl.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastream.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamhandler.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamhandler.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamprovider.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamimpl.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamimpl.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamtrackproxy.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamtrackproxy.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamproxy.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamproxy.cc',            
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediatrackimpl.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnection.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionimpl.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionimpl.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionfactoryimpl.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionfactoryimpl.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionmessage.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionmessage.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionsignaling.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionsignaling.h',
-            
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/sessiondescriptionprovider.h'
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/streamcollectionimpl.h',            
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/videorendererimpl.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/videotrackimpl.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/videotrackimpl.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/webrtc_devicemanager.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/webrtc_devicemanager.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/webrtcjson.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/webrtcjson.h',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/webrtcsessionobserver',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/webrtcsession.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/webrtcsession.h',
-          ],
-        }], # peer_connection_dev
+        } ],  # inside_chromium_build
       ],  # conditions
-    },
-    {
-      'target_name': 'peerconnection_unittests',
-      'conditions': [
-        ['peer_connection_dev==1', {          
-          'dependencies': [
-            'libjingle_app',
-            '../../testing/gmock.gyp:gmock',
-            '../../testing/gtest.gyp:gtest',
-            '../../testing/gtest.gyp:gtest_main',
-            # TODO(perkj): Temporary build the client app here to make sure
-            # nothing is broken.
-            'source/talk/examples/peerconnection_client/'
-                'peerconnection_client.gyp:peerconnection_client_dev',                
-          ],
-          'type': 'executable',
-          'conditions': [
-            ['inside_chromium_build==1', {
-              'dependencies': [        
-                '../../third_party/webrtc/modules/modules.gyp:audio_device',
-                '../../third_party/webrtc/modules/modules.gyp:video_capture_module',
-                '../../third_party/webrtc/system_wrappers/source/system_wrappers.gyp:system_wrappers',
-              ],
-            }, {
-              'dependencies': [
-                '../../src/modules/modules.gyp:audio_device',
-                '../../src/modules/modules.gyp:video_capture_module',
-                '../../src/system_wrappers/source/system_wrappers.gyp:system_wrappers',
-               ],
-            }],
-            ['OS=="linux"', {
-              'libraries': [
-              '-lXext',
-              '-lX11',
-              ],
-            }],
-          ], #conditions             
-          'sources': [
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/test/filevideocapturemodule.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastream_unittest.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/mediastreamhandler_unittest.cc',                       
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnection_unittest.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnection_unittests.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionimpl_unittest.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionfactory_unittest.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionmessage_unittest.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/peerconnectionsignaling_unittest.cc',
-            '<(libjingle_mods)/source/talk/app/webrtc_dev/webrtcsession_unittest.cc',
-          ],
-        } , {
-          'type': 'none',
-        }
-        ], # peer_connection_dev 
-      ],  # conditions
-    },
+    },    
   ],
 }

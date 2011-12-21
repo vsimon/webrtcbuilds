@@ -25,7 +25,8 @@ class ModuleRtpRtcpImpl;
 class RTCPSender
 {
 public:
-    RTCPSender(const WebRtc_Word32 id, const bool audio, ModuleRtpRtcpImpl* owner);
+    RTCPSender(const WebRtc_Word32 id, const bool audio,
+               RtpRtcpClock* clock, ModuleRtpRtcpImpl* owner);
     virtual ~RTCPSender();
 
     void ChangeUniqueId(const WebRtc_Word32 id);
@@ -97,6 +98,13 @@ public:
                                const WebRtc_UWord32 packetOH);
 
     /*
+    *   Extended jitter report
+    */
+    bool IJ() const;
+
+    WebRtc_Word32 SetIJStatus(const bool enable);
+
+    /*
     *
     */
 
@@ -145,6 +153,11 @@ private:
                         const WebRtc_UWord32 NTPfrac,
                         const RTCPReportBlock* received = NULL);
 
+    WebRtc_Word32 BuildExtendedJitterReport(
+        WebRtc_UWord8* rtcpbuffer,
+        WebRtc_UWord32& pos,
+        const WebRtc_UWord32 jitterTransmissionTimeOffset);
+
     WebRtc_Word32 BuildSDEC(WebRtc_UWord8* rtcpbuffer, WebRtc_UWord32& pos);
     WebRtc_Word32 BuildPLI(WebRtc_UWord8* rtcpbuffer, WebRtc_UWord32& pos);
     WebRtc_Word32 BuildREMB(WebRtc_UWord8* rtcpbuffer, WebRtc_UWord32& pos);
@@ -172,20 +185,22 @@ private:
 private:
     WebRtc_Word32            _id;
     const bool               _audio;
+    RtpRtcpClock&            _clock;
     RTCPMethod               _method;
 
     ModuleRtpRtcpImpl&      _rtpRtcp;
 
-    CriticalSectionWrapper& _criticalSectionTransport;
+    CriticalSectionWrapper* _criticalSectionTransport;
     Transport*              _cbTransport;
 
-    CriticalSectionWrapper& _criticalSectionRTCPSender;
+    CriticalSectionWrapper* _criticalSectionRTCPSender;
     bool                    _usingNack;
     bool                    _sending;
     bool                    _sendTMMBN;
     bool                    _REMB;
     bool                    _sendREMB;
     bool                    _TMMBR;
+    bool                    _IJ;
 
     WebRtc_UWord32        _nextTimeToSendRTCP;
 

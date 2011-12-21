@@ -21,7 +21,7 @@
 #include <string.h>
 
 #include "aec_rdft.h"
-#include "delay_estimator_float.h"
+#include "delay_estimator_wrapper.h"
 #include "ring_buffer.h"
 #include "system_wrappers/interface/cpu_features_wrapper.h"
 #include "typedefs.h"
@@ -197,7 +197,7 @@ int WebRtcAec_CreateAec(aec_t **aecInst)
         aec = NULL;
         return -1;
     }
-#ifdef AEC_DEBUG
+#ifdef WEBRTC_AEC_DEBUG_DUMP
     if (WebRtc_CreateBuffer(&aec->far_time_buf, kBufSizePartitions,
                             sizeof(int16_t) * PART_LEN) == -1) {
         WebRtcAec_FreeAec(aec);
@@ -205,10 +205,10 @@ int WebRtcAec_CreateAec(aec_t **aecInst)
         return -1;
     }
 #endif
-    if (WebRtc_CreateDelayEstimatorFloat(&aec->delay_estimator,
-                                         PART_LEN1,
-                                         kMaxDelay,
-                                         0) == -1) {
+    if (WebRtc_CreateDelayEstimator(&aec->delay_estimator,
+                                    PART_LEN1,
+                                    kMaxDelayBlocks,
+                                    kLookaheadBlocks) == -1) {
       WebRtcAec_FreeAec(aec);
       aec = NULL;
       return -1;
@@ -231,10 +231,10 @@ int WebRtcAec_FreeAec(aec_t *aec)
 
     WebRtc_FreeBuffer(aec->far_buf);
     WebRtc_FreeBuffer(aec->far_buf_windowed);
-#ifdef AEC_DEBUG
+#ifdef WEBRTC_AEC_DEBUG_DUMP
     WebRtc_FreeBuffer(aec->far_time_buf);
 #endif
-    WebRtc_FreeDelayEstimatorFloat(aec->delay_estimator);
+    WebRtc_FreeDelayEstimator(aec->delay_estimator);
 
     free(aec);
     return 0;
@@ -420,14 +420,14 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq)
     if (WebRtc_InitBuffer(aec->far_buf_windowed) == -1) {
         return -1;
     }
-#ifdef AEC_DEBUG
+#ifdef WEBRTC_AEC_DEBUG_DUMP
     if (WebRtc_InitBuffer(aec->far_time_buf) == -1) {
         return -1;
     }
 #endif
     aec->system_delay = 0;
 
-    if (WebRtc_InitDelayEstimatorFloat(aec->delay_estimator) != 0) {
+    if (WebRtc_InitDelayEstimator(aec->delay_estimator) != 0) {
       return -1;
     }
     aec->delay_logging_enabled = 0;
@@ -550,7 +550,7 @@ void WebRtcAec_BufferFarendPartition(aec_t *aec, const float* farend) {
     WebRtc_MoveReadPtr(aec->far_buf, 1);
     WebRtc_MoveReadPtr(aec->far_buf_windowed, 1);
     aec->system_delay -= PART_LEN;
-#ifdef AEC_DEBUG
+#ifdef WEBRTC_AEC_DEBUG_DUMP
     WebRtc_MoveReadPtr(aec->far_time_buf, 1);
 #endif
   }
@@ -606,9 +606,9 @@ void WebRtcAec_ProcessFrame(aec_t *aec,
     if (aec->system_delay < FRAME_LEN) {
       // We don't have enough data so we rewind 10 ms.
       WebRtc_MoveReadPtr(aec->far_buf_windowed, -(aec->mult + 1));
-      aec->system_delay -= WebRtc_MoveReadPtr(aec->far_buf,
-                                              -(aec->mult + 1)) * PART_LEN;
-#ifdef AEC_DEBUG
+      aec->system_delay -= WebRtc_MoveReadPtr(aec->far_buf, -(aec->mult + 1)) *
+          PART_LEN;
+#ifdef WEBRTC_AEC_DEBUG_DUMP
       WebRtc_MoveReadPtr(aec->far_time_buf, -(aec->mult + 1));
 #endif
     }
@@ -618,7 +618,7 @@ void WebRtcAec_ProcessFrame(aec_t *aec,
     WebRtc_MoveReadPtr(aec->far_buf_windowed, move_elements);
     moved_elements = WebRtc_MoveReadPtr(aec->far_buf, move_elements);
     aec->knownDelay -= moved_elements * PART_LEN;
-#ifdef AEC_DEBUG
+#ifdef WEBRTC_AEC_DEBUG_DUMP
     WebRtc_MoveReadPtr(aec->far_time_buf, move_elements);
 #endif
 
@@ -658,11 +658,6 @@ static void ProcessBlock(aec_t* aec) {
     int16_t outputH[PART_LEN];
 
     float* xf_ptr = NULL;
-#ifdef AEC_DEBUG
-    int16_t eInt16[PART_LEN];
-    int16_t farend[PART_LEN];
-    int16_t* farend_ptr = NULL;
-#endif
 
     memset(dH, 0, sizeof(dH));
     if (aec->sampFreq == 32000) {
@@ -685,10 +680,14 @@ static void ProcessBlock(aec_t* aec) {
     }
     memcpy(aec->dBuf + PART_LEN, d, sizeof(float) * PART_LEN);
 
-#ifdef AEC_DEBUG
-    WebRtc_ReadBuffer(aec->far_time_buf, (void**) &farend_ptr, farend, 1);
-    fwrite(farend_ptr, sizeof(int16_t), PART_LEN, aec->farFile);
-    fwrite(nearend_ptr, sizeof(int16_t), PART_LEN, aec->nearFile);
+#ifdef WEBRTC_AEC_DEBUG_DUMP
+    {
+        int16_t farend[PART_LEN];
+        int16_t* farend_ptr = NULL;
+        WebRtc_ReadBuffer(aec->far_time_buf, (void**) &farend_ptr, farend, 1);
+        fwrite(farend_ptr, sizeof(int16_t), PART_LEN, aec->farFile);
+        fwrite(nearend_ptr, sizeof(int16_t), PART_LEN, aec->nearFile);
+    }
 #endif
 
     // We should always have at least one element stored in |far_buf|.
@@ -755,7 +754,7 @@ static void ProcessBlock(aec_t* aec) {
                                                          PART_LEN1,
                                                          aec->echoState);
       if (delay_estimate >= 0) {
-        // Update delay estimate buffer
+        // Update delay estimate buffer.
         aec->delay_histogram[delay_estimate]++;
       }
     }
@@ -823,13 +822,6 @@ static void ProcessBlock(aec_t* aec) {
     WebRtcAec_FilterAdaptation(aec, fft, ef);
     NonLinearProcessing(aec, output, outputH);
 
-#ifdef AEC_DEBUG
-    for (i = 0; i < PART_LEN; i++) {
-        eInt16[i] = (int16_t)WEBRTC_SPL_SAT(WEBRTC_SPL_WORD16_MAX, e[i],
-            WEBRTC_SPL_WORD16_MIN);
-    }
-#endif
-
     if (aec->metricsMode == 1) {
         // Update power levels and echo metrics
         UpdateLevel(&aec->farlevel, (float (*)[PART_LEN1]) xf_ptr);
@@ -844,9 +836,17 @@ static void ProcessBlock(aec_t* aec) {
         WebRtc_WriteBuffer(aec->outFrBufH, outputH, PART_LEN);
     }
 
-#ifdef AEC_DEBUG
-    fwrite(eInt16, sizeof(int16_t), PART_LEN, aec->outLpFile);
-    fwrite(output, sizeof(short), PART_LEN, aec->outFile);
+#ifdef WEBRTC_AEC_DEBUG_DUMP
+    {
+        int16_t eInt16[PART_LEN];
+        for (i = 0; i < PART_LEN; i++) {
+            eInt16[i] = (int16_t)WEBRTC_SPL_SAT(WEBRTC_SPL_WORD16_MAX, e[i],
+                WEBRTC_SPL_WORD16_MIN);
+        }
+
+        fwrite(eInt16, sizeof(int16_t), PART_LEN, aec->outLinearFile);
+        fwrite(output, sizeof(int16_t), PART_LEN, aec->outFile);
+    }
 #endif
 }
 

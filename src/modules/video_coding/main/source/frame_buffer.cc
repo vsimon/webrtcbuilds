@@ -8,7 +8,6 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "../../../../engine_configurations.h"
 #include "frame_buffer.h"
 #include "packet.h"
 
@@ -60,28 +59,45 @@ VCMFrameBuffer::SetPreviousFrameLoss()
 WebRtc_Word32
 VCMFrameBuffer::GetLowSeqNum() const
 {
-    return _sessionInfo.GetLowSeqNum();
+    return _sessionInfo.LowSequenceNumber();
 }
 
 WebRtc_Word32
 VCMFrameBuffer::GetHighSeqNum() const
 {
-    return _sessionInfo.GetHighSeqNum();
+    return _sessionInfo.HighSequenceNumber();
 }
 
 int VCMFrameBuffer::PictureId() const {
   return _sessionInfo.PictureId();
 }
 
+int VCMFrameBuffer::TemporalId() const {
+  return _sessionInfo.TemporalId();
+}
+
+bool VCMFrameBuffer::LayerSync() const {
+  return _sessionInfo.LayerSync();
+}
+
+int VCMFrameBuffer::Tl0PicId() const {
+  return _sessionInfo.Tl0PicId();
+}
+
+bool VCMFrameBuffer::NonReference() const {
+  return _sessionInfo.NonReference();
+}
+
 bool
 VCMFrameBuffer::IsSessionComplete() const
 {
-    return _sessionInfo.IsSessionComplete();
+    return _sessionInfo.complete();
 }
 
 // Insert packet
 VCMFrameBufferEnum
-VCMFrameBuffer::InsertPacket(const VCMPacket& packet, WebRtc_Word64 timeInMs)
+VCMFrameBuffer::InsertPacket(const VCMPacket& packet, WebRtc_Word64 timeInMs,
+                             bool enableDecodableState, WebRtc_UWord32 rttMS)
 {
     if (_state == kStateDecoding)
     {
@@ -111,11 +127,6 @@ VCMFrameBuffer::InsertPacket(const VCMPacket& packet, WebRtc_Word64 timeInMs)
     if (NULL == packet.dataPtr && packet.sizeBytes > 0)
     {
         return kSizeError;
-    }
-    if ((packet.frameType != kFrameEmpty) &&
-        (!_sessionInfo.HaveStartSeqNumber()))
-    {
-        _sessionInfo.SetStartSeqNumber(packet.seqNum);
     }
     if (packet.dataPtr != NULL)
     {
@@ -154,12 +165,14 @@ VCMFrameBuffer::InsertPacket(const VCMPacket& packet, WebRtc_Word64 timeInMs)
         {
             return kSizeError;
         }
-        _sessionInfo.UpdateDataPointers(_buffer, prevBuffer);
+        _sessionInfo.UpdateDataPointers(_buffer - prevBuffer);
     }
 
     CopyCodecSpecific(&packet.codecSpecificHeader);
 
-    WebRtc_Word64 retVal = _sessionInfo.InsertPacket(packet, _buffer);
+    int retVal = _sessionInfo.InsertPacket(packet, _buffer,
+                                           enableDecodableState,
+                                           rttMS);
     if (retVal == -1)
     {
         return kSizeError;
@@ -173,19 +186,18 @@ VCMFrameBuffer::InsertPacket(const VCMPacket& packet, WebRtc_Word64 timeInMs)
 
     _latestPacketTimeMs = timeInMs;
 
-    if (_sessionInfo.IsSessionComplete())
-    {
-        return kCompleteSession;
-    }
-    else
-    {
-        // this layer is not complete
-        if (_state == kStateComplete)
-        {
-            // we already have a complete layer
-            // wait for all independent layers belonging to the same frame
-            _state = kStateIncomplete;
-        }
+    if (_sessionInfo.complete()) {
+      return kCompleteSession;
+    } else if (_sessionInfo.decodable()) {
+      SetState(kStateDecodable);
+      return kDecodableSession;
+    } else {
+      // this layer is not complete
+      if (_state == kStateComplete) {
+        // we already have a complete layer
+        // wait for all independent layers belonging to the same frame
+        _state = kStateIncomplete;
+      }
     }
     return kIncomplete;
 }
@@ -215,9 +227,9 @@ VCMFrameBuffer::ZeroOutSeqNum(WebRtc_Word32* list, WebRtc_Word32 num)
 WebRtc_Word32
 VCMFrameBuffer::ZeroOutSeqNumHybrid(WebRtc_Word32* list,
                                     WebRtc_Word32 num,
-                                    float rttScore)
+                                    WebRtc_UWord32 rttMs)
 {
-    return _sessionInfo.ZeroOutSeqNumHybrid(list, num, rttScore);
+    return _sessionInfo.ZeroOutSeqNumHybrid(list, num, rttMs);
 }
 
 void
@@ -259,11 +271,11 @@ VCMFrameBuffer::MakeSessionDecodable()
     WebRtc_UWord32 retVal;
 #ifdef INDEPENDENT_PARTITIONS
     if (_codec != kVideoCodecVP8) {
-        retVal = _sessionInfo.MakeDecodable(_buffer);
+        retVal = _sessionInfo.MakeDecodable();
         _length -= retVal;
     }
 #else
-    retVal = _sessionInfo.MakeDecodable(_buffer);
+    retVal = _sessionInfo.MakeDecodable();
     _length -= retVal;
 #endif
 }
@@ -308,7 +320,7 @@ VCMFrameBuffer::SetState(VCMFrameBufferStateEnum state)
         break;
 
     case kStateDecoding:
-        // A frame migth have received empty packets, or media packets might
+        // A frame might have received empty packets, or media packets might
         // have been removed when making the frame decodable. The frame can
         // still be set to decodable since it can be used to inform the
         // decoder of a frame loss.
@@ -320,11 +332,6 @@ VCMFrameBuffer::SetState(VCMFrameBufferStateEnum state)
         break;
 
     case kStateDecodable:
-        if (_state == kStateComplete)
-        {
-            // if complete, obviously decodable, keep as is.
-            return;
-        }
         assert(_state == kStateEmpty ||
                _state == kStateIncomplete);
         break;
@@ -342,7 +349,7 @@ VCMFrameBuffer::RestructureFrameInformation()
 {
     PrepareForDecode();
     _frameType = ConvertFrameType(_sessionInfo.FrameType());
-    _completeFrame = _sessionInfo.IsSessionComplete();
+    _completeFrame = _sessionInfo.complete();
     _missingFrame = _sessionInfo.PreviousFrameLoss();
 }
 
@@ -363,14 +370,14 @@ VCMFrameBuffer::ExtractFromStorage(const EncodedVideoData& frameFromStorage)
     {
         return VCM_MEMORY;
     }
-    _sessionInfo.UpdateDataPointers(_buffer, prevBuffer);
+    _sessionInfo.UpdateDataPointers(_buffer - prevBuffer);
     memcpy(_buffer, frameFromStorage.payloadData, frameFromStorage.payloadSize);
     _length = frameFromStorage.payloadSize;
     return VCM_OK;
 }
 
 int VCMFrameBuffer::NotDecodablePackets() const {
-  return _sessionInfo.NotDecodablePackets();
+  return _sessionInfo.packets_not_decodable();
 }
 
 // Set counted status (as counted by JB or not)
@@ -402,7 +409,7 @@ VCMFrameBuffer::GetState(WebRtc_UWord32& timeStamp) const
 bool
 VCMFrameBuffer::IsRetransmitted() const
 {
-    return _sessionInfo.IsRetransmitted();
+    return _sessionInfo.session_nack();
 }
 
 void
@@ -417,10 +424,10 @@ VCMFrameBuffer::PrepareForDecode()
     }
     else
     {
-        _length = _sessionInfo.PrepareForDecode(_buffer, _codec);
+        _length = _sessionInfo.PrepareForDecode(_buffer);
     }
 #else
-    _length = _sessionInfo.PrepareForDecode(_buffer, _codec);
+    _length = _sessionInfo.PrepareForDecode(_buffer);
 #endif
 }
 

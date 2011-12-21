@@ -15,6 +15,7 @@
 #include "packet.h"
 #include "trace.h"
 #include "video_codec_interface.h"
+#include "modules/video_coding/main/source/tick_time_base.h"
 
 namespace webrtc
 {
@@ -33,26 +34,30 @@ VCMProcessTimer::TimeUntilProcess() const
 {
     return static_cast<WebRtc_UWord32>(
         VCM_MAX(static_cast<WebRtc_Word64>(_periodMs) -
-                (VCMTickTime::MillisecondTimestamp() - _latestMs), 0));
+                (_clock->MillisecondTimestamp() - _latestMs), 0));
 }
 
 void
 VCMProcessTimer::Processed()
 {
-    _latestMs = VCMTickTime::MillisecondTimestamp();
+    _latestMs = _clock->MillisecondTimestamp();
 }
 
-VideoCodingModuleImpl::VideoCodingModuleImpl(const WebRtc_Word32 id)
+VideoCodingModuleImpl::VideoCodingModuleImpl(const WebRtc_Word32 id,
+                                             TickTimeBase* clock,
+                                             bool delete_clock_on_destroy)
 :
 _id(id),
-_receiveCritSect(*CriticalSectionWrapper::CreateCriticalSection()),
+clock_(clock),
+delete_clock_on_destroy_(delete_clock_on_destroy),
+_receiveCritSect(CriticalSectionWrapper::CreateCriticalSection()),
 _receiverInited(false),
-_timing(id, 1),
-_dualTiming(id, 2, &_timing),
-_receiver(_timing, id, 1),
-_dualReceiver(_dualTiming, id, 2, false),
-_decodedFrameCallback(_timing),
-_dualDecodedFrameCallback(_dualTiming),
+_timing(clock_, id, 1),
+_dualTiming(clock_, id, 2, &_timing),
+_receiver(_timing, clock_, id, 1),
+_dualReceiver(_dualTiming, clock_, id, 2, false),
+_decodedFrameCallback(_timing, clock_),
+_dualDecodedFrameCallback(_dualTiming, clock_),
 _frameTypeCallback(NULL),
 _frameStorageCallback(NULL),
 _receiveStatsCallback(NULL),
@@ -64,20 +69,21 @@ _frameFromFile(),
 _keyRequestMode(kKeyOnError),
 _scheduleKeyRequest(false),
 
-_sendCritSect(*CriticalSectionWrapper::CreateCriticalSection()),
+_sendCritSect(CriticalSectionWrapper::CreateCriticalSection()),
 _encoder(),
 _encodedFrameCallback(),
-_mediaOpt(id),
+_mediaOpt(id, clock_),
 _sendCodecType(kVideoCodecUnknown),
 _sendStatsCallback(NULL),
 _encoderInputFile(NULL),
 
 _codecDataBase(id),
-_receiveStatsTimer(1000),
-_sendStatsTimer(1000),
-_retransmissionTimer(10),
-_keyRequestTimer(500)
+_receiveStatsTimer(1000, clock_),
+_sendStatsTimer(1000, clock_),
+_retransmissionTimer(10, clock_),
+_keyRequestTimer(500, clock_)
 {
+    assert(clock_);
     for (int i = 0; i < kMaxSimulcastStreams; i++)
     {
         _nextFrameType[i] = kVideoFrameDelta;
@@ -96,8 +102,9 @@ VideoCodingModuleImpl::~VideoCodingModuleImpl()
     {
         _codecDataBase.ReleaseDecoder(_dualDecoder);
     }
-    delete &_receiveCritSect;
-    delete &_sendCritSect;
+    delete _receiveCritSect;
+    delete _sendCritSect;
+    if (delete_clock_on_destroy_) delete clock_;
 #ifdef DEBUG_DECODER_BIT_STREAM
     fclose(_bitStreamBeforeDecoder);
 #endif
@@ -113,7 +120,18 @@ VideoCodingModule::Create(const WebRtc_Word32 id)
                  webrtc::kTraceVideoCoding,
                  VCMId(id),
                  "VideoCodingModule::Create()");
-    return new VideoCodingModuleImpl(id);
+    return new VideoCodingModuleImpl(id, new TickTimeBase(), true);
+}
+
+VideoCodingModule*
+VideoCodingModule::Create(const WebRtc_Word32 id, TickTimeBase* clock)
+{
+    WEBRTC_TRACE(webrtc::kTraceModuleCall,
+                 webrtc::kTraceVideoCoding,
+                 VCMId(id),
+                 "VideoCodingModule::Create()");
+    assert(clock);
+    return new VideoCodingModuleImpl(id, clock, false);
 }
 
 void
@@ -366,7 +384,7 @@ VideoCodingModuleImpl::InitializeSender()
     _encoder = NULL;
     _encodedFrameCallback.SetTransportCallback(NULL);
     // setting default bitRate and frameRate to 0
-    _mediaOpt.SetEncodingData(kVideoCodecUnknown, 0, 0, 0, 0, 0);
+    _mediaOpt.SetEncodingData(kVideoCodecUnknown, 0, 0, 0, 0, 0, 0);
     _mediaOpt.Reset(); // Resetting frame dropper
     return VCM_OK;
 }
@@ -420,12 +438,16 @@ VideoCodingModuleImpl::RegisterSendCodec(const VideoCodec* sendCodec,
         return VCM_CODEC_ERROR;
     }
     _sendCodecType = sendCodec->codecType;
+    int numLayers = (_sendCodecType != kVideoCodecVP8) ? 1 :
+                        sendCodec->codecSpecific.VP8.numberOfTemporalLayers;
+
     _mediaOpt.SetEncodingData(_sendCodecType,
                               sendCodec->maxBitrate,
                               sendCodec->maxFramerate,
                               sendCodec->startBitrate,
                               sendCodec->width,
-                              sendCodec->height);
+                              sendCodec->height,
+                              numLayers);
     _mediaOpt.SetMtu(maxPayloadSize);
 
     return VCM_OK;
@@ -547,7 +569,7 @@ VideoCodingModuleImpl::FrameRate() const
 WebRtc_Word32
 VideoCodingModuleImpl::SetChannelParameters(WebRtc_UWord32 availableBandWidth,
                                             WebRtc_UWord8 lossRate,
-                                            WebRtc_UWord32 RTT)
+                                            WebRtc_UWord32 rtt)
 {
     WEBRTC_TRACE(webrtc::kTraceModuleCall,
                  webrtc::kTraceVideoCoding,
@@ -558,10 +580,10 @@ VideoCodingModuleImpl::SetChannelParameters(WebRtc_UWord32 availableBandWidth,
         CriticalSectionScoped sendCs(_sendCritSect);
         WebRtc_UWord32 targetRate = _mediaOpt.SetTargetRates(availableBandWidth,
                                                              lossRate,
-                                                             RTT);
+                                                             rtt);
         if (_encoder != NULL)
         {
-            ret = _encoder->SetPacketLoss(lossRate);
+            ret = _encoder->SetChannelParameters(lossRate, rtt);
             if (ret < 0 )
             {
                 return ret;
@@ -582,14 +604,14 @@ VideoCodingModuleImpl::SetChannelParameters(WebRtc_UWord32 availableBandWidth,
 }
 
 WebRtc_Word32
-VideoCodingModuleImpl::SetReceiveChannelParameters(WebRtc_UWord32 RTT)
+VideoCodingModuleImpl::SetReceiveChannelParameters(WebRtc_UWord32 rtt)
 {
     WEBRTC_TRACE(webrtc::kTraceModuleCall,
                  webrtc::kTraceVideoCoding,
                  VCMId(_id),
                  "SetReceiveChannelParameters()");
     CriticalSectionScoped receiveCs(_receiveCritSect);
-    _receiver.UpdateRtt(RTT);
+    _receiver.UpdateRtt(rtt);
     return 0;
 }
 
@@ -1071,6 +1093,10 @@ VideoCodingModuleImpl::Decode(WebRtc_UWord16 maxWaitTimeMs)
             _dualDecoder->RegisterDecodeCompleteCallback(
                 &_dualDecodedFrameCallback);
         }
+        else
+        {
+            _dualReceiver.Reset();
+        }
     }
 
     if (frame == NULL)
@@ -1081,7 +1107,7 @@ VideoCodingModuleImpl::Decode(WebRtc_UWord16 maxWaitTimeMs)
 
         // If this frame was too late, we should adjust the delay accordingly
         _timing.UpdateCurrentDelay(frame->RenderTimeMs(),
-                                   VCMTickTime::MillisecondTimestamp());
+                                   clock_->MillisecondTimestamp());
 
 #ifdef DEBUG_DECODER_BIT_STREAM
         if (_bitStreamBeforeDecoder != NULL)
@@ -1198,7 +1224,8 @@ VideoCodingModuleImpl::DecodeDualFrame(WebRtc_UWord16 maxWaitTimeMs)
                      "Decoding frame %u with dual decoder",
                      dualFrame->TimeStamp());
         // Decode dualFrame and try to catch up
-        WebRtc_Word32 ret = _dualDecoder->Decode(*dualFrame);
+        WebRtc_Word32 ret = _dualDecoder->Decode(*dualFrame,
+                                                 clock_->MillisecondTimestamp());
         if (ret != WEBRTC_VIDEO_CODEC_OK)
         {
             WEBRTC_TRACE(webrtc::kTraceWarning,
@@ -1246,7 +1273,7 @@ VideoCodingModuleImpl::Decode(const VCMEncodedFrame& frame)
         return VCM_NO_CODEC_REGISTERED;
     }
     // Decode a frame
-    WebRtc_Word32 ret = _decoder->Decode(frame);
+    WebRtc_Word32 ret = _decoder->Decode(frame, clock_->MillisecondTimestamp());
 
     // Check for failed decoding, run frame type request callback if needed.
     if (ret < 0)
@@ -1405,16 +1432,20 @@ VideoCodingModuleImpl::IncomingPacket(const WebRtc_UWord8* incomingPayload,
         ret = _dualReceiver.InsertPacket(packet,
                                          rtpInfo.type.Video.width,
                                          rtpInfo.type.Video.height);
-        if (ret < 0)
-        {
-            return ret;
+        if (ret == VCM_FLUSH_INDICATOR) {
+          RequestKeyFrame();
+          ResetDecoder();
+        } else if (ret < 0) {
+          return ret;
         }
     }
     ret = _receiver.InsertPacket(packet, rtpInfo.type.Video.width,
                                  rtpInfo.type.Video.height);
-    if (ret < 0)
-    {
-        return ret;
+    if (ret == VCM_FLUSH_INDICATOR) {
+      RequestKeyFrame();
+      ResetDecoder();
+    } else if (ret < 0) {
+      return ret;
     }
     return VCM_OK;
 }

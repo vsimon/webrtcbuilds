@@ -25,7 +25,8 @@ namespace webrtc {
 class RTPSenderAudio: public DTMFqueue
 {
 public:
-    RTPSenderAudio(const WebRtc_Word32 id, RTPSenderInterface* rtpSender);
+    RTPSenderAudio(const WebRtc_Word32 id, RtpRtcpClock* clock,
+                   RTPSenderInterface* rtpSender);
     virtual ~RTPSenderAudio();
 
     void ChangeUniqueId(const WebRtc_Word32 id);
@@ -92,11 +93,12 @@ protected:
 
 private:
     WebRtc_Word32             _id;
+    RtpRtcpClock&             _clock;
     RTPSenderInterface*     _rtpSender;
-    CriticalSectionWrapper&    _audioFeedbackCritsect;
+    CriticalSectionWrapper* _audioFeedbackCritsect;
     RtpAudioFeedback*   _audioFeedback;
 
-    CriticalSectionWrapper&    _sendAudioCritsect;
+    CriticalSectionWrapper*   _sendAudioCritsect;
 
     WebRtc_UWord32            _frequency;
     WebRtc_UWord16            _packetSizeSamples;

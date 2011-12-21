@@ -9,50 +9,26 @@
 {
   'targets': [
     {
-      'target_name': 'rtp_format_vp8_unittest',
+      'target_name': 'rtp_rtcp_unittests',
       'type': 'executable',
       'dependencies': [
         'rtp_rtcp',
-        '../../testing/gtest.gyp:gtest',
-        '../../testing/gtest.gyp:gtest_main',
-      ],
-      'include_dirs': [
-        '.',
-      ],
-      'sources': [
-        'rtp_format_vp8_unittest.cc',
-      ],
-    },
-    {
-      'target_name': 'rtcp_format_remb_unittest',
-      'type': 'executable',
-      'dependencies': [
-        'rtp_rtcp',
+        '<(webrtc_root)/../testing/gtest.gyp:gtest',
+        '<(webrtc_root)/../test/test.gyp:test_support_main',
         '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
-        '../../testing/gtest.gyp:gtest',
-        '../../testing/gtest.gyp:gtest_main',
       ],
       'include_dirs': [
-        '.',
         '../../../',
       ],
       'sources': [
+        'rtp_format_vp8_unittest.cc',
+        'rtp_format_vp8_test_helper.cc',
+        'rtp_format_vp8_test_helper.h',
         'rtcp_format_remb_unittest.cc',
-      ],
-    },
-    {
-      'target_name': 'rtp_utility_test',
-      'type': 'executable',
-      'dependencies': [
-        'rtp_rtcp',
-        '../../testing/gtest.gyp:gtest',
-        '../../testing/gtest.gyp:gtest_main',
-      ],
-      'include_dirs': [
-        '.',
-      ],
-      'sources': [
         'rtp_utility_test.cc',
+        'rtp_header_extension_test.cc',
+        'rtp_sender_test.cc',
+        'rtcp_sender_test.cc',
       ],
     },
   ],

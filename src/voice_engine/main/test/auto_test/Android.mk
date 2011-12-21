@@ -17,11 +17,13 @@ include $(LOCAL_PATH)/../../../../../android-webrtc.mk
 LOCAL_MODULE_TAGS := tests
 LOCAL_CPP_EXTENSION := .cc
 LOCAL_SRC_FILES:= \
+    automated_mode.cc \
     voe_cpu_test.cc \
     voe_standard_test.cc \
     voe_stress_test.cc \
     voe_unit_test.cc \
-    voe_extended_test.cc 
+    voe_extended_test.cc \
+    voe_standard_integration_test.cc
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
@@ -35,6 +37,7 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../../../modules/audio_device/main/interface \
     $(LOCAL_PATH)/../../../../modules/interface \
     $(LOCAL_PATH)/../../../../system_wrappers/interface \
+    $(LOCAL_PATH)/../../../../../test \
     external/gtest/include \
 
 LOCAL_SHARED_LIBRARIES := \

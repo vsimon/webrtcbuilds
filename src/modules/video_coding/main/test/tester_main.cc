@@ -27,15 +27,9 @@
 using namespace webrtc;
 
 /*
- * Build with TICK_TIME_DEBUG and EVENT_DEBUG defined
- * to build the tests with simulated clock.
+ * Build with EVENT_DEBUG defined
+ * to build the tests with simulated events.
  */
-
-// TODO(holmer): How do we get debug time into the cmd line interface?
-/* Debug time */
-#if defined(TICK_TIME_DEBUG) && defined(EVENT_DEBUG)
-WebRtc_Word64 VCMTickTime::_timeNowDebug = 0; // current time in ms
-#endif
 
 int vcmMacrosTests = 0;
 int vcmMacrosErrors = 0;
@@ -195,6 +189,12 @@ int main(int argc, char **argv)
         break;
     case 10:
         ret = DecodeFromStorageTest(args);
+        break;
+    case 11:
+        ret = NormalTest::RunTest(args);
+        ret |= CodecDataBaseTest::RunTest(args);
+        ret |= ReceiverTimingTests(args);
+        ret |= JitterBufferTest(args);
         break;
     default:
         ret = -1;

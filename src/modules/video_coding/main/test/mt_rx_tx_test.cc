@@ -55,7 +55,8 @@ MainSenderThread(void* obj)
     }
     if (feof(state->_sourceFile) == 0)
     {
-        fread(tmpBuffer, 1, lengthSourceFrame,state->_sourceFile);
+        TEST(fread(tmpBuffer, 1, lengthSourceFrame,state->_sourceFile) > 0 ||
+             feof(state->_sourceFile));
         state->_frameCnt++;
         sourceFrame.CopyFrame(lengthSourceFrame, tmpBuffer);
         sourceFrame.SetHeight(height);
@@ -96,7 +97,7 @@ int MTRxTxTest(CmdArgs& args)
     std::string   inname = args.inputFile;
     std::string outname;
     if (args.outputFile == "")
-        outname = "../MTRxTxTest_decoded.yuv";
+        outname = test::OutputPath() + "MTRxTxTest_decoded.yuv";
     else
         outname = args.outputFile;
 
@@ -120,7 +121,7 @@ int MTRxTxTest(CmdArgs& args)
 
     // Set up trace
     Trace::CreateTrace();
-    Trace::SetTraceFile("MTRxTxTestTrace.txt");
+    Trace::SetTraceFile((test::OutputPath() + "MTRxTxTestTrace.txt").c_str());
     Trace::SetLevelFilter(webrtc::kTraceAll);
 
     FILE* sourceFile;
@@ -161,6 +162,7 @@ int MTRxTxTest(CmdArgs& args)
     strncpy(videoCodec.plName, args.codecName.c_str(), 32);
     videoCodec.plType = VCM_VP8_PAYLOAD_TYPE;
     videoCodec.maxBitrate = 10000;
+    videoCodec.codecType = args.codecType;
     TEST(rtp->RegisterReceivePayload(videoCodec) == 0);
     TEST(rtp->RegisterSendPayload(videoCodec) == 0);
 
@@ -168,7 +170,8 @@ int MTRxTxTest(CmdArgs& args)
     TEST(rtp->SetGenericFECStatus(fecEnabled, VCM_RED_PAYLOAD_TYPE, VCM_ULPFEC_PAYLOAD_TYPE) == 0);
 
     //VCM
-    VideoCodingModule* vcm = VideoCodingModule::Create(1);
+    TickTimeBase clock;
+    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock);
     if (vcm->InitializeReceiver() < 0)
     {
         return -1;
@@ -213,7 +216,8 @@ int MTRxTxTest(CmdArgs& args)
     encodeCompleteCallback->SetCodecType(ConvertCodecType(args.codecName.c_str()));
     encodeCompleteCallback->SetFrameDimensions(width, height);
     // frame ready to be sent to network
-    RTPSendCompleteCallback* outgoingTransport = new RTPSendCompleteCallback(rtp, "dump.rtp");
+    RTPSendCompleteCallback* outgoingTransport =
+        new RTPSendCompleteCallback(rtp, &clock, "dump.rtp");
     rtp->RegisterSendTransport(outgoingTransport);
     // FrameReceiveCallback
     VCMDecodeCompleteCallback receiveCallback(decodedFile);

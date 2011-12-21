@@ -44,6 +44,10 @@
     # which can be easily parsed for offline processing.
     'enable_data_logging%': 0,
 
+    # Disable these to not build components which can be externally provided.
+    'build_libjpeg%': 1,
+    'build_libyuv%': 1,
+
     'conditions': [
       ['OS=="win"', {
         # TODO(andrew, perkj): does this need to be here?
@@ -66,6 +70,9 @@
         # Exclude internal video render module on Chromium build
         'include_internal_video_render%': 0,
 
+        # Disable the use of protocol buffers in production code.
+        'enable_protobuf%': 0,
+
         'webrtc_root%': '<(DEPTH)/third_party/webrtc',
       }, {
         # Settings for the standalone (not-in-Chromium) build.
@@ -77,14 +84,17 @@
 
         'include_internal_video_render%': 1,
 
+        'enable_protobuf%': 1,
+
         'webrtc_root%': '<(DEPTH)/src',
 
         'conditions': [
           ['OS=="mac"', {
-            # TODO(andrew): clang is now the default on Mac, but we have a build
-            # error in a test. Temporarily disable clang until this is solved:
-            # http://code.google.com/p/webrtc/issues/detail?id=78
-            'clang%': 0,
+            # TODO(andrew): clang is the default on Mac. For now, disable the
+            # Chrome plugins, which causes a flood of chromium-style warnings.
+            # Investigate enabling the plugins:
+            # http://code.google.com/p/webrtc/issues/detail?id=163
+            'clang_use_chrome_plugins%': 0,
           }],
         ],
       }],
@@ -95,6 +105,12 @@
       '..','../..', # common_types.h, typedefs.h
     ],
     'conditions': [
+      ['build_with_chromium==1', {
+        'defines': [
+          # Changes settings for Chromium build.
+          'WEBRTC_CHROMIUM_BUILD',
+         ],
+      }],
       ['OS=="linux"', {
         'defines': [
           'WEBRTC_TARGET_PC',

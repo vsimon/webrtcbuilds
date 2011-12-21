@@ -17,6 +17,8 @@
 #include "event_wrapper.h"
 #include "utility.h"
 
+namespace webrtc {
+
 enum APITESTAction {TEST_CHANGE_CODEC_ONLY = 0, DTX_TEST = 1};
 
 class APITest : public ACMTest
@@ -150,8 +152,8 @@ private:
     ACMBackgroundNoiseMode _bgnModeB;
 
 
-    WebRtc_UWord64   _receiveVADActivityA[3];
-    WebRtc_UWord64   _receiveVADActivityB[3];
+    int            _receiveVADActivityA[3];
+    int            _receiveVADActivityB[3];
     bool           _verbose;
     
     int            _dotPositionA;
@@ -170,5 +172,6 @@ private:
     int            _testNumB;
 };
 
+} // namespace webrtc
 
 #endif

@@ -23,8 +23,8 @@
 #include "test_callbacks.h"
 #include "test_macros.h"
 #include "test_util.h" // send side callback
+#include "testsupport/metrics/video_metrics.h"
 #include "video_coding.h"
-#include "video_metrics.h"
 
 
 using namespace webrtc;
@@ -32,10 +32,11 @@ using namespace webrtc;
 int MediaOptTest::RunTest(int testNum, CmdArgs& args)
 {
     Trace::CreateTrace();
-    Trace::SetTraceFile("mediaOptTestTrace.txt");
+    Trace::SetTraceFile((test::OutputPath() + "mediaOptTestTrace.txt").c_str());
     Trace::SetLevelFilter(webrtc::kTraceAll);
-    VideoCodingModule* vcm = VideoCodingModule::Create(1);
-    MediaOptTest* mot = new MediaOptTest(vcm);
+    TickTimeBase clock;
+    VideoCodingModule* vcm = VideoCodingModule::Create(1, &clock);
+    MediaOptTest* mot = new MediaOptTest(vcm, &clock);
     if (testNum == 0)
     { // regular
          mot->Setup(0, args);
@@ -66,8 +67,9 @@ int MediaOptTest::RunTest(int testNum, CmdArgs& args)
 }
 
 
-MediaOptTest::MediaOptTest(VideoCodingModule* vcm):
+MediaOptTest::MediaOptTest(VideoCodingModule* vcm, TickTimeBase* clock):
 _vcm(vcm),
+_clock(clock),
 _width(0),
 _height(0),
 _lengthSourceFrame(0),
@@ -98,10 +100,11 @@ MediaOptTest::Setup(int testType, CmdArgs& args)
     // test parameters
     _inname = args.inputFile;
     if (args.outputFile == "")
-        _outname = "../MOTest_out.vp8";
+        _outname = test::OutputPath() + "MOTest_out.vp8";
     else
         _outname = args.outputFile;
-    _actualSourcename = "../MOTestSource.yuv"; // actual source after frame dropping
+    // actual source after frame dropping
+    _actualSourcename = test::OutputPath() + "MOTestSource.yuv";
     _codecName = args.codecName;
     _sendCodecType = args.codecType;
     _width = args.width;
@@ -128,7 +131,7 @@ MediaOptTest::Setup(int testType, CmdArgs& args)
         _fpinp = fopen("dat_inp","rb");
         _fpout = fopen("test_runs/dat_out","ab");
         _fpout2 = fopen("test_runs/dat_out2","ab");
-        fscanf(_fpinp,"%f %f %d \n",&rateTest,&lossTest,&numRuns);
+        TEST(fscanf(_fpinp,"%f %f %d \n",&rateTest,&lossTest,&numRuns) > 0);
         _bitRate = rateTest;
         _lossRate = lossTest;
         _testNum = 0;
@@ -163,7 +166,8 @@ MediaOptTest::Setup(int testType, CmdArgs& args)
     /* test settings end*/
 
    _lengthSourceFrame  = 3*_width*_height/2;
-    _log.open("../VCM_MediaOptLog.txt", std::fstream::out | std::fstream::app);
+    _log.open((test::OutputPath() + "VCM_MediaOptLog.txt").c_str(),
+              std::fstream::out | std::fstream::app);
     return;
 }
 
@@ -277,7 +281,8 @@ MediaOptTest::Perform()
     encodeCompleteCallback->SetCodecType(ConvertCodecType(_codecName.c_str()));
     encodeCompleteCallback->SetFrameDimensions(_width, _height);
     // frame ready to be sent to network
-    RTPSendCompleteCallback* outgoingTransport = new RTPSendCompleteCallback(_rtp);
+    RTPSendCompleteCallback* outgoingTransport =
+        new RTPSendCompleteCallback(_rtp, _clock);
     _rtp->RegisterSendTransport(outgoingTransport);
     //FrameReceiveCallback
     VCMDecodeCompleteCallback receiveCallback(_decodedFile);
@@ -311,7 +316,7 @@ MediaOptTest::Perform()
 
     while (feof(_sourceFile)== 0)
     {
-        fread(tmpBuffer, 1, _lengthSourceFrame, _sourceFile);
+        TEST(fread(tmpBuffer, 1, _lengthSourceFrame, _sourceFile) > 0);
         _frameCnt++;
 
         sourceFrame.CopyFrame(_lengthSourceFrame, tmpBuffer);
@@ -384,12 +389,16 @@ MediaOptTest::RTTest()
     _rttMS = 20;
     _renderDelayMs = 0;
 
-    _outname = "../RTMOTest_out.yuv"; // same out name for all
-    _actualSourcename = "../RTMOTestSource.yuv"; // actual source after frame dropping
+    // same out name for all
+    _outname = test::OutputPath() + "RTMOTest_out.yuv";
+    // actual source after frame dropping
+    _actualSourcename = test::OutputPath() + "RTMOTestSource.yuv";
 
     _codecName = "VP8";  // for now just this one - later iterate over all codec types
-    _log.open("../VCM_RTMediaOptLog.txt", std::fstream::out | std::fstream::app);
-    _outputRes=fopen("../VCM_MediaOpt","ab");
+    _log.open((test::OutputPath() + "/VCM_RTMediaOptLog.txt").c_str(),
+              std::fstream::out | std::fstream::app);
+    _outputRes=fopen((test::OutputPath() + "VCM_MediaOptResults.txt").c_str(),
+                     "ab");
 
     //char filename[128];
     /* test settings end*/

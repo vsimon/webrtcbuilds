@@ -4,13 +4,17 @@ vars = {
   "googlecode_url": "http://%s.googlecode.com/svn",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
   "chromium_revision": "106036",
-  "libjingle_revision": "87",
+  "libjingle_revision": "100",
 
   # Note: On most bots, clang is not checked out via DEPS but by
   # tools/clang/scripts/update.sh. The script reads this line here.
   # Do NOT CHANGE this if you don't know what you're doing -- see
   # http://code.google.com/p/chromium/wiki/UpdatingClang
   "clang_revision": "142072",
+
+  # External resources like video and audio files used for testing purposes.
+  # Downloaded on demand when needed.
+  "webrtc_resources_revision": "4",
 }
 
 # NOTE: Prefer revision numbers to tags for svn deps.
@@ -37,11 +41,17 @@ deps = {
   "trunk/tools/clang/scripts":
     Var("chromium_trunk") + "/src/tools/clang/scripts@" + Var("chromium_revision"),
 
+  "trunk/tools/python":
+    Var("chromium_trunk") + "/src/tools/python@" + Var("chromium_revision"),
+
+  "trunk/tools/valgrind":
+    Var("chromium_trunk") + "/src/tools/valgrind@" + Var("chromium_revision"),
+
   "trunk/third_party/protobuf/":
     Var("chromium_trunk") + "/src/third_party/protobuf@" + Var("chromium_revision"),
 
   "trunk/third_party/libvpx/source/libvpx":
-    "http://git.chromium.org/webm/libvpx.git@e529a825",
+    "http://git.chromium.org/webm/libvpx.git@bdd35c13",
 
   "trunk/third_party/libjpeg_turbo/":
     Var("chromium_trunk") + "/deps/third_party/libjpeg_turbo@95800",
@@ -72,6 +82,9 @@ deps = {
 
   "trunk/third_party/jsoncpp/":
     "http://jsoncpp.svn.sourceforge.net/svnroot/jsoncpp/trunk/jsoncpp@246",
+
+  "trunk/third_party/libyuv":
+    (Var("googlecode_url") % "libyuv") + "/trunk@101",
 }
 
 deps_os = {
@@ -94,6 +107,14 @@ hooks = [
     # zero seconds to run. If something changed, it downloads a prebuilt clang.
     "pattern": ".",
     "action": ["python", "trunk/tools/clang/scripts/update.py", "--mac-only"],
+  },
+  {
+    # Download test resources, i.e. video and audio files. If the latest
+    # version is already downloaded, this takes zero seconds to run.
+    # If a newer version or no current download exists, it will download
+    # the resources and extract them.
+    "pattern": ".",
+    "action": ["python", "trunk/tools/resources/update.py"],
   },
   {
     # A change to a .gyp, .gypi, or to GYP itself should run the generator.

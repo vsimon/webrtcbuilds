@@ -57,7 +57,8 @@ public:
         const RtpVideoCodecTypes videoType,
         const bool isRED,
         const WebRtc_UWord8* incomingRtpPacket,
-        const WebRtc_UWord16 incomingRtpPacketSize);
+        const WebRtc_UWord16 incomingRtpPacketSize,
+        const WebRtc_Word64 nowMS);
 
     WebRtc_Word32 SetH263InverseLogic(const bool enable);
 
@@ -131,10 +132,10 @@ private:
     WebRtc_Word32             _id;
     ModuleRtpRtcpImpl&        _rtpRtcp;
 
-    CriticalSectionWrapper&   _criticalSectionFeedback;
+    CriticalSectionWrapper*   _criticalSectionFeedback;
     RtpVideoFeedback*         _cbVideoFeedback;
 
-    CriticalSectionWrapper&   _criticalSectionReceiverVideo;
+    CriticalSectionWrapper*   _criticalSectionReceiverVideo;
 
     // bandwidth
     bool                      _completeFrame;

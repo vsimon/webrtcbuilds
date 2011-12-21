@@ -16,7 +16,6 @@
 #include <cstdlib> // rand
 
 #include "trace.h"
-#include "tick_util.h"
 #include "common_types.h"
 #include "critical_section_wrapper.h"
 
@@ -25,21 +24,24 @@
 namespace webrtc {
 RTCPSender::RTCPSender(const WebRtc_Word32 id,
                        const bool audio,
+                       RtpRtcpClock* clock,
                        ModuleRtpRtcpImpl* owner) :
     _id(id),
     _audio(audio),
+    _clock(*clock),
     _method(kRtcpOff),
     _rtpRtcp(*owner),
-    _criticalSectionTransport(*CriticalSectionWrapper::CreateCriticalSection()),
+    _criticalSectionTransport(CriticalSectionWrapper::CreateCriticalSection()),
     _cbTransport(NULL),
 
-    _criticalSectionRTCPSender(*CriticalSectionWrapper::CreateCriticalSection()),
+    _criticalSectionRTCPSender(CriticalSectionWrapper::CreateCriticalSection()),
     _usingNack(false),
     _sending(false),
     _sendTMMBN(false),
     _REMB(false),
     _sendREMB(false),
     _TMMBR(false),
+    _IJ(false),
     _nextTimeToSendRTCP(0),
     _SSRC(0),
     _remoteSSRC(0),
@@ -111,8 +113,8 @@ RTCPSender::~RTCPSender()
         _csrcCNAMEs.Erase(item);
         item = _csrcCNAMEs.First();
     }
-    delete &_criticalSectionTransport;
-    delete &_criticalSectionRTCPSender;
+    delete _criticalSectionTransport;
+    delete _criticalSectionRTCPSender;
 
     WEBRTC_TRACE(kTraceMemory, kTraceRtpRtcp, _id, "%s deleted", __FUNCTION__);
 }
@@ -128,6 +130,7 @@ RTCPSender::Init()
     _sending = false;
     _sendTMMBN = false;
     _TMMBR = false;
+    _IJ = false;
     _REMB = false;
     _sendREMB = false;
     _SSRC = 0;
@@ -187,10 +190,10 @@ RTCPSender::SetRTCPStatus(const RTCPMethod method)
     {
         if(_audio)
         {
-            _nextTimeToSendRTCP = ModuleRTPUtility::GetTimeInMS() + (RTCP_INTERVAL_AUDIO_MS/2);
+            _nextTimeToSendRTCP = _clock.GetTimeInMS() + (RTCP_INTERVAL_AUDIO_MS/2);
         } else
         {
-            _nextTimeToSendRTCP = ModuleRTPUtility::GetTimeInMS() + (RTCP_INTERVAL_VIDEO_MS/2);
+            _nextTimeToSendRTCP = _clock.GetTimeInMS() + (RTCP_INTERVAL_VIDEO_MS/2);
         }
     }
     _method = method;
@@ -281,6 +284,21 @@ RTCPSender::SetTMMBRStatus(const bool enable)
     return 0;
 }
 
+bool
+RTCPSender::IJ() const
+{
+    CriticalSectionScoped lock(_criticalSectionRTCPSender);
+    return _IJ;
+}
+
+WebRtc_Word32
+RTCPSender::SetIJStatus(const bool enable)
+{
+    CriticalSectionScoped lock(_criticalSectionRTCPSender);
+    _IJ = enable;
+    return 0;
+}
+
 void
 RTCPSender::SetSSRC( const WebRtc_UWord32 ssrc)
 {
@@ -290,7 +308,8 @@ RTCPSender::SetSSRC( const WebRtc_UWord32 ssrc)
     {
         // not first SetSSRC, probably due to a collision
         // schedule a new RTCP report
-        _nextTimeToSendRTCP = ModuleRTPUtility::GetTimeInMS() + 100; // make sure that we send a RTP packet
+        // make sure that we send a RTP packet
+        _nextTimeToSendRTCP = _clock.GetTimeInMS() + 100;
     }
     _SSRC = ssrc;
 }
@@ -457,14 +476,14 @@ From RFC 3550
       a value of the RTCP bandwidth below the intended average
 */
 
+    WebRtc_UWord32 now = _clock.GetTimeInMS();
+
+    CriticalSectionScoped lock(_criticalSectionRTCPSender);
+
     if(_method == kRtcpOff)
     {
         return false;
     }
-
-    WebRtc_UWord32 now = ModuleRTPUtility::GetTimeInMS();
-
-    CriticalSectionScoped lock(_criticalSectionRTCPSender);
 
     if(!_audio && sendKeyframeBeforeRTP)
     {
@@ -633,7 +652,7 @@ RTCPSender::BuildSR(WebRtc_UWord8* rtcpbuffer,
     if(_audio)
     {
         freqHz =  _rtpRtcp.CurrentSendFrequencyHz();
-        RTPtime = ModuleRTPUtility::CurrentRTP(freqHz);
+        RTPtime = ModuleRTPUtility::GetCurrentRTP(&_clock, freqHz);
     }
     else // video 
     {
@@ -826,6 +845,57 @@ RTCPSender::BuildRR(WebRtc_UWord8* rtcpbuffer,
     return 0;
 }
 
+// From RFC 5450: Transmission Time Offsets in RTP Streams.
+//        0                   1                   2                   3
+//        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+//       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//   hdr |V=2|P|    RC   |   PT=IJ=195   |             length            |
+//       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//       |                      inter-arrival jitter                     |
+//       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//       .                                                               .
+//       .                                                               .
+//       .                                                               .
+//       |                      inter-arrival jitter                     |
+//       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+//
+//  If present, this RTCP packet must be placed after a receiver report
+//  (inside a compound RTCP packet), and MUST have the same value for RC
+//  (reception report count) as the receiver report.
+
+WebRtc_Word32
+RTCPSender::BuildExtendedJitterReport(
+    WebRtc_UWord8* rtcpbuffer,
+    WebRtc_UWord32& pos,
+    const WebRtc_UWord32 jitterTransmissionTimeOffset)
+{
+    if (_reportBlocks.Size() > 0)
+    {
+        WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, _id, "Not implemented.");
+        return 0;
+    }
+
+    // sanity
+    if(pos + 8 >= IP_PACKET_SIZE)
+    {
+        return -2;
+    }
+    // add picture loss indicator
+    WebRtc_UWord8 RC = 1;
+    rtcpbuffer[pos++]=(WebRtc_UWord8)0x80 + RC;
+    rtcpbuffer[pos++]=(WebRtc_UWord8)195;
+
+    // Used fixed length of 2
+    rtcpbuffer[pos++]=(WebRtc_UWord8)0;
+    rtcpbuffer[pos++]=(WebRtc_UWord8)(1);
+
+    // Add inter-arrival jitter
+    ModuleRTPUtility::AssignUWord32ToBuffer(rtcpbuffer + pos,
+                                            jitterTransmissionTimeOffset);
+    pos += 4;
+    return 0;
+}
+
 WebRtc_Word32
 RTCPSender::BuildPLI(WebRtc_UWord8* rtcpbuffer, WebRtc_UWord32& pos)
 {
@@ -857,7 +927,7 @@ WebRtc_Word32
 RTCPSender::BuildFIR(WebRtc_UWord8* rtcpbuffer, WebRtc_UWord32& pos, const WebRtc_UWord32 RTT)
 {
     bool firRepeat = false;
-    WebRtc_UWord32 diff = ModuleRTPUtility::GetTimeInMS() - _lastTimeFIR;
+    WebRtc_UWord32 diff = _clock.GetTimeInMS() - _lastTimeFIR;
     if(diff < RTT + 3) // 3 is processing jitter
     {
         // we have recently sent a FIR
@@ -872,7 +942,7 @@ RTCPSender::BuildFIR(WebRtc_UWord8* rtcpbuffer, WebRtc_UWord32& pos, const WebRt
             firRepeat = true;
         }
     }
-    _lastTimeFIR = ModuleRTPUtility::GetTimeInMS();
+    _lastTimeFIR = _clock.GetTimeInMS();
     if(!firRepeat)
     {
         _sequenceNumberFIR++;   // do not increase if repetition
@@ -1103,7 +1173,8 @@ RTCPSender::BuildREMB(WebRtc_UWord8* rtcpbuffer, WebRtc_UWord32& pos)
 WebRtc_UWord32
 RTCPSender::CalculateNewTargetBitrate(WebRtc_UWord32 RTT)
 {
-    WebRtc_UWord32 target_bitrate = _remoteRateControl.TargetBitRate(RTT);
+    WebRtc_UWord32 target_bitrate =
+        _remoteRateControl.TargetBitRate(RTT, _clock.GetTimeInMS());
     _tmmbr_Send = target_bitrate / 1000;
     return target_bitrate;
 }
@@ -1564,12 +1635,6 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
     WebRtc_UWord32 pos = 0;
     WebRtc_UWord8 rtcpbuffer[IP_PACKET_SIZE];
 
-    if(_method == kRtcpOff)
-    {
-        WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, _id, "%s invalid state", __FUNCTION__);
-        return -1;
-    }
-
     do  // only to be able to use break :) (and the critsect must be inside its own scope)
     {
         // collect the received information
@@ -1577,8 +1642,21 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
         bool hasReceived = false;
         WebRtc_UWord32 NTPsec = 0;
         WebRtc_UWord32 NTPfrac = 0;
+        bool rtcpCompound = false;
+        WebRtc_UWord32 jitterTransmissionOffset = 0;
 
-        if( _method == kRtcpCompound ||
+        {
+          CriticalSectionScoped lock(_criticalSectionRTCPSender);
+          if(_method == kRtcpOff)
+          {
+              WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, _id,
+                           "%s invalid state", __FUNCTION__);
+              return -1;
+          }
+          rtcpCompound = (_method == kRtcpCompound) ? true : false;
+        }
+
+        if (rtcpCompound ||
             rtcpPacketTypeFlags & kRtcpReport ||
             rtcpPacketTypeFlags & kRtcpSr ||
             rtcpPacketTypeFlags & kRtcpRr)
@@ -1587,7 +1665,8 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
             if(_rtpRtcp.ReportBlockStatistics(&received.fractionLost,
                                               &received.cumulativeLost,
                                               &received.extendedHighSeqNum,
-                                              &received.jitter) == 0)
+                                              &received.jitter,
+                                              &jitterTransmissionOffset) == 0)
             {
                 hasReceived = true;
 
@@ -1601,7 +1680,7 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
                                          remoteSR);
 
                 // get our NTP as late as possible to avoid a race
-                ModuleRTPUtility::CurrentNTP(NTPsec, NTPfrac);
+                _clock.CurrentNTP(NTPsec, NTPfrac);
 
                 // Delay since last received report
                 WebRtc_UWord32 delaySinceLastReceivedSR = 0;
@@ -1623,7 +1702,7 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
             } else
             {
                 // we need to send our NTP even if we dont have received any reports
-                ModuleRTPUtility::CurrentNTP(NTPsec, NTPfrac);
+                _clock.CurrentNTP(NTPsec, NTPfrac);
             }
         }
 
@@ -1662,6 +1741,10 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
             } else
             {
                 rtcpPacketTypeFlags |= kRtcpRr;
+            }
+            if (_IJ && hasReceived)
+            {
+                rtcpPacketTypeFlags |= kRtcpTransmissionTimeOffset;
             }
         } else if(_method == kRtcpNonCompound)
         {
@@ -1713,7 +1796,7 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
                 }
                 timeToNext = (minIntervalMs/2) + (minIntervalMs*random/1000);
             }
-            _nextTimeToSendRTCP = ModuleRTPUtility::GetTimeInMS() + timeToNext;
+            _nextTimeToSendRTCP = _clock.GetTimeInMS() + timeToNext;
         }
 
         // if the data does not fitt in the packet we fill it as much as possible
@@ -1771,6 +1854,22 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
                 {
                     return -1; // error
                 }
+            }
+        }
+        if(rtcpPacketTypeFlags & kRtcpTransmissionTimeOffset)
+        {
+            // If present, this RTCP packet must be placed after a
+            // receiver report.
+            buildVal = BuildExtendedJitterReport(rtcpbuffer,
+                                                 pos,
+                                                 jitterTransmissionOffset);
+            if(buildVal == -1)
+            {
+                return -1; // error
+            }
+            else if(buildVal == -2)
+            {
+                break;  // out of buffer
             }
         }
         if(rtcpPacketTypeFlags & kRtcpPli)
@@ -2129,6 +2228,7 @@ RateControlRegion
 RTCPSender::UpdateOverUseState(const RateControlInput& rateControlInput, bool& firstOverUse)
 {
     CriticalSectionScoped lock(_criticalSectionRTCPSender);
-    return _remoteRateControl.Update(rateControlInput, firstOverUse);
+    return _remoteRateControl.Update(rateControlInput, firstOverUse,
+                                     _clock.GetTimeInMS());
 }
 } // namespace webrtc

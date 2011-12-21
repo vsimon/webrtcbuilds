@@ -61,8 +61,9 @@ VCMEncodedFrame::VCMEncodedFrame(const VCMEncodedFrame& rhs)
   _length = 0;
   if (rhs._buffer != NULL)
   {
-      VerifyAndAllocate(rhs._size);
+      VerifyAndAllocate(rhs._length);
       memcpy(_buffer, rhs._buffer, rhs._length);
+      _length = rhs._length;
   }
   // Deep operator=
   _fragmentation = rhs._fragmentation;
@@ -110,6 +111,9 @@ void VCMEncodedFrame::CopyCodecSpecific(const RTPVideoHeader* header)
                 {
                     // This is the first packet for this frame.
                     _codecSpecificInfo.codecSpecific.VP8.pictureId = -1;
+                    _codecSpecificInfo.codecSpecific.VP8.temporalIdx = 0;
+                    _codecSpecificInfo.codecSpecific.VP8.layerSync = false;
+                    _codecSpecificInfo.codecSpecific.VP8.keyIdx = -1;
                     _codecSpecificInfo.codecType = kVideoCodecVP8;
                 }
                 _codecSpecificInfo.codecSpecific.VP8.nonReference =
@@ -118,6 +122,18 @@ void VCMEncodedFrame::CopyCodecSpecific(const RTPVideoHeader* header)
                 {
                     _codecSpecificInfo.codecSpecific.VP8.pictureId =
                         header->codecHeader.VP8.pictureId;
+                }
+                if (header->codecHeader.VP8.temporalIdx != kNoTemporalIdx)
+                {
+                    _codecSpecificInfo.codecSpecific.VP8.temporalIdx =
+                        header->codecHeader.VP8.temporalIdx;
+                    _codecSpecificInfo.codecSpecific.VP8.layerSync =
+                        header->codecHeader.VP8.layerSync;
+                }
+                if (header->codecHeader.VP8.keyIdx != kNoKeyIdx)
+                {
+                    _codecSpecificInfo.codecSpecific.VP8.keyIdx =
+                        header->codecHeader.VP8.keyIdx;
                 }
                 break;
             }

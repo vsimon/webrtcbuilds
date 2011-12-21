@@ -13,6 +13,7 @@
 
 #include "typedefs.h"
 #include "critical_section_wrapper.h"
+#include "decoding_state.h"
 #include "module_common_types.h"
 #include "video_coding_defines.h"
 #include "inter_frame_delay.h"
@@ -32,6 +33,7 @@ enum VCMNackMode
 };
 
 // forward declarations
+class TickTimeBase;
 class VCMFrameBuffer;
 class VCMPacket;
 class VCMEncodedFrame;
@@ -48,12 +50,13 @@ public:
 class VCMJitterBuffer
 {
 public:
-    VCMJitterBuffer(WebRtc_Word32 vcmId = -1,
+    VCMJitterBuffer(TickTimeBase* clock,
+                    WebRtc_Word32 vcmId = -1,
                     WebRtc_Word32 receiverId = -1,
                     bool master = true);
     virtual ~VCMJitterBuffer();
 
-    VCMJitterBuffer& operator=(const VCMJitterBuffer& rhs);
+    void CopyFrom(const VCMJitterBuffer& rhs);
 
     // We need a start and stop to break out of the wait event
     // used in GetCompleteFrameForDecoding
@@ -89,6 +92,7 @@ public:
     // or more packets?
     bool CompleteSequenceWithNextFrame();
 
+    // TODO (mikhal/stefan): Merge all GetFrameForDecoding into one.
     // Wait maxWaitTimeMS for a complete frame to arrive. After timeout NULL
     // is returned.
     VCMEncodedFrame* GetCompleteFrameForDecoding(WebRtc_UWord32 maxWaitTimeMS);
@@ -120,7 +124,15 @@ public:
     void UpdateRtt(WebRtc_UWord32 rttMs);
 
     // NACK
-    void SetNackMode(VCMNackMode mode); // Enable/disable nack
+    // Set the NACK mode. "highRttNackThreshold" is an RTT threshold in ms above
+    // which NACK will be disabled if the NACK mode is "kNackHybrid",
+    // -1 meaning that NACK is always enabled in the Hybrid mode.
+    // "lowRttNackThreshold" is an RTT threshold in ms below which we expect to
+    // rely on NACK only, and therefore are using larger buffers to have time to
+    // wait for retransmissions.
+    void SetNackMode(VCMNackMode mode,
+                     int lowRttNackThresholdMs,
+                     int highRttNackThresholdMs);
     VCMNackMode GetNackMode() const;    // Get nack mode
     // Get list of missing sequence numbers (size in number of elements)
     WebRtc_UWord16* GetNackList(WebRtc_UWord16& nackSize,
@@ -135,7 +147,6 @@ private:
     void ReleaseFrameInternal(VCMFrameBuffer* frame);
     // Flush and reset the jitter buffer. Call under critical section.
     void FlushInternal();
-    VCMFrameListItem* FindOldestSequenceNum() const;
 
     // Help functions for insert packet
     // Get empty frame, creates new (i.e. increases JB size) if necessary
@@ -144,14 +155,14 @@ private:
     bool RecycleFramesUntilKeyFrame();
     // Update frame state
     // (set as complete or reconstructable if conditions are met)
-    void UpdateFrameState(VCMFrameBuffer* frameListItem);
+    VCMFrameBufferEnum UpdateFrameState(VCMFrameBuffer* frameListItem);
 
     // Help functions for getting a frame
     // Find oldest complete frame, used for getting next frame to decode
-    VCMFrameListItem* FindOldestCompleteContinuousFrame();
+    // When enabled, will return a decodable frame
+    VCMFrameListItem* FindOldestCompleteContinuousFrame(bool enableDecodable);
 
     void CleanUpOldFrames();
-    void CleanUpSizeZeroFrames();
 
     void VerifyAndSetPreviousFrameLost(VCMFrameBuffer& frame);
     bool IsPacketRetransmitted(const VCMPacket& packet) const;
@@ -177,15 +188,15 @@ private:
                                     const void* timestamp);
     static bool CompleteDecodableKeyFrameCriteria(VCMFrameBuffer* frame,
                                                   const void* notUsed);
-    bool ContinuousPictureId(int pictureId) const;
     // Decide whether should wait for NACK (mainly relevant for hybrid mode)
     bool WaitForNack();
 
     WebRtc_Word32                 _vcmId;
     WebRtc_Word32                 _receiverId;
+    TickTimeBase*                 _clock;
     // If we are running (have started) or not
     bool                          _running;
-    CriticalSectionWrapper&       _critSect;
+    CriticalSectionWrapper*       _critSect;
     bool                          _master;
     // Event to signal when we have a frame ready for decoder
     VCMEvent                      _frameEvent;
@@ -198,11 +209,7 @@ private:
     VCMFrameListTimestampOrderAsc _frameBuffersTSOrder;
 
     // timing
-    // Sequence number of last frame that was given to decoder
-    WebRtc_Word32           _lastDecodedSeqNum;
-    // Timestamp of last frame that was given to decoder
-    WebRtc_Word64           _lastDecodedTimeStamp;
-    int                     _lastDecodedPictureId;
+    VCMDecodingState       _lastDecodedState;
     WebRtc_UWord32          _packetsNotDecodable;
 
     // Statistics
@@ -234,6 +241,8 @@ private:
 
     // NACK
     VCMNackMode             _nackMode;
+    int                     _lowRttNackThresholdMs;
+    int                     _highRttNackThresholdMs;
     // Holds the internal nack list (the missing sequence numbers)
     WebRtc_Word32           _NACKSeqNumInternal[kNackHistoryLength];
     WebRtc_UWord16          _NACKSeqNum[kNackHistoryLength];
@@ -241,6 +250,8 @@ private:
     bool                    _waitingForKeyFrame;
 
     bool                    _firstPacket;
+
+    DISALLOW_COPY_AND_ASSIGN(VCMJitterBuffer);
 };
 
 } // namespace webrtc

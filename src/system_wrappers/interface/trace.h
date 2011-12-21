@@ -18,14 +18,7 @@
 #include "common_types.h"
 #include "typedefs.h"
 
-#ifdef WEBRTC_NO_TRACE
-    #define WEBRTC_TRACE
-#else
-    // Ideally we would use __VA_ARGS__ but it's not supported by all compilers
-    // such as VS2003 (it's supported in VS2005). TODO (hellner) why
-    // would this be better than current implementation (not convinced)?
-    #define WEBRTC_TRACE Trace::Add
-#endif
+#define WEBRTC_TRACE Trace::Add
 
 namespace webrtc {
 class Trace

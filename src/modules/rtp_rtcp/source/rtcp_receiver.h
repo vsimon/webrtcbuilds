@@ -24,7 +24,8 @@ class ModuleRtpRtcpImpl;
 class RTCPReceiver
 {
 public:
-    RTCPReceiver(const WebRtc_Word32 id, ModuleRtpRtcpImpl* owner);
+    RTCPReceiver(const WebRtc_Word32 id, RtpRtcpClock* clock,
+                 ModuleRtpRtcpImpl* owner);
     virtual ~RTCPReceiver();
 
     void ChangeUniqueId(const WebRtc_Word32 id);
@@ -150,6 +151,12 @@ protected:
     void HandleREMBItem(RTCPUtility::RTCPParserV2& rtcpParser,
                         RTCPHelp::RTCPPacketInformation& rtcpPacketInformation);
 
+    void HandleIJ(RTCPUtility::RTCPParserV2& rtcpParser,
+                  RTCPHelp::RTCPPacketInformation& rtcpPacketInformation);
+
+    void HandleIJItem(const RTCPUtility::RTCPPacket& rtcpPacket,
+                      RTCPHelp::RTCPPacketInformation& rtcpPacketInformation);
+
     void HandleTMMBR(RTCPUtility::RTCPParserV2& rtcpParser,
                      RTCPHelp::RTCPPacketInformation& rtcpPacketInformation);
 
@@ -181,15 +188,16 @@ protected:
 
 private:
     WebRtc_Word32           _id;
+    RtpRtcpClock&           _clock;
     RTCPMethod              _method;
     WebRtc_UWord32          _lastReceived;
     ModuleRtpRtcpImpl&      _rtpRtcp;
 
-    CriticalSectionWrapper& _criticalSectionFeedbacks;
+    CriticalSectionWrapper* _criticalSectionFeedbacks;
     RtcpFeedback*           _cbRtcpFeedback;
     RtpVideoFeedback*       _cbVideoFeedback;
 
-    CriticalSectionWrapper& _criticalSectionRTCPReceiver;
+    CriticalSectionWrapper* _criticalSectionRTCPReceiver;
     WebRtc_UWord32          _SSRC;
     WebRtc_UWord32          _remoteSSRC;
 

@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
     WebRtc_UWord16  payload[600];
     WebRtc_UWord16  payloadRCU[600];
     WebRtc_UWord16  packetLossPercent = 0;
-    WebRtc_Word16   rcuStreamLen;
+    WebRtc_Word16   rcuStreamLen = 0;
 	int onlyEncode;
 	int onlyDecode;
 
@@ -373,10 +373,6 @@ valid values are 8 and 16.\n", sampFreqKHz);
 				cur_framesmpls += samplesIn10Ms;
 	            
 				//-------- iSAC encoding ---------
-				if(framecnt == 11)
-				{
-					framecnt = framecnt;
-				}
 				stream_len = WebRtcIsac_Encode(ISAC_main_inst, shortdata, 
 					(WebRtc_Word16*)payload);
 	            

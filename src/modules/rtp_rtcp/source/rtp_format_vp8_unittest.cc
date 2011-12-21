@@ -15,437 +15,287 @@
 
 #include <gtest/gtest.h>
 
+#include "modules/rtp_rtcp/source/rtp_format_vp8.h"
+#include "modules/rtp_rtcp/source/rtp_format_vp8_test_helper.h"
 #include "typedefs.h"
-#include "rtp_format_vp8.h"
 
-namespace {
+namespace webrtc {
 
-using webrtc::RTPFragmentationHeader;
-using webrtc::RtpFormatVp8;
-using webrtc::RTPVideoHeaderVP8;
+template <bool>
+struct CompileAssert {
+};
 
-const int kPayloadSize = 30;
-const int kBufferSize = kPayloadSize + 6; // Add space for payload descriptor.
+#undef COMPILE_ASSERT
+#define COMPILE_ASSERT(expr, msg) \
+  typedef CompileAssert<(bool(expr))> msg[bool(expr) ? 1 : -1]
 
 class RtpFormatVp8Test : public ::testing::Test {
  protected:
-  RtpFormatVp8Test() {};
-  virtual void SetUp();
-  virtual void TearDown();
-  void CheckHeader(bool first_in_frame, bool frag_start, int part_id);
-  void CheckPictureID();
-  void CheckTl0PicIdx();
-  void CheckTID();
-  void CheckPayload(int payload_end);
-  void CheckLast(bool last) const;
-  void CheckPacket(int send_bytes, int expect_bytes, bool last,
-              bool first_in_frame, bool frag_start);
-  void CheckPacketZeroPartId(int send_bytes, int expect_bytes, bool last,
-                             bool first_in_frame, bool frag_start);
-  WebRtc_UWord8 payload_data_[kPayloadSize];
-  WebRtc_UWord8 buffer_[kBufferSize];
-  WebRtc_UWord8 *data_ptr_;
-  RTPFragmentationHeader* fragmentation_;
+  RtpFormatVp8Test() : helper_(NULL) {}
+  virtual void TearDown() { delete helper_; }
+  bool Init() {
+    const int kSizeVector[] = {10, 10, 10};
+    const int kNumPartitions = sizeof(kSizeVector) / sizeof(kSizeVector[0]);
+    return Init(kSizeVector, kNumPartitions);
+  }
+  bool Init(const int* partition_sizes, int num_partitions) {
+    hdr_info_.pictureId = kNoPictureId;
+    hdr_info_.nonReference = false;
+    hdr_info_.temporalIdx = kNoTemporalIdx;
+    hdr_info_.layerSync = false;
+    hdr_info_.tl0PicIdx = kNoTl0PicIdx;
+    hdr_info_.keyIdx = kNoKeyIdx;
+    if (helper_ != NULL) return false;
+    helper_ = new test::RtpFormatVp8TestHelper(&hdr_info_);
+    return helper_->Init(partition_sizes, num_partitions);
+  }
+
   RTPVideoHeaderVP8 hdr_info_;
-  int payload_start_;
+  test::RtpFormatVp8TestHelper* helper_;
 };
 
-void RtpFormatVp8Test::SetUp() {
-    for (int i = 0; i < kPayloadSize; i++)
-    {
-        payload_data_[i] = i / 10; // integer division
-    }
-    data_ptr_ = payload_data_;
+TEST_F(RtpFormatVp8Test, TestStrictMode) {
+  ASSERT_TRUE(Init());
 
-    fragmentation_ = new RTPFragmentationHeader;
-    fragmentation_->VerifyAndAllocateFragmentationHeader(3);
-    fragmentation_->fragmentationLength[0] = 10;
-    fragmentation_->fragmentationLength[1] = 10;
-    fragmentation_->fragmentationLength[2] = 10;
-    fragmentation_->fragmentationOffset[0] = 0;
-    fragmentation_->fragmentationOffset[1] = 10;
-    fragmentation_->fragmentationOffset[2] = 20;
+  hdr_info_.pictureId = 200;  // > 0x7F should produce 2-byte PictureID.
+  RtpFormatVp8 packetizer = RtpFormatVp8(helper_->payload_data(),
+                                         helper_->payload_size(),
+                                         hdr_info_,
+                                         *(helper_->fragmentation()),
+                                         kStrict);
 
-    hdr_info_.pictureId = webrtc::kNoPictureId;
-    hdr_info_.nonReference = false;
-    hdr_info_.temporalIdx = webrtc::kNoTemporalIdx;
-    hdr_info_.tl0PicIdx = webrtc::kNoTl0PicIdx;
+  // The expected sizes are obtained by running a verified good implementation.
+  const int kExpectedSizes[] = {8, 10, 14, 5, 5, 7, 5};
+  const int kExpectedPart[] = {0, 0, 1, 2, 2, 2, 2};
+  const bool kExpectedFragStart[] =
+      {true, false, true, true, false, false, false};
+  const int kMaxSize[] = {13, 13, 20, 7, 7, 7, 7};
+  const int kExpectedNum = sizeof(kExpectedSizes) / sizeof(kExpectedSizes[0]);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedPart) / sizeof(kExpectedPart[0]),
+      kExpectedPart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedFragStart) / sizeof(kExpectedFragStart[0]),
+      kExpectedFragStart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum == sizeof(kMaxSize) / sizeof(kMaxSize[0]),
+                 kMaxSize_wrong_size);
+
+  helper_->GetAllPacketsAndCheck(&packetizer, kExpectedSizes, kExpectedPart,
+                                 kExpectedFragStart, kMaxSize, kExpectedNum);
 }
 
-void RtpFormatVp8Test::TearDown() {
-    delete fragmentation_;
+TEST_F(RtpFormatVp8Test, TestAggregateMode) {
+  ASSERT_TRUE(Init());
+
+  hdr_info_.pictureId = 20;  // <= 0x7F should produce 1-byte PictureID.
+  RtpFormatVp8 packetizer = RtpFormatVp8(helper_->payload_data(),
+                                         helper_->payload_size(),
+                                         hdr_info_,
+                                         *(helper_->fragmentation()),
+                                         kAggregate);
+
+  // The expected sizes are obtained by running a verified good implementation.
+  const int kExpectedSizes[] = {7, 5, 7, 23};
+  const int kExpectedPart[] = {0, 0, 0, 1};
+  const bool kExpectedFragStart[] = {true, false, false, true};
+  const int kMaxSize[] = {8, 8, 8, 25};
+  const int kExpectedNum = sizeof(kExpectedSizes) / sizeof(kExpectedSizes[0]);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedPart) / sizeof(kExpectedPart[0]),
+      kExpectedPart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedFragStart) / sizeof(kExpectedFragStart[0]),
+      kExpectedFragStart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum == sizeof(kMaxSize) / sizeof(kMaxSize[0]),
+                 kMaxSize_wrong_size);
+
+  helper_->GetAllPacketsAndCheck(&packetizer, kExpectedSizes, kExpectedPart,
+                                 kExpectedFragStart, kMaxSize, kExpectedNum);
 }
 
-// First octet tests
-#define EXPECT_BIT_EQ(x,n,a) EXPECT_EQ((((x)>>n)&0x1), a)
+TEST_F(RtpFormatVp8Test, TestSloppyMode) {
+  ASSERT_TRUE(Init());
 
-#define EXPECT_RSV_ZERO(x) EXPECT_EQ(((x)&0xE0), 0)
+  hdr_info_.pictureId = kNoPictureId;  // No PictureID.
+  RtpFormatVp8 packetizer = RtpFormatVp8(helper_->payload_data(),
+                                         helper_->payload_size(),
+                                         hdr_info_,
+                                         *(helper_->fragmentation()),
+                                         kSloppy);
 
-#define EXPECT_BIT_X_EQ(x,a) EXPECT_BIT_EQ(x, 7, a)
+  // The expected sizes are obtained by running a verified good implementation.
+  const int kExpectedSizes[] = {9, 9, 9, 7};
+  const int kExpectedPart[] = {0, 0, 1, 2};
+  const bool kExpectedFragStart[] = {true, false, false, false};
+  const int kMaxSize[] = {9, 9, 9, 9};
+  const int kExpectedNum = sizeof(kExpectedSizes) / sizeof(kExpectedSizes[0]);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedPart) / sizeof(kExpectedPart[0]),
+      kExpectedPart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedFragStart) / sizeof(kExpectedFragStart[0]),
+      kExpectedFragStart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum == sizeof(kMaxSize) / sizeof(kMaxSize[0]),
+                 kMaxSize_wrong_size);
 
-#define EXPECT_BIT_N_EQ(x,a) EXPECT_BIT_EQ(x, 5, a)
-
-#define EXPECT_BIT_S_EQ(x,a) EXPECT_BIT_EQ(x, 4, a)
-
-#define EXPECT_PART_ID_EQ(x, a) EXPECT_EQ(((x)&0x0F), a)
-
-// Extension fields tests
-#define EXPECT_BIT_I_EQ(x,a) EXPECT_BIT_EQ(x, 7, a)
-
-#define EXPECT_BIT_L_EQ(x,a) EXPECT_BIT_EQ(x, 6, a)
-
-#define EXPECT_BIT_T_EQ(x,a) EXPECT_BIT_EQ(x, 5, a)
-
-#define EXPECT_TID_EQ(x,a) EXPECT_EQ((((x)&0xE0) >> 5), a)
-
-void RtpFormatVp8Test::CheckHeader(bool first_in_frame, bool frag_start,
-                                   int part_id)
-{
-    payload_start_ = 1;
-    EXPECT_BIT_EQ(buffer_[0], 6, 0); // check reserved bit
-
-
-    if (hdr_info_.pictureId != webrtc::kNoPictureId ||
-        hdr_info_.temporalIdx != webrtc::kNoTemporalIdx ||
-        hdr_info_.tl0PicIdx != webrtc::kNoTl0PicIdx)
-    {
-        EXPECT_BIT_X_EQ(buffer_[0], 1);
-        ++payload_start_;
-        CheckPictureID();
-        CheckTl0PicIdx();
-        CheckTID();
-    }
-    else
-    {
-        EXPECT_BIT_X_EQ(buffer_[0], 0);
-    }
-
-    EXPECT_BIT_N_EQ(buffer_[0], 0);
-    EXPECT_BIT_S_EQ(buffer_[0], frag_start);
-
-    // Check partition index.
-    if (part_id < 0)
-    {
-        // (Payload data is the same as the partition index.)
-        EXPECT_EQ(buffer_[0] & 0x0F, buffer_[payload_start_]);
-    }
-    else
-    {
-        EXPECT_EQ(buffer_[0] & 0x0F, part_id);
-    }
-}
-
-void RtpFormatVp8Test::CheckPictureID()
-{
-    if (hdr_info_.pictureId != webrtc::kNoPictureId)
-    {
-        EXPECT_BIT_I_EQ(buffer_[1], 1);
-        if (hdr_info_.pictureId > 0x7F)
-        {
-            EXPECT_BIT_EQ(buffer_[payload_start_], 7, 1);
-            EXPECT_EQ(buffer_[payload_start_] & 0x7F,
-                      (hdr_info_.pictureId >> 8) & 0x7F);
-            EXPECT_EQ(buffer_[payload_start_ + 1],
-                      hdr_info_.pictureId & 0xFF);
-            payload_start_ += 2;
-        }
-        else
-        {
-            EXPECT_BIT_EQ(buffer_[payload_start_], 7, 0);
-            EXPECT_EQ(buffer_[payload_start_] & 0x7F,
-                      (hdr_info_.pictureId) & 0x7F);
-            payload_start_ += 1;
-        }
-    }
-    else
-    {
-        EXPECT_BIT_I_EQ(buffer_[1], 0);
-    }
-}
-
-void RtpFormatVp8Test::CheckTl0PicIdx()
-{
-    if (hdr_info_.tl0PicIdx != webrtc::kNoTl0PicIdx)
-    {
-        EXPECT_BIT_L_EQ(buffer_[1], 1);
-        EXPECT_EQ(buffer_[payload_start_], hdr_info_.tl0PicIdx);
-        ++payload_start_;
-    }
-    else
-    {
-        EXPECT_BIT_L_EQ(buffer_[1], 0);
-    }
-}
-
-void RtpFormatVp8Test::CheckTID()
-{
-    if (hdr_info_.temporalIdx != webrtc::kNoTemporalIdx)
-    {
-        EXPECT_BIT_T_EQ(buffer_[1], 1);
-        EXPECT_TID_EQ(buffer_[payload_start_], hdr_info_.temporalIdx);
-        EXPECT_EQ(buffer_[payload_start_] & 0x1F, 0);
-        ++payload_start_;
-    }
-    else
-    {
-        EXPECT_BIT_T_EQ(buffer_[1], 0);
-    }
-}
-
-void RtpFormatVp8Test::CheckPayload(int payload_end)
-{
-    for (int i = payload_start_; i < payload_end; i++, data_ptr_++)
-        EXPECT_EQ(buffer_[i], *data_ptr_);
-}
-
-void RtpFormatVp8Test::CheckLast(bool last) const
-{
-    EXPECT_EQ(last, data_ptr_ == payload_data_ + kPayloadSize);
-}
-
-void RtpFormatVp8Test::CheckPacket(int send_bytes, int expect_bytes, bool last,
-            bool first_in_frame, bool frag_start)
-{
-    EXPECT_EQ(send_bytes, expect_bytes);
-    CheckHeader(first_in_frame, frag_start, -1);
-    CheckPayload(send_bytes);
-    CheckLast(last);
-}
-
-void RtpFormatVp8Test::CheckPacketZeroPartId(int send_bytes,
-                                             int expect_bytes,
-                                             bool last,
-                                             bool first_in_frame,
-                                             bool frag_start)
-{
-    EXPECT_EQ(send_bytes, expect_bytes);
-    CheckHeader(first_in_frame, frag_start, 0);
-    CheckPayload(send_bytes);
-    CheckLast(last);
-}
-
-TEST_F(RtpFormatVp8Test, TestStrictMode)
-{
-    int send_bytes = 0;
-    bool last;
-    bool first_in_frame = true;
-
-    hdr_info_.pictureId = 200; // > 0x7F should produce 2-byte PictureID
-    RtpFormatVp8 packetizer = RtpFormatVp8(payload_data_, kPayloadSize,
-        hdr_info_, *fragmentation_, webrtc::kStrict);
-
-    // get first packet, expect balanced size ~= same as second packet
-    EXPECT_EQ(0, packetizer.NextPacket(13, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 8, last,
-                first_in_frame,
-                /* frag_start */ true);
-    first_in_frame = false;
-
-    // get second packet
-    EXPECT_EQ(0, packetizer.NextPacket(13, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 10, last,
-                first_in_frame,
-                /* frag_start */ false);
-
-    // Second partition
-    // Get first (and only) packet
-    EXPECT_EQ(1, packetizer.NextPacket(20, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 14, last,
-                first_in_frame,
-                /* frag_start */ true);
-
-    // Third partition
-    // Get first packet (of four)
-    EXPECT_EQ(2, packetizer.NextPacket(7, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 5, last,
-                first_in_frame,
-                /* frag_start */ true);
-
-    // Get second packet (of four)
-    EXPECT_EQ(2, packetizer.NextPacket(7, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 5, last,
-                first_in_frame,
-                /* frag_start */ false);
-
-    // Get third packet (of four)
-    EXPECT_EQ(2, packetizer.NextPacket(7, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 7, last,
-                first_in_frame,
-                /* frag_start */ false);
-
-    // Get fourth and last packet
-    EXPECT_EQ(2, packetizer.NextPacket(7, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 5, last,
-                first_in_frame,
-                /* frag_start */ false);
-
-}
-
-TEST_F(RtpFormatVp8Test, TestAggregateMode)
-{
-    int send_bytes = 0;
-    bool last;
-    bool first_in_frame = true;
-
-    hdr_info_.pictureId = 20; // <= 0x7F should produce 1-byte PictureID
-    RtpFormatVp8 packetizer = RtpFormatVp8(payload_data_, kPayloadSize,
-        hdr_info_, *fragmentation_, webrtc::kAggregate);
-
-    // get first packet
-    // first part of first partition (balanced fragments are expected)
-    EXPECT_EQ(0, packetizer.NextPacket(8, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 7, last,
-                first_in_frame,
-                /* frag_start */ true);
-    first_in_frame = false;
-
-    // get second packet
-    // second fragment of first partition
-    EXPECT_EQ(0, packetizer.NextPacket(8, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 5, last,
-                first_in_frame,
-                /* frag_start */ false);
-
-    // get third packet
-    // third fragment of first partition
-    EXPECT_EQ(0, packetizer.NextPacket(8, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 7, last,
-                first_in_frame,
-                /* frag_start */ false);
-
-    // get fourth packet
-    // last two partitions aggregated
-    EXPECT_EQ(1, packetizer.NextPacket(25, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 23, last,
-                first_in_frame,
-                /* frag_start */ true);
-
-}
-
-TEST_F(RtpFormatVp8Test, TestSloppyMode)
-{
-    int send_bytes = 0;
-    bool last;
-    bool first_in_frame = true;
-
-    hdr_info_.pictureId = webrtc::kNoPictureId; // no PictureID
-    RtpFormatVp8 packetizer = RtpFormatVp8(payload_data_, kPayloadSize,
-        hdr_info_, *fragmentation_, webrtc::kSloppy);
-
-    // get first packet
-    EXPECT_EQ(0, packetizer.NextPacket(9, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 9, last,
-                first_in_frame,
-                /* frag_start */ true);
-    first_in_frame = false;
-
-    // get second packet
-    // fragments of first and second partitions
-    EXPECT_EQ(0, packetizer.NextPacket(9, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 9, last,
-                first_in_frame,
-                /* frag_start */ false);
-
-    // get third packet
-    // fragments of second and third partitions
-    EXPECT_EQ(1, packetizer.NextPacket(9, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 9, last,
-                first_in_frame,
-                /* frag_start */ false);
-
-    // get fourth packet
-    // second half of last partition
-    EXPECT_EQ(2, packetizer.NextPacket(9, buffer_, &send_bytes, &last));
-    CheckPacket(send_bytes, 7, last,
-                first_in_frame,
-                /* frag_start */ false);
-
+  helper_->GetAllPacketsAndCheck(&packetizer, kExpectedSizes, kExpectedPart,
+                                 kExpectedFragStart, kMaxSize, kExpectedNum);
 }
 
 // Verify that sloppy mode is forced if fragmentation info is missing.
-TEST_F(RtpFormatVp8Test, TestSloppyModeFallback)
-{
-    int send_bytes = 0;
-    bool last;
-    bool first_in_frame = true;
+TEST_F(RtpFormatVp8Test, TestSloppyModeFallback) {
+  ASSERT_TRUE(Init());
 
-    hdr_info_.pictureId = 200; // > 0x7F should produce 2-byte PictureID
-    RtpFormatVp8 packetizer = RtpFormatVp8(payload_data_, kPayloadSize,
-        hdr_info_);
+  hdr_info_.pictureId = 200;  // > 0x7F should produce 2-byte PictureID
+  RtpFormatVp8 packetizer = RtpFormatVp8(helper_->payload_data(),
+                                         helper_->payload_size(),
+                                         hdr_info_);
 
-    // get first packet
-    EXPECT_EQ(0, packetizer.NextPacket(10, buffer_, &send_bytes, &last));
-    CheckPacketZeroPartId(send_bytes, 10, last,
-                          first_in_frame,
-                          /* frag_start */ true);
-    first_in_frame = false;
+  // Expecting three full packets, and one with the remainder.
+  const int kExpectedSizes[] = {10, 10, 10, 7};
+  const int kExpectedPart[] = {0, 0, 0, 0};  // Always 0 for sloppy mode.
+  // Frag start only true for first packet in sloppy mode.
+  const bool kExpectedFragStart[] = {true, false, false, false};
+  const int kMaxSize[] = {10, 10, 10, 7};  // Small enough to produce 4 packets.
+  const int kExpectedNum = sizeof(kExpectedSizes) / sizeof(kExpectedSizes[0]);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedPart) / sizeof(kExpectedPart[0]),
+      kExpectedPart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedFragStart) / sizeof(kExpectedFragStart[0]),
+      kExpectedFragStart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum == sizeof(kMaxSize) / sizeof(kMaxSize[0]),
+                 kMaxSize_wrong_size);
 
-    // get second packet
-    // fragments of first and second partitions
-    EXPECT_EQ(0, packetizer.NextPacket(10, buffer_, &send_bytes, &last));
-    CheckPacketZeroPartId(send_bytes, 10, last,
-                          first_in_frame,
-                          /* frag_start */ false);
-
-    // get third packet
-    // fragments of second and third partitions
-    EXPECT_EQ(0, packetizer.NextPacket(10, buffer_, &send_bytes, &last));
-    CheckPacketZeroPartId(send_bytes, 10, last,
-                          first_in_frame,
-                          /* frag_start */ false);
-
-    // get fourth packet
-    // second half of last partition
-    EXPECT_EQ(0, packetizer.NextPacket(7, buffer_, &send_bytes, &last));
-    CheckPacketZeroPartId(send_bytes, 7, last,
-                          first_in_frame,
-                          /* frag_start */ false);
-
+  helper_->set_sloppy_partitioning(true);
+  helper_->GetAllPacketsAndCheck(&packetizer, kExpectedSizes, kExpectedPart,
+                                 kExpectedFragStart, kMaxSize, kExpectedNum);
 }
 
-// Verify that non-reference bit is set.
+// Verify that non-reference bit is set. Sloppy mode fallback is expected.
 TEST_F(RtpFormatVp8Test, TestNonReferenceBit) {
-    int send_bytes = 0;
-    bool last;
+  ASSERT_TRUE(Init());
 
-    hdr_info_.nonReference = true;
-    RtpFormatVp8 packetizer = RtpFormatVp8(payload_data_, kPayloadSize,
-        hdr_info_);
+  hdr_info_.nonReference = true;
+  RtpFormatVp8 packetizer = RtpFormatVp8(helper_->payload_data(),
+                                         helper_->payload_size(),
+                                         hdr_info_);
 
-    // get first packet
-    ASSERT_EQ(0, packetizer.NextPacket(25, buffer_, &send_bytes, &last));
-    ASSERT_FALSE(last);
-    EXPECT_BIT_N_EQ(buffer_[0], 1);
+  // Sloppy mode => First packet full; other not.
+  const int kExpectedSizes[] = {25, 7};
+  const int kExpectedPart[] = {0, 0};  // Always 0 for sloppy mode.
+  // Frag start only true for first packet in sloppy mode.
+  const bool kExpectedFragStart[] = {true, false};
+  const int kMaxSize[] = {25, 25};  // Small enough to produce two packets.
+  const int kExpectedNum = sizeof(kExpectedSizes) / sizeof(kExpectedSizes[0]);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedPart) / sizeof(kExpectedPart[0]),
+      kExpectedPart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedFragStart) / sizeof(kExpectedFragStart[0]),
+      kExpectedFragStart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum == sizeof(kMaxSize) / sizeof(kMaxSize[0]),
+                 kMaxSize_wrong_size);
 
-    // get second packet
-    ASSERT_EQ(0, packetizer.NextPacket(25, buffer_, &send_bytes, &last));
-    ASSERT_TRUE(last);
-    EXPECT_BIT_N_EQ(buffer_[0], 1);
+  helper_->set_sloppy_partitioning(true);
+  helper_->GetAllPacketsAndCheck(&packetizer, kExpectedSizes, kExpectedPart,
+                                 kExpectedFragStart, kMaxSize, kExpectedNum);
 }
 
-// Verify Tl0PicIdx and TID fields
+// Verify Tl0PicIdx and TID fields, and layerSync bit.
 TEST_F(RtpFormatVp8Test, TestTl0PicIdxAndTID) {
-    int send_bytes = 0;
-    bool last;
+  ASSERT_TRUE(Init());
 
-    hdr_info_.tl0PicIdx = 117;
-    hdr_info_.temporalIdx = 2;
-    RtpFormatVp8 packetizer = RtpFormatVp8(payload_data_, kPayloadSize,
-        hdr_info_, *fragmentation_, webrtc::kAggregate);
+  hdr_info_.tl0PicIdx = 117;
+  hdr_info_.temporalIdx = 2;
+  hdr_info_.layerSync = true;
+  RtpFormatVp8 packetizer = RtpFormatVp8(helper_->payload_data(),
+                                         helper_->payload_size(),
+                                         hdr_info_,
+                                         *(helper_->fragmentation()),
+                                         kAggregate);
 
-    // get first and only packet
-    EXPECT_EQ(0, packetizer.NextPacket(kBufferSize, buffer_, &send_bytes,
-                                       &last));
-    bool first_in_frame = true;
-    CheckPacket(send_bytes, kPayloadSize + 4, last,
-                first_in_frame,
-                /* frag_start */ true);
+  // Expect one single packet of payload_size() + 4 bytes header.
+  const int kExpectedSizes[1] = {helper_->payload_size() + 4};
+  const int kExpectedPart[1] = {0};  // Packet starts with partition 0.
+  const bool kExpectedFragStart[1] = {true};
+  // kMaxSize is only limited by allocated buffer size.
+  const int kMaxSize[1] = {helper_->buffer_size()};
+  const int kExpectedNum = sizeof(kExpectedSizes) / sizeof(kExpectedSizes[0]);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedPart) / sizeof(kExpectedPart[0]),
+      kExpectedPart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedFragStart) / sizeof(kExpectedFragStart[0]),
+      kExpectedFragStart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum == sizeof(kMaxSize) / sizeof(kMaxSize[0]),
+                 kMaxSize_wrong_size);
+
+  helper_->GetAllPacketsAndCheck(&packetizer, kExpectedSizes, kExpectedPart,
+                                 kExpectedFragStart, kMaxSize, kExpectedNum);
 }
 
-int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
+// Verify KeyIdx field.
+TEST_F(RtpFormatVp8Test, TestKeyIdx) {
+  ASSERT_TRUE(Init());
 
-  return RUN_ALL_TESTS();
+  hdr_info_.keyIdx = 17;
+  RtpFormatVp8 packetizer = RtpFormatVp8(helper_->payload_data(),
+                                         helper_->payload_size(),
+                                         hdr_info_,
+                                         *(helper_->fragmentation()),
+                                         kAggregate);
+
+  // Expect one single packet of payload_size() + 3 bytes header.
+  const int kExpectedSizes[1] = {helper_->payload_size() + 3};
+  const int kExpectedPart[1] = {0};  // Packet starts with partition 0.
+  const bool kExpectedFragStart[1] = {true};
+  // kMaxSize is only limited by allocated buffer size.
+  const int kMaxSize[1] = {helper_->buffer_size()};
+  const int kExpectedNum = sizeof(kExpectedSizes) / sizeof(kExpectedSizes[0]);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedPart) / sizeof(kExpectedPart[0]),
+      kExpectedPart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedFragStart) / sizeof(kExpectedFragStart[0]),
+      kExpectedFragStart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum == sizeof(kMaxSize) / sizeof(kMaxSize[0]),
+                 kMaxSize_wrong_size);
+
+  helper_->GetAllPacketsAndCheck(&packetizer, kExpectedSizes, kExpectedPart,
+                                 kExpectedFragStart, kMaxSize, kExpectedNum);
 }
 
-} // namespace
+// Verify TID field and KeyIdx field in combination.
+TEST_F(RtpFormatVp8Test, TestTIDAndKeyIdx) {
+  ASSERT_TRUE(Init());
+
+  hdr_info_.temporalIdx = 1;
+  hdr_info_.keyIdx = 5;
+  RtpFormatVp8 packetizer = RtpFormatVp8(helper_->payload_data(),
+                                         helper_->payload_size(),
+                                         hdr_info_,
+                                         *(helper_->fragmentation()),
+                                         kAggregate);
+
+  // Expect one single packet of payload_size() + 3 bytes header.
+  const int kExpectedSizes[1] = {helper_->payload_size() + 3};
+  const int kExpectedPart[1] = {0};  // Packet starts with partition 0.
+  const bool kExpectedFragStart[1] = {true};
+  // kMaxSize is only limited by allocated buffer size.
+  const int kMaxSize[1] = {helper_->buffer_size()};
+  const int kExpectedNum = sizeof(kExpectedSizes) / sizeof(kExpectedSizes[0]);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedPart) / sizeof(kExpectedPart[0]),
+      kExpectedPart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum ==
+      sizeof(kExpectedFragStart) / sizeof(kExpectedFragStart[0]),
+      kExpectedFragStart_wrong_size);
+  COMPILE_ASSERT(kExpectedNum == sizeof(kMaxSize) / sizeof(kMaxSize[0]),
+                 kMaxSize_wrong_size);
+
+  helper_->GetAllPacketsAndCheck(&packetizer, kExpectedSizes, kExpectedPart,
+                                 kExpectedFragStart, kMaxSize, kExpectedNum);
+}
+
+}  // namespace

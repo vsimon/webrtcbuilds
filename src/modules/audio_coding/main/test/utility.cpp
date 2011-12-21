@@ -9,17 +9,18 @@
  */
 
 #include "utility.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-
 #include "audio_coding_module.h"
 #include "common_types.h"
-
+#include "gtest/gtest.h"
 
 #define NUM_CODECS_WITH_FIXED_PAYLOAD_TYPE 13
 
+namespace webrtc {
 
 ACMTestTimer::ACMTestTimer() :
 _msec(0),
@@ -128,7 +129,7 @@ ChooseCodec(
     do
     {
         printf("\nChoose a codec [0]: ");
-        fgets(myStr, 10, stdin);
+        EXPECT_TRUE(fgets(myStr, 10, stdin) != NULL);
         codecID = atoi(myStr);
         if((codecID < 0) || (codecID >= noCodec))
         {
@@ -166,7 +167,7 @@ _calcVar(false),
 _sum(0),
 _sumSqr(0)
 {
-    _buff = new(double[len]);
+    _buff = new double[len];
     if(_buff == NULL)
     {
         _buffLen = 0;
@@ -429,3 +430,5 @@ VADCallback::InFrameType(
     _numFrameTypes[frameType]++;
     return 0;
 }
+
+} // namespace webrtc

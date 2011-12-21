@@ -11,7 +11,7 @@
 /*
  * filters.c
  *
- * This file contains function WebRtcIsacfix_AutocorrFix,
+ * This file contains function WebRtcIsacfix_AutocorrC,
  * AllpassFilterForDec32, and WebRtcIsacfix_DecimateAllpass32
  *
  */
@@ -22,50 +22,41 @@
 #include "lpc_masking_model.h"
 #include "codec.h"
 
+// Autocorrelation function in fixed point.
+// NOTE! Different from SPLIB-version in how it scales the signal.
+int WebRtcIsacfix_AutocorrC(WebRtc_Word32* __restrict r,
+                            const WebRtc_Word16* __restrict x,
+                            WebRtc_Word16 N,
+                            WebRtc_Word16 order,
+                            WebRtc_Word16* __restrict scale) {
+  int i = 0;
+  int j = 0;
+  int16_t scaling = 0;
+  int32_t sum = 0;
+  uint32_t temp = 0;
+  int64_t prod = 0;
 
-/* Autocorrelation function in fixed point. NOTE! Different from SPLIB-version in how it scales the signal. */
-int WebRtcIsacfix_AutocorrFix(
-    WebRtc_Word32          *r,
-    const WebRtc_Word16 *x,
-    WebRtc_Word16          N,
-    WebRtc_Word16          order,
-    WebRtc_Word16          *scale)
-{
-  int  j, i;
-  WebRtc_Word16  scaling;
-  WebRtc_Word32 sum, prod, newsum;
-  G_CONST WebRtc_Word16    *xptr1;
-  G_CONST WebRtc_Word16    *xptr2;
-
-  sum=0;
-  scaling=0;
-  /* Calculate r[0] and how much scaling is needed */
-  for (i=0; i < N; i++) {
-    prod = WEBRTC_SPL_MUL_16_16_RSFT(x[i],x[i],scaling);
-    newsum = sum+prod;
-    /* If sum gets less than 0 we have overflow and need to scale the signal */
-    if(newsum<0) {
-      scaling++;
-      sum=WEBRTC_SPL_RSHIFT_W32(sum, 1);
-      prod=WEBRTC_SPL_RSHIFT_W32(prod, 1);
-    }
-    sum += prod;
+  // Calculate r[0].
+  for (i = 0; i < N; i++) {
+    prod += WEBRTC_SPL_MUL_16_16(x[i], x[i]);
   }
-  r[0]=sum;
 
-  /* Perform the actual correlation calculation */
-  for (i = 1; i < order + 1; i++)
-  {
-    int loops=(N-i);
-    sum = 0;
-    xptr1=(G_CONST WebRtc_Word16 *)x;
-    xptr2=(G_CONST WebRtc_Word16 *)&x[i];
+  // Calculate scaling (the value of shifting).
+  temp = (uint32_t)(prod >> 31);
+  if(temp == 0) {
+    scaling = 0;
+  } else {
+    scaling = 32 - WebRtcSpl_NormU32(temp);
+  }
+  r[0] = (int32_t)(prod >> scaling);
 
-    for (j = loops;j > 0; j--)
-    {
-      sum += WEBRTC_SPL_MUL_16_16_RSFT(*xptr1++,*xptr2++,scaling);
+  // Perform the actual correlation calculation.
+  for (i = 1; i < order + 1; i++) {
+    prod = 0;
+    for (j = 0; j < N - i; j++) {
+      prod += WEBRTC_SPL_MUL_16_16(x[j], x[i + j]);
     }
-
+    sum = (int32_t)(prod >> scaling);
     r[i] = sum;
   }
 

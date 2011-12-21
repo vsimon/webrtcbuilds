@@ -9,9 +9,6 @@
  */
 
 #include "rtp_player.h"
-#include "../source/internal_defines.h"
-#include "rtp_rtcp.h"
-#include "tick_time.h"
 
 #include <cstdlib>
 #ifdef WIN32
@@ -20,6 +17,11 @@
 #else
 #include <arpa/inet.h>
 #endif
+
+#include "../source/internal_defines.h"
+#include "gtest/gtest.h"
+#include "modules/video_coding/main/source/tick_time_base.h"
+#include "rtp_rtcp.h"
 
 using namespace webrtc;
 
@@ -38,7 +40,7 @@ RawRtpPacket::~RawRtpPacket()
 
 LostPackets::LostPackets()
 :
-_critSect(*CriticalSectionWrapper::CreateCriticalSection()),
+_critSect(CriticalSectionWrapper::CreateCriticalSection()),
 _lossCount(0),
 _debugFile(NULL)
 {
@@ -62,7 +64,7 @@ LostPackets::~LostPackets()
         Erase(item);
         item = First();
     }
-    delete &_critSect;
+    delete _critSect;
 }
 
 WebRtc_UWord32 LostPackets::AddPacket(WebRtc_UWord8* rtpData, WebRtc_UWord16 rtpLen)
@@ -70,7 +72,7 @@ WebRtc_UWord32 LostPackets::AddPacket(WebRtc_UWord8* rtpData, WebRtc_UWord16 rtp
     CriticalSectionScoped cs(_critSect);
     RawRtpPacket* packet = new RawRtpPacket(rtpData, rtpLen);
     ListItem* newItem = new ListItem(packet);
-    InsertBefore(First(), newItem);
+    Insert(Last(), newItem);
     const WebRtc_UWord16 seqNo = (rtpData[2] << 8) + rtpData[3];
     if (_debugFile != NULL)
     {
@@ -80,7 +82,9 @@ WebRtc_UWord32 LostPackets::AddPacket(WebRtc_UWord8* rtpData, WebRtc_UWord16 rtp
     return 0;
 }
 
-WebRtc_UWord32 LostPackets::SetResendTime(WebRtc_UWord16 sequenceNumber, WebRtc_Word64 resendTime)
+WebRtc_UWord32 LostPackets::SetResendTime(WebRtc_UWord16 sequenceNumber,
+                                          WebRtc_Word64 resendTime,
+                                          WebRtc_Word64 nowMs)
 {
     CriticalSectionScoped cs(_critSect);
     ListItem* item = First();
@@ -88,7 +92,6 @@ WebRtc_UWord32 LostPackets::SetResendTime(WebRtc_UWord16 sequenceNumber, WebRtc_
     {
         RawRtpPacket* packet = static_cast<RawRtpPacket*>(item->GetItem());
         const WebRtc_UWord16 seqNo = (packet->rtpData[2] << 8) + packet->rtpData[3];
-        const WebRtc_Word64 nowMs = VCMTickTime::MillisecondTimestamp();
         if (sequenceNumber == seqNo && packet->resendTimeMs + 10 < nowMs)
         {
             if (_debugFile != NULL)
@@ -121,18 +124,21 @@ WebRtc_UWord32 LostPackets::NumberOfPacketsToResend() const
     return count;
 }
 
-void LostPackets::ResentPacket(WebRtc_UWord16 seqNo)
+void LostPackets::ResentPacket(WebRtc_UWord16 seqNo, WebRtc_Word64 nowMs)
 {
     CriticalSectionScoped cs(_critSect);
     if (_debugFile != NULL)
     {
         fprintf(_debugFile, "Resent %u at %u\n", seqNo,
-                MaskWord64ToUWord32(VCMTickTime::MillisecondTimestamp()));
+                MaskWord64ToUWord32(nowMs));
     }
 }
 
-RTPPlayer::RTPPlayer(const char* filename, RtpData* callback)
+RTPPlayer::RTPPlayer(const char* filename,
+                     RtpData* callback,
+                     TickTimeBase* clock)
 :
+_clock(clock),
 _rtpModule(*RtpRtcp::CreateRtpRtcp(1, false)),
 _nextRtpTime(0),
 _dataCallback(callback),
@@ -231,7 +237,7 @@ WebRtc_Word32 RTPPlayer::ReadHeader()
     {
         return -1;
     }
-    fgets(firstline, FIRSTLINELEN, _rtpFile);
+    EXPECT_TRUE(fgets(firstline, FIRSTLINELEN, _rtpFile) != NULL);
     if(strncmp(firstline,"#!rtpplay",9) == 0) {
         if(strncmp(firstline,"#!rtpplay1.0",12) != 0){
             printf("ERROR: wrong rtpplay version, must be 1.0\n");
@@ -255,22 +261,22 @@ WebRtc_Word32 RTPPlayer::ReadHeader()
     WebRtc_UWord16 port;
     WebRtc_UWord16 padding;
 
-    fread(&start_sec, 4, 1, _rtpFile);
+    EXPECT_GT(fread(&start_sec, 4, 1, _rtpFile), 0u);
     start_sec=ntohl(start_sec);
-    fread(&start_usec, 4, 1, _rtpFile);
+    EXPECT_GT(fread(&start_usec, 4, 1, _rtpFile), 0u);
     start_usec=ntohl(start_usec);
-    fread(&source, 4, 1, _rtpFile);
+    EXPECT_GT(fread(&source, 4, 1, _rtpFile), 0u);
     source=ntohl(source);
-    fread(&port, 2, 1, _rtpFile);
+    EXPECT_GT(fread(&port, 2, 1, _rtpFile), 0u);
     port=ntohs(port);
-    fread(&padding, 2, 1, _rtpFile);
+    EXPECT_GT(fread(&padding, 2, 1, _rtpFile), 0u);
     padding=ntohs(padding);
     return 0;
 }
 
 WebRtc_UWord32 RTPPlayer::TimeUntilNextPacket() const
 {
-    WebRtc_Word64 timeLeft = (_nextRtpTime - _firstPacketRtpTime) - (VCMTickTime::MillisecondTimestamp() - _firstPacketTimeMs);
+    WebRtc_Word64 timeLeft = (_nextRtpTime - _firstPacketRtpTime) - (_clock->MillisecondTimestamp() - _firstPacketTimeMs);
     if (timeLeft < 0)
     {
         return 0;
@@ -303,7 +309,8 @@ WebRtc_Word32 RTPPlayer::NextPacket(const WebRtc_Word64 timeNow)
             _resendPacketCount++;
             if (ret > 0)
             {
-                _lostPackets.ResentPacket(seqNo);
+                _lostPackets.ResentPacket(seqNo,
+                                          _clock->MillisecondTimestamp());
             }
             else if (ret < 0)
             {
@@ -325,7 +332,7 @@ WebRtc_Word32 RTPPlayer::NextPacket(const WebRtc_Word64 timeNow)
         if (_firstPacket)
         {
             _firstPacketRtpTime = static_cast<WebRtc_Word64>(_nextRtpTime);
-            _firstPacketTimeMs = VCMTickTime::MillisecondTimestamp();
+            _firstPacketTimeMs = _clock->MillisecondTimestamp();
         }
         if (_reordering && _reorderBuffer == NULL)
         {
@@ -445,7 +452,9 @@ WebRtc_Word32 RTPPlayer::ResendPackets(const WebRtc_UWord16* sequenceNumbers, We
     }
     for (int i=0; i < length; i++)
     {
-        _lostPackets.SetResendTime(sequenceNumbers[i], VCMTickTime::MillisecondTimestamp() + _rttMs);
+        _lostPackets.SetResendTime(sequenceNumbers[i],
+                                   _clock->MillisecondTimestamp() + _rttMs,
+                                   _clock->MillisecondTimestamp());
     }
     return 0;
 }

@@ -48,7 +48,7 @@
   considered 7 enteries, uniformly distributed in this interval, i.e. 38,
   39.17, 40.33, 41.5, 42.67, 43.83 and 45. For every entery, the lower-band
   and the upper-band bottlenecks are specified in
-  'WebRtcIsac_kLowerBandBitRate12' and 'WebRtcIsac_kUpperBandBitRate12'
+  'kLowerBandBitRate12' and 'kUpperBandBitRate12'
   tables, respectively. E.g. the overall rate of 41.5 kbps corresponts to a
   bottleneck of 31 kbps for lower-band and 27 kbps for upper-band. Given an
   overall bottleneck of the codec, we use linear interpolation to get
@@ -56,11 +56,11 @@
 
   16 kHz bandwidth
   -----------------
-  The overall bottleneck of the coder is between 38 kbps and 45 kbps. We have
+  The overall bottleneck of the coder is between 50 kbps and 56 kbps. We have
   considered 7 enteries, uniformly distributed in this interval, i.e. 50, 51.2,
   52.4, 53.6, 54.8 and 56. For every entery, the lower-band and the upper-band
-  bottlenecks are specified in 'WebRtcIsac_kLowerBandBitRate12' and
-  'WebRtcIsac_kUpperBandBitRate12' tables, respectively. E.g. the overall rate
+  bottlenecks are specified in 'kLowerBandBitRate16' and
+  'kUpperBandBitRate16' tables, respectively. E.g. the overall rate
   of 53.6 kbps corresponts to a bottleneck of 32 kbps for lower-band and 30
   kbps for upper-band. Given an overall bottleneck of the codec, we use linear
   interpolation to get lower-band and upper-band bottlenecks.
@@ -68,15 +68,15 @@
 */
 
 //     38  39.17  40.33   41.5  42.67  43.83     45
-static const WebRtc_Word16 WebRtcIsac_kLowerBandBitRate12[7] = {
+static const WebRtc_Word16 kLowerBandBitRate12[7] = {
   29000, 30000, 30000, 31000, 31000, 32000, 32000};
-static const WebRtc_Word16 WebRtcIsac_kUpperBandBitRate12[7] = {
+static const WebRtc_Word16 kUpperBandBitRate12[7] = {
   25000, 25000, 27000, 27000, 29000, 29000, 32000};
 
 //    50     51.2  52.4   53.6   54.8    56
-static const WebRtc_Word16 WebRtcIsac_kLowerBandBitRate16[6] = {
+static const WebRtc_Word16 kLowerBandBitRate16[6] = {
   31000, 31000, 32000, 32000, 32000, 32000};
-static const WebRtc_Word16 WebRtcIsac_kUpperBandBitRate16[6] = {
+static const WebRtc_Word16 kUpperBandBitRate16[6] = {
   28000, 29000, 29000, 30000, 31000, 32000};
 
 /******************************************************************************
@@ -129,17 +129,17 @@ WebRtcIsac_RateAllocation(
     idxD = (inRateBitPerSec - 38000) * stepSizeInv;
     idx = (idxD >= 6)? 6:((WebRtc_Word16)idxD);
     idxErr = idxD - idx;
-    *rateLBBitPerSec = WebRtcIsac_kLowerBandBitRate12[idx];
-    *rateUBBitPerSec = WebRtcIsac_kUpperBandBitRate12[idx];
+    *rateLBBitPerSec = kLowerBandBitRate12[idx];
+    *rateUBBitPerSec = kUpperBandBitRate12[idx];
 
     if(idx < 6)
     {
       *rateLBBitPerSec += (WebRtc_Word16)(idxErr *
-                                          (WebRtcIsac_kLowerBandBitRate12[idx + 1] -
-                                           WebRtcIsac_kLowerBandBitRate12[idx]));
+                                          (kLowerBandBitRate12[idx + 1] -
+                                           kLowerBandBitRate12[idx]));
       *rateUBBitPerSec += (WebRtc_Word16)(idxErr *
-                                          (WebRtcIsac_kUpperBandBitRate12[idx + 1] -
-                                           WebRtcIsac_kUpperBandBitRate12[idx]));
+                                          (kUpperBandBitRate12[idx + 1] -
+                                           kUpperBandBitRate12[idx]));
     }
 
     *bandwidthKHz = isac12kHz;
@@ -156,18 +156,18 @@ WebRtcIsac_RateAllocation(
     idxD = (inRateBitPerSec - 50000) * stepSizeInv;
     idx = (idxD >= 5)? 5:((WebRtc_Word16)idxD);
     idxErr = idxD - idx;
-    *rateLBBitPerSec = WebRtcIsac_kLowerBandBitRate16[idx];
-    *rateUBBitPerSec  = WebRtcIsac_kUpperBandBitRate16[idx];
+    *rateLBBitPerSec = kLowerBandBitRate16[idx];
+    *rateUBBitPerSec  = kUpperBandBitRate16[idx];
 
     if(idx < 5)
     {
       *rateLBBitPerSec += (WebRtc_Word16)(idxErr *
-                                          (WebRtcIsac_kLowerBandBitRate16[idx + 1] -
-                                           WebRtcIsac_kLowerBandBitRate16[idx]));
+                                          (kLowerBandBitRate16[idx + 1] -
+                                           kLowerBandBitRate16[idx]));
 
       *rateUBBitPerSec += (WebRtc_Word16)(idxErr *
-                                          (WebRtcIsac_kUpperBandBitRate16[idx + 1] -
-                                           WebRtcIsac_kUpperBandBitRate16[idx]));
+                                          (kUpperBandBitRate16[idx + 1] -
+                                           kUpperBandBitRate16[idx]));
     }
 
     *bandwidthKHz = isac16kHz;
@@ -566,7 +566,6 @@ WebRtcIsac_EncodeLb(
   return stream_length;
 }
 
-
 int
 WebRtcIsac_EncodeUb16(
     float*           in,
@@ -594,7 +593,6 @@ WebRtcIsac_EncodeUb16(
   WebRtc_UWord16 payloadLimitBytes;
   WebRtc_UWord16 iterCntr;
   double s2nr;
-
 
   /* buffer speech samples (by 10ms packet) until the framelength is   */
   /* reached (30 or 60 ms)                                             */
@@ -1256,8 +1254,8 @@ int WebRtcIsac_EncodeStoredDataUb12(
   int n;
   int err;
   double lpcGain[SUBFRAMES];
-  WebRtc_Word16 realFFT[FRAMESAMPLES];
-  WebRtc_Word16 imagFFT[FRAMESAMPLES];
+  WebRtc_Word16 realFFT[FRAMESAMPLES_HALF];
+  WebRtc_Word16 imagFFT[FRAMESAMPLES_HALF];
 
   /* reset bitstream */
   bitStream->W_upper = 0xFFFFFFFF;
@@ -1302,7 +1300,7 @@ int WebRtcIsac_EncodeStoredDataUb12(
     }
     // store lpc gain
     WebRtcIsac_StoreLpcGainUb(lpcGain, bitStream);
-    for(n = 0; n < FRAMESAMPLES; n++)
+    for(n = 0; n < FRAMESAMPLES_HALF; n++)
     {
       realFFT[n] = (WebRtc_Word16)(scale * (float)ISACSavedEnc_obj->realFFT[n] + 0.5f);
       imagFFT[n] = (WebRtc_Word16)(scale * (float)ISACSavedEnc_obj->imagFFT[n] + 0.5f);
@@ -1331,8 +1329,8 @@ WebRtcIsac_EncodeStoredDataUb16(
   int n;
   int err;
   double lpcGain[SUBFRAMES << 1];
-  WebRtc_Word16 realFFT[FRAMESAMPLES];
-  WebRtc_Word16 imagFFT[FRAMESAMPLES];
+  WebRtc_Word16 realFFT[FRAMESAMPLES_HALF];
+  WebRtc_Word16 imagFFT[FRAMESAMPLES_HALF];
 
   /* reset bitstream */
   bitStream->W_upper = 0xFFFFFFFF;
@@ -1381,7 +1379,7 @@ WebRtcIsac_EncodeStoredDataUb16(
     WebRtcIsac_StoreLpcGainUb(lpcGain, bitStream);
     WebRtcIsac_StoreLpcGainUb(&lpcGain[SUBFRAMES], bitStream);
     /* scale FFT coefficients */
-    for(n = 0; n < FRAMESAMPLES; n++)
+    for(n = 0; n < FRAMESAMPLES_HALF; n++)
     {
       realFFT[n] = (WebRtc_Word16)(scale * (float)ISACSavedEnc_obj->realFFT[n] + 0.5f);
       imagFFT[n] = (WebRtc_Word16)(scale * (float)ISACSavedEnc_obj->imagFFT[n] + 0.5f);

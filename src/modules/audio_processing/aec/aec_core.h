@@ -20,8 +20,6 @@
 #include "signal_processing_library.h"
 #include "typedefs.h"
 
-//#define AEC_DEBUG // for recording files
-
 #define FRAME_LEN 80
 #define PART_LEN 64 // Length of partition
 #define PART_LEN1 (PART_LEN + 1) // Unique fft coefficients
@@ -29,8 +27,10 @@
 #define NR_PART 12  // Number of partitions in filter.
 #define PREF_BAND_SIZE 24
 
-// Maximum delay in fixed point delay estimator, used for logging
-enum {kMaxDelay = 100};
+// Delay estimator constants, used for logging.
+enum { kMaxDelayBlocks = 60 };
+enum { kLookaheadBlocks = 15 };
+enum { kHistorySizeBlocks = kMaxDelayBlocks + kLookaheadBlocks };
 
 typedef float complex_t[2];
 // For performance reasons, some arrays of complex numbers are replaced by twice
@@ -140,16 +140,16 @@ typedef struct {
     int flag_Hband_cn;      //for comfort noise
     float cn_scale_Hband;   //scale for comfort noise in H band
 
-    int delay_histogram[kMaxDelay];
+    int delay_histogram[kHistorySizeBlocks];
     int delay_logging_enabled;
     void* delay_estimator;
 
-#ifdef AEC_DEBUG
+#ifdef WEBRTC_AEC_DEBUG_DUMP
     void* far_time_buf;
     FILE *farFile;
     FILE *nearFile;
     FILE *outFile;
-    FILE *outLpFile;
+    FILE *outLinearFile;
 #endif
 } aec_t;
 

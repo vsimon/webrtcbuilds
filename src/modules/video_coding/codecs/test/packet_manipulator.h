@@ -7,13 +7,14 @@
  *  in the file PATENTS.  All contributing project authors may
  *  be found in the AUTHORS file in the root of the source tree.
  */
-#ifndef SRC_MODULES_VIDEO_CODING_CODECS_TEST_PACKET_MANIPULATOR_H_
-#define SRC_MODULES_VIDEO_CODING_CODECS_TEST_PACKET_MANIPULATOR_H_
+
+#ifndef WEBRTC_MODULES_VIDEO_CODING_CODECS_TEST_PACKET_MANIPULATOR_H_
+#define WEBRTC_MODULES_VIDEO_CODING_CODECS_TEST_PACKET_MANIPULATOR_H_
 
 #include <cstdlib>
 
-#include "packet_reader.h"
-#include "video_codec_interface.h"
+#include "modules/video_coding/codecs/interface/video_codec_interface.h"
+#include "testsupport/packet_reader.h"
 
 namespace webrtc {
 namespace test {
@@ -87,22 +88,21 @@ class PacketManipulator {
 class PacketManipulatorImpl : public PacketManipulator {
  public:
   PacketManipulatorImpl(PacketReader* packet_reader,
-                        const NetworkingConfig& config);
+                        const NetworkingConfig& config, bool verbose);
   virtual ~PacketManipulatorImpl();
   virtual int ManipulatePackets(webrtc::EncodedImage* encoded_image);
-
- private:
+ protected:
   // Returns a uniformly distributed random value between 0.0 and 1.0
-  inline double RandomUniform() {
-    return (std::rand() + 1.0)/(RAND_MAX + 1.0);
-  }
+  virtual double RandomUniform();
+ private:
   PacketReader* packet_reader_;
   const NetworkingConfig& config_;
   // Used to simulate a burst over several frames.
   int active_burst_packets_;
+  bool verbose_;
 };
 
 }  // namespace test
 }  // namespace webrtc
 
-#endif  // SRC_MODULES_VIDEO_CODING_CODECS_TEST_PACKET_MANIPULATOR_H_
+#endif  // WEBRTC_MODULES_VIDEO_CODING_CODECS_TEST_PACKET_MANIPULATOR_H_

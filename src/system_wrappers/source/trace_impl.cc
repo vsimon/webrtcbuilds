@@ -14,8 +14,7 @@
 #include <string.h> // memset
 
 #ifdef _WIN32
-#include "trace_windows.h"
-#include "fix_interlocked_exchange_pointer_windows.h"
+#include "trace_win.h"
 #else
 #include <stdio.h>
 #include <time.h>
@@ -35,166 +34,31 @@ namespace webrtc {
 static WebRtc_UWord32 levelFilter = kTraceDefault;
 
 // Construct On First Use idiom. Avoids "static initialization order fiasco".
-Trace* TraceImpl::StaticInstance(TraceCount inc, const TraceLevel level)
+TraceImpl* TraceImpl::StaticInstance(CountOperation count_operation,
+                                     const TraceLevel level)
 {
-    // TODO (hellner): use atomic wrapper instead.
-    static volatile long theTraceCount = 0;
-    static Trace* volatile theTrace = NULL;
-
-    TraceCreate state = WEBRTC_TRACE_EXIST;
-
-    // Sanitys to avoid taking lock unless absolutely necessary (for
-    // performance reasons). inc == WEBRTC_TRACE_INC_NO_CREATE) implies that
-    // a message will be written to file.
-    if(level != kTraceAll && inc == WEBRTC_TRACE_INC_NO_CREATE)
+    // Sanities to avoid taking lock unless absolutely necessary (for
+    // performance reasons).
+    // count_operation == kAddRefNoCreate implies that a message will be
+    // written to file.
+    if((level != kTraceAll) && (count_operation == kAddRefNoCreate))
     {
         if(!(level & levelFilter))
         {
             return NULL;
         }
     }
-
-#ifndef _WIN32
-    // TODO (pwestin): crtiSect is never reclaimed. Fix memory leak.
-    static CriticalSectionWrapper* crtiSect(
-        CriticalSectionWrapper::CreateCriticalSection());
-    CriticalSectionScoped lock(*crtiSect);
-
-    if(inc == WEBRTC_TRACE_INC_NO_CREATE && theTraceCount == 0)
-    {
-        return NULL;
-    }
-
-    if(inc == WEBRTC_TRACE_INC || inc == WEBRTC_TRACE_INC_NO_CREATE)
-    {
-        theTraceCount++;
-        if(theTraceCount == 1)
-        {
-            state = WEBRTC_TRACE_CREATE;
-        }
-    } else {
-        theTraceCount--;
-        if(theTraceCount == 0)
-        {
-            state = WEBRTC_TRACE_DESTROY;
-        }
-    }
-    if(state == WEBRTC_TRACE_CREATE)
-    {
-        theTrace = TraceImpl::CreateTrace();
-
-    } else if(state == WEBRTC_TRACE_DESTROY) {
-        Trace* oldValue = theTrace;
-        theTrace = NULL;
-        // The lock is held by the scoped critical section. Release the lock
-        // temporarily so that the trace can be safely deleted. If the lock
-        // was kept during the delete, e.g. creating and destroying the trace
-        // too quickly may lead to a deadlock.
-        // This is due to the fact that starting and stopping a ThreadWrapper
-        // thread will trigger writing of trace messages.
-        // TODO (hellner): remove the tight coupling with the thread
-        //                 implementation.
-        crtiSect->Leave();
-        if(oldValue)
-        {
-            delete static_cast<TraceImpl*>(oldValue);
-        }
-        // Re-aqcuire the lock.
-        crtiSect->Enter();
-        return NULL;
-    }
-#else  // _WIN32
-    if(inc == WEBRTC_TRACE_INC_NO_CREATE && theTraceCount == 0)
-    {
-        return NULL;
-    }
-    if(inc == WEBRTC_TRACE_INC_NO_CREATE)
-    {
-        if(1 == InterlockedIncrement(&theTraceCount))
-        {
-            // The trace has been destroyed by some other thread. Rollback.
-            InterlockedDecrement(&theTraceCount);
-            assert(false);
-            return NULL;
-        }
-        // Sanity to catch corrupt state.
-        if(theTrace == NULL)
-        {
-            assert(false);
-            InterlockedDecrement(&theTraceCount);
-            return NULL;
-        }
-    } else if(inc == WEBRTC_TRACE_INC) {
-        if(theTraceCount == 0)
-        {
-            state = WEBRTC_TRACE_CREATE;
-        } else {
-            if(1 == InterlockedIncrement(&theTraceCount))
-            {
-                // InterlockedDecrement because reference count should not be
-                // updated just yet (that's done when the trace is created).
-                InterlockedDecrement(&theTraceCount);
-                state = WEBRTC_TRACE_CREATE;
-            }
-        }
-    } else {
-        int newValue = InterlockedDecrement(&theTraceCount);
-        if(newValue == 0)
-        {
-            state = WEBRTC_TRACE_DESTROY;
-        }
-    }
-
-    if(state == WEBRTC_TRACE_CREATE)
-    {
-        // Create trace and let whichever thread finishes first assign its local
-        // copy to the global instance. All other threads reclaim their local
-        // copy.
-        Trace* newTrace = TraceImpl::CreateTrace();
-        if(1 == InterlockedIncrement(&theTraceCount))
-        {
-            Trace* oldValue = (Trace*)InterlockedExchangePointer(
-                reinterpret_cast<void* volatile*>(&theTrace), newTrace);
-            assert(oldValue == NULL);
-            assert(theTrace);
-        } else {
-            InterlockedDecrement(&theTraceCount);
-            if(newTrace)
-            {
-                delete static_cast<TraceImpl*>(newTrace);
-            }
-        }
-        return NULL;
-    } else if(state == WEBRTC_TRACE_DESTROY)
-    {
-        Trace* oldValue = (Trace*)InterlockedExchangePointer(
-            reinterpret_cast<void* volatile*>(&theTrace), NULL);
-        if(oldValue)
-        {
-            delete static_cast<TraceImpl*>(oldValue);
-        }
-        return NULL;
-    }
-#endif // #ifndef _WIN32
-    return theTrace;
-}
-
-void Trace::CreateTrace()
-{
-    TraceImpl::StaticInstance(WEBRTC_TRACE_INC);
-}
-
-void Trace::ReturnTrace()
-{
-    TraceImpl::StaticInstance(WEBRTC_TRACE_DEC);
+    TraceImpl* impl =
+        GetStaticInstance<TraceImpl>(count_operation);
+    return impl;
 }
 
 TraceImpl* TraceImpl::GetTrace(const TraceLevel level)
 {
-    return (TraceImpl*)StaticInstance(WEBRTC_TRACE_INC_NO_CREATE, level);
+    return StaticInstance(kAddRefNoCreate, level);
 }
 
-Trace* TraceImpl::CreateTrace()
+TraceImpl* TraceImpl::CreateInstance()
 {
 #if defined(_WIN32)
     return new TraceWindows();
@@ -204,7 +68,7 @@ Trace* TraceImpl::CreateTrace()
 }
 
 TraceImpl::TraceImpl()
-    : _critsectInterface(*CriticalSectionWrapper::CreateCriticalSection()),
+    : _critsectInterface(CriticalSectionWrapper::CreateCriticalSection()),
       _callback(NULL),
       _rowCountText(0),
       _fileCountText(0),
@@ -212,7 +76,7 @@ TraceImpl::TraceImpl()
       _thread(*ThreadWrapper::CreateThread(TraceImpl::Run, this,
                                            kHighestPriority, "Trace")),
       _event(*EventWrapper::Create()),
-      _critsectArray(*CriticalSectionWrapper::CreateCriticalSection()),
+      _critsectArray(CriticalSectionWrapper::CreateCriticalSection()),
       _nextFreeIdx(),
       _level(),
       _length(),
@@ -271,8 +135,8 @@ TraceImpl::~TraceImpl()
     delete &_event;
     delete &_traceFile;
     delete &_thread;
-    delete &_critsectInterface;
-    delete &_critsectArray;
+    delete _critsectInterface;
+    delete _critsectArray;
 
     for(int m = 0; m < WEBRTC_TRACE_NUM_ARRAY; m++)
     {
@@ -874,17 +738,27 @@ bool TraceImpl::CreateFileName(
     return true;
 }
 
+void Trace::CreateTrace()
+{
+    TraceImpl::StaticInstance(kAddRef);
+}
+
+void Trace::ReturnTrace()
+{
+    TraceImpl::StaticInstance(kRelease);
+}
+
 WebRtc_Word32 Trace::SetLevelFilter(WebRtc_UWord32 filter)
 {
     levelFilter = filter;
     return 0;
-};
+}
 
 WebRtc_Word32 Trace::LevelFilter(WebRtc_UWord32& filter)
 {
     filter = levelFilter;
     return 0;
-};
+}
 
 WebRtc_Word32 Trace::TraceFile(WebRtc_Word8 fileName[FileWrapper::kMaxFileNameSize])
 {
@@ -951,4 +825,5 @@ void Trace::Add(const TraceLevel level, const TraceModule module,
         ReturnTrace();
     }
 }
+
 } // namespace webrtc

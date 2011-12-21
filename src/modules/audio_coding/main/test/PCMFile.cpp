@@ -1,3 +1,4 @@
+
 /*
  *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
  *
@@ -8,17 +9,18 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#include "PCMFile.h"
+
 #include <cctype>
 #include <stdio.h>
 #include <string.h>
 
-
-#include "PCMFile.h"
+#include "gtest/gtest.h"
 #include "module_common_types.h"
 
+namespace webrtc {
+
 #define MAX_FILE_NAME_LENGTH_BYTE 500
-
-
 
 PCMFile::PCMFile(): 
 _pcmFile(NULL), 
@@ -54,7 +56,7 @@ PCMFile::ChooseFile(
     WebRtc_Word8 tmpName[MAX_FILE_NAME_LENGTH_BYTE];
     //strcpy(_fileName, "in.pcm");
     //printf("\n\nPlease enter the input file: ");
-    fgets(tmpName, MAX_FILE_NAME_LENGTH_BYTE, stdin);
+    EXPECT_TRUE(fgets(tmpName, MAX_FILE_NAME_LENGTH_BYTE, stdin) != NULL);
     tmpName[MAX_FILE_NAME_LENGTH_BYTE-1] = '\0';
     WebRtc_Word16 n = 0;
 
@@ -106,7 +108,7 @@ PCMFile::ChooseFile(
     WebRtc_Word8 tmpName[MAX_FILE_NAME_LENGTH_BYTE];
     //strcpy(_fileName, "in.pcm");
     //printf("\n\nPlease enter the input file: ");
-    fgets(tmpName, MAX_FILE_NAME_LENGTH_BYTE, stdin);
+    EXPECT_TRUE(fgets(tmpName, MAX_FILE_NAME_LENGTH_BYTE, stdin) != NULL);
     tmpName[MAX_FILE_NAME_LENGTH_BYTE-1] = '\0';
     WebRtc_Word16 n = 0;
 
@@ -147,7 +149,7 @@ PCMFile::ChooseFile(
         strncpy(fileName, tmpName, len+1);
     }
     printf("Enter the sampling frequency (in Hz) of the above file [%u]: ", *frequencyHz);
-    fgets(tmpName, 10, stdin);
+    EXPECT_TRUE(fgets(tmpName, 10, stdin) != NULL);
     WebRtc_UWord16 tmpFreq = (WebRtc_UWord16)atoi(tmpName);
     if(tmpFreq > 0)
     {
@@ -158,7 +160,7 @@ PCMFile::ChooseFile(
 
 void 
 PCMFile::Open(
-    char*        filename, 
+    const char*        filename,
     WebRtc_UWord16 frequency, 
     const char*  mode, 
     bool         autoRewind)
@@ -166,8 +168,7 @@ PCMFile::Open(
     if ((_pcmFile = fopen(filename, mode)) == NULL)
     {
         printf("Cannot open file %s.\n", filename);
-        throw "Unable to read file";
-        exit(1);
+        ADD_FAILURE() << "Unable to read file";
     }
     _frequency = frequency;
     _nSamples10Ms = (WebRtc_UWord16)(_frequency / 100);
@@ -298,3 +299,5 @@ PCMFile::ReadStereo(
 {
     _readStereo = readStereo;
 }
+
+} // namespace webrtc
