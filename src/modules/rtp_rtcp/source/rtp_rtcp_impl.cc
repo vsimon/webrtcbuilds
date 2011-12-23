@@ -453,8 +453,12 @@ WebRtc_Word32 ModuleRtpRtcpImpl::Process()
     {
         WebRtc_UWord16 RTT = 0;
         _rtcpReceiver.RTT(_rtpReceiver.SSRC(), &RTT, NULL, NULL, NULL);
-        if (TMMBR())
+        if (REMB())
         {
+          unsigned int target_bitrate =
+              _rtcpSender.CalculateNewTargetBitrate(RTT);
+          _rtcpSender.UpdateRemoteBitrateEstimate(target_bitrate);
+        } else if (TMMBR()) {
             _rtcpSender.CalculateNewTargetBitrate(RTT);
         }
         _rtcpSender.SendRTCP(kRtcpReport, 0, 0, RTT);
@@ -1192,7 +1196,10 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SetSendingStatus(const bool sending)
     if(_rtcpSender.Sending() != sending)
     {
         // sends RTCP BYE when going from true to false
-        WebRtc_Word32 retVal = _rtcpSender.SetSendingStatus(sending);
+        if (_rtcpSender.SetSendingStatus(sending) != 0) {
+          WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, _id,
+                       "Failed to send RTCP BYE");
+        }
 
         _collisionDetected = false;
 
@@ -1204,7 +1211,7 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SetSendingStatus(const bool sending)
         WebRtc_UWord32 SSRC = _rtpSender.SSRC();
         _rtcpReceiver.SetSSRC(SSRC);
         _rtcpSender.SetSSRC(SSRC);
-        return retVal;
+        return 0;
     }
     return 0;
 }
@@ -1768,9 +1775,9 @@ ModuleRtpRtcpImpl::RemoveRTCPReportBlock(const WebRtc_UWord32 SSRC)
     return _rtcpSender.RemoveReportBlock(SSRC);
 }
 
-    /*
-    *  (REMB) Receiver Estimated Max Bitrate
-    */
+/*
+ *  (REMB) Receiver Estimated Max Bitrate
+ */
 bool ModuleRtpRtcpImpl::REMB() const
 {
     WEBRTC_TRACE(kTraceModuleCall, kTraceRtpRtcp, _id, "REMB()");
@@ -1804,9 +1811,14 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SetREMBData(const WebRtc_UWord32 bitrate,
     return _rtcpSender.SetREMBData(bitrate, numberOfSSRC, SSRC);
 }
 
-    /*
-    *   (IJ) Extended jitter report.
-    */
+bool ModuleRtpRtcpImpl::SetRemoteBitrateObserver(
+    RtpRemoteBitrateObserver* observer) {
+  return _rtcpSender.SetRemoteBitrateObserver(observer);
+}
+
+/*
+ *   (IJ) Extended jitter report.
+ */
 bool ModuleRtpRtcpImpl::IJ() const
 {
     WEBRTC_TRACE(kTraceModuleCall, kTraceRtpRtcp, _id, "IJ()");
@@ -1952,6 +1964,26 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SetNACKStatus(NACKMethod method)
     _nackMethod = method;
     _rtpReceiver.SetNACKStatus(method);
     return 0;
+}
+
+// Returns the currently configured retransmission mode.
+int ModuleRtpRtcpImpl::SelectiveRetransmissions() const {
+  WEBRTC_TRACE(kTraceModuleCall,
+               kTraceRtpRtcp,
+               _id,
+               "SelectiveRetransmissions()");
+  return _rtpSender.SelectiveRetransmissions();
+}
+
+// Enable or disable a retransmission mode, which decides which packets will
+// be retransmitted if NACKed.
+int ModuleRtpRtcpImpl::SetSelectiveRetransmissions(uint8_t settings) {
+  WEBRTC_TRACE(kTraceModuleCall,
+               kTraceRtpRtcp,
+               _id,
+               "SetSelectiveRetransmissions(%u)",
+               settings);
+  return _rtpSender.SetSelectiveRetransmissions(settings);
 }
 
     // Send a Negative acknowledgement packet
@@ -2573,13 +2605,18 @@ RateControlRegion ModuleRtpRtcpImpl::OnOverUseStateUpdate(
     RateControlRegion region = _rtcpSender.UpdateOverUseState(rateControlInput,
                                                               firstOverUse);
     if (firstOverUse) {
-        // Send TMMBR immediately
+        // Send TMMBR or REMB immediately.
         WebRtc_UWord16 RTT = 0;
         _rtcpReceiver.RTT(_rtpReceiver.SSRC(), &RTT, NULL, NULL, NULL);
          // About to send TMMBR, first run remote rate control
          // to get a target bit rate.
-        _rtcpSender.CalculateNewTargetBitrate(RTT);
-        _rtcpSender.SendRTCP(kRtcpTmmbr);
+        unsigned int target_bitrate =
+            _rtcpSender.CalculateNewTargetBitrate(RTT);
+        if (REMB()) {
+          _rtcpSender.UpdateRemoteBitrateEstimate(target_bitrate);
+        } else if (TMMBR()) {
+          _rtcpSender.SendRTCP(kRtcpTmmbr);
+        }
     }
     return region;
 }
@@ -2637,7 +2674,9 @@ void ModuleRtpRtcpImpl::OnReceivedEstimatedMaxBitrate(
                                                      &newBitrate,
                                                      &fractionLost,
                                                      &roundTripTime) == 0) {
-        // might trigger a OnNetworkChanged in video callback
+      // TODO(mflodman) When encoding two streams, we need to split the bitrate
+      // between REMB sending channels.
+      // might trigger a OnNetworkChanged in video callback
         _rtpReceiver.UpdateBandwidthManagement(newBitrate,
                                                fractionLost,
                                                roundTripTime);

@@ -13,7 +13,7 @@
 #include "engine_configurations.h"
 #include "system_wrappers/interface/file_wrapper.h"
 #include "system_wrappers/interface/trace.h"
-#include "video_engine/main/interface/vie_errors.h"
+#include "video_engine/include/vie_errors.h"
 #include "video_engine/vie_channel.h"
 #include "video_engine/vie_channel_manager.h"
 #include "video_engine/vie_defines.h"
@@ -539,6 +539,14 @@ int ViERTP_RTCPImpl::SetTMMBRStatus(const int video_channel,
     return -1;
   }
   return 0;
+}
+
+bool ViERTP_RTCPImpl::SetRembStatus(int video_channel, bool sender,
+                                   bool receiver) {
+  WEBRTC_TRACE(kTraceApiCall, kTraceVideo, ViEId(instance_id_, video_channel),
+               "ViERTP_RTCPImpl::SetRembStatus(%d, %d, %d)", video_channel,
+               sender, receiver);
+  return channel_manager_.SetRembStatus(video_channel, sender, receiver);
 }
 
 int ViERTP_RTCPImpl::GetReceivedRTCPStatistics(const int video_channel,

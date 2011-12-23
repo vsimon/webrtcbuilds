@@ -336,6 +336,7 @@ public:
                                       const WebRtc_UWord8 numberOfSSRC,
                                       const WebRtc_UWord32* SSRC);
 
+    virtual bool SetRemoteBitrateObserver(RtpRemoteBitrateObserver* observer);
     /*
     *   (IJ) Extended jitter report.
     */
@@ -379,6 +380,10 @@ public:
 
     // Turn negative acknowledgement requests on/off
     virtual WebRtc_Word32 SetNACKStatus(const NACKMethod method);
+
+    virtual int SelectiveRetransmissions() const;
+
+    virtual int SetSelectiveRetransmissions(uint8_t settings);
 
     // Send a Negative acknowledgement packet
     virtual WebRtc_Word32 SendNACK(const WebRtc_UWord16* nackList,

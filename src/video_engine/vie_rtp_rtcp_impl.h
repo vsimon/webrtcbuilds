@@ -13,7 +13,7 @@
 
 #include "modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
 #include "typedefs.h"
-#include "video_engine/main/interface/vie_rtp_rtcp.h"
+#include "video_engine/include/vie_rtp_rtcp.h"
 #include "video_engine/vie_ref_count.h"
 #include "video_engine/vie_shared_data.h"
 
@@ -65,6 +65,7 @@ class ViERTP_RTCPImpl
   virtual int SetKeyFrameRequestMethod(const int video_channel,
                                        const ViEKeyFrameRequestMethod method);
   virtual int SetTMMBRStatus(const int video_channel, const bool enable);
+  virtual bool SetRembStatus(int video_channel, bool sender, bool receiver);
   virtual int GetReceivedRTCPStatistics(const int video_channel,
                                         unsigned short& fraction_lost,
                                         unsigned int& cumulative_lost,

@@ -18,10 +18,11 @@
 #include "modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
 #include "modules/udp_transport/interface/udp_transport.h"
 #include "modules/video_coding/main/interface/video_coding_defines.h"
+#include "system_wrappers/interface/scoped_ptr.h"
 #include "system_wrappers/interface/tick_util.h"
 #include "typedefs.h"
-#include "video_engine/main/interface/vie_network.h"
-#include "video_engine/main/interface/vie_rtp_rtcp.h"
+#include "video_engine/include/vie_network.h"
+#include "video_engine/include/vie_rtp_rtcp.h"
 #include "video_engine/vie_defines.h"
 #include "video_engine/vie_file_recorder.h"
 #include "video_engine/vie_frame_provider_base.h"
@@ -101,6 +102,7 @@ class ViEChannel
                                        const unsigned char payload_typeRED,
                                        const unsigned char payload_typeFEC);
   WebRtc_Word32 SetKeyFrameRequestMethod(const KeyFrameRequestMethod method);
+  bool EnableRemb(bool enable);
   WebRtc_Word32 EnableTMMBR(const bool enable);
   WebRtc_Word32 EnableKeyFrameRequestCallback(const bool enable);
 
@@ -289,6 +291,9 @@ class ViEChannel
   // the channel.
   WebRtc_Word32 DeregisterSendRtpRtcpModule();
 
+  // Gets the modules used by the channel.
+  RtpRtcp* rtp_rtcp();
+
   // Implements VCMReceiveCallback.
   virtual WebRtc_Word32 FrameToRender(VideoFrame& video_frame);
 
@@ -352,7 +357,7 @@ class ViEChannel
   WebRtc_UWord8 num_socket_threads_;
 
   // Used for all registered callbacks except rendering.
-  CriticalSectionWrapper& callbackCritsect_;
+  scoped_ptr<CriticalSectionWrapper> callback_cs_;
 
   // Owned modules/classes.
   RtpRtcp& rtp_rtcp_;
