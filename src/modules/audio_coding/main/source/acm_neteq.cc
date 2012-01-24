@@ -492,7 +492,6 @@ ACMNetEQ::NetworkStatistics(
         {
             statistics->medianWaitingTimeMs = waiting_times_vec[size / 2];
         }
-        statistics->minWaitingTimeMs = waiting_times_vec.front();
         statistics->maxWaitingTimeMs = waiting_times_vec.back();
         double sum = 0;
         for (size_t i = 0; i < size; ++i) {
@@ -504,7 +503,6 @@ ACMNetEQ::NetworkStatistics(
     {
         statistics->meanWaitingTimeMs = -1;
         statistics->medianWaitingTimeMs = -1;
-        statistics->minWaitingTimeMs = -1;
         statistics->maxWaitingTimeMs = -1;
     }
     else
