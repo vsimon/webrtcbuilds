@@ -2888,52 +2888,43 @@ void ModuleRtpRtcpImpl::ProcessDefaultModuleBandwidth() {
     WebRtc_UWord32 fractionLostAcc = 0;
     WebRtc_UWord16 maxRoundTripTime = 0;
     {
-        // get min and max for the sending channels
-        CriticalSectionScoped lock(_criticalSectionModulePtrs);
+      // get min and max for the sending channels
+      CriticalSectionScoped lock(_criticalSectionModulePtrs);
 
-        std::list<ModuleRtpRtcpImpl*>::iterator it =
-            _childModules.begin();
-        while (it != _childModules.end()) {
-            // Get child RTP sender and ask for bitrate estimate
-            ModuleRtpRtcpImpl* childModule = *it;
-            if (childModule->Sending()) {
-                count++;
-                RTPSender& childRtpSender = (*it)->_rtpSender;
-                const WebRtc_UWord32 childEstimateBps =
-                    1000 * childRtpSender.TargetSendBitrateKbit();
-                if (childEstimateBps < minBitrateBps) {
-                    minBitrateBps = childEstimateBps;
-                }
-                if (childEstimateBps > maxBitrateBps) {
-                    maxBitrateBps = childEstimateBps;
-                }
-                WebRtc_UWord16 RTT = 0;
-                WebRtc_UWord8 fractionLost = 0;
-                RTPReceiver& childRtpReceiver = (*it)->_rtpReceiver;
-                RTCPReceiver& childRtcpReceiver = (*it)->_rtcpReceiver;
-                childRtpReceiver.Statistics(&fractionLost,
-                                            NULL,
-                                            NULL,
-                                            NULL,
-                                            NULL,
-                                            NULL,
-                                            false);
-                fractionLostAcc += fractionLost;
-                childRtcpReceiver.RTT(childRtpReceiver.SSRC(),
-                                      &RTT,
-                                      NULL,
-                                      NULL,
-                                      NULL);
-                maxRoundTripTime =
-                    (RTT > maxRoundTripTime) ? RTT : maxRoundTripTime;
-            }
-            it++;
+      for (std::list<ModuleRtpRtcpImpl*>::iterator it = _childModules.begin();
+           it != _childModules.end(); ++ it) {
+        // Get child RTP sender and ask for bitrate estimate.
+        ModuleRtpRtcpImpl* childModule = *it;
+        if (childModule->Sending()) {
+          RTPSender& childRtpSender = (*it)->_rtpSender;
+          const WebRtc_UWord32 childEstimateBps =
+              1000 * childRtpSender.TargetSendBitrateKbit();
+          if (childEstimateBps < minBitrateBps) {
+            minBitrateBps = childEstimateBps;
+          }
+          if (childEstimateBps > maxBitrateBps) {
+            maxBitrateBps = childEstimateBps;
+          }
+          RTCPReceiver& childRtcpReceiver = (*it)->_rtcpReceiver;
+
+          std::vector<RTCPReportBlock> rtcp_blocks;
+          childRtcpReceiver.StatisticsReceived(&rtcp_blocks);
+          for (std::vector<RTCPReportBlock>::iterator rit = rtcp_blocks.begin();
+               rit != rtcp_blocks.end(); ++rit) {
+            count++;
+            fractionLostAcc += rit->fractionLost;
+            WebRtc_UWord16 RTT = 0;
+            childRtcpReceiver.RTT(rit->remoteSSRC, &RTT, NULL, NULL, NULL);
+            maxRoundTripTime =
+                (RTT > maxRoundTripTime) ? RTT : maxRoundTripTime;
+          }
         }
+      }
     }  // end critsect
 
     if (count == 0) {
-        // No sending modules and no bitrate estimate.
-        return;
+      // No sending modules and no bitrate estimate.
+      return;
     }
     _bandwidthManagement.SetSendBitrate(minBitrateBps, 0, 0);
 
