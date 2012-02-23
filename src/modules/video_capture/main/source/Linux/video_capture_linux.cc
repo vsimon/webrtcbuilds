@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -47,10 +47,18 @@ VideoCaptureModule* VideoCaptureImpl::Create(const WebRtc_Word32 id,
 }
 
 VideoCaptureModuleV4L2::VideoCaptureModuleV4L2(const WebRtc_Word32 id)
-    : VideoCaptureImpl(id), _captureThread(NULL),
+    : VideoCaptureImpl(id), 
+      _captureThread(NULL),
       _captureCritSect(CriticalSectionWrapper::CreateCriticalSection()),
-      _deviceId(-1), _currentWidth(-1), _currentHeight(-1),
-      _currentFrameRate(-1), _captureStarted(false), _captureVideoType(kVideoI420)
+      _deviceId(-1), 
+      _deviceFd(-1),
+      _buffersAllocatedByDevice(-1),
+      _currentWidth(-1), 
+      _currentHeight(-1),
+      _currentFrameRate(-1), 
+      _captureStarted(false),
+      _captureVideoType(kVideoI420), 
+      _pool(NULL)
 {
 }
 
@@ -71,30 +79,26 @@ WebRtc_Word32 VideoCaptureModuleV4L2::Init(const WebRtc_UWord8* deviceUniqueIdUT
     int n;
     for (n = 0; n < 64; n++)
     {
-        struct stat s;
         sprintf(device, "/dev/video%d", n);
-        if (stat(device, &s) == 0) //check validity of path
+        if ((fd = open(device, O_RDONLY)) != -1)
         {
-            if ((fd = open(device, O_RDONLY)) > 0)
+            // query device capabilities
+            struct v4l2_capability cap;
+            if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0)
             {
-                // query device capabilities
-                struct v4l2_capability cap;
-                if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0)
+                if (cap.bus_info[0] != 0)
                 {
-                    if (cap.bus_info[0] != 0)
+                    if (strncmp((const char*) cap.bus_info,
+                                (const char*) deviceUniqueIdUTF8,
+                                strlen((const char*) deviceUniqueIdUTF8)) == 0) //match with device id
                     {
-                        if (strncmp((const char*) cap.bus_info,
-                                    (const char*) deviceUniqueIdUTF8,
-                                    strlen((const char*) deviceUniqueIdUTF8)) == 0) //match with device id
-                        {
-                            close(fd);
-                            found = true;
-                            break; // fd matches with device unique id supplied
-                        }
+                        close(fd);
+                        found = true;
+                        break; // fd matches with device unique id supplied
                     }
                 }
-                close(fd); // close since this is not the matching device
             }
+            close(fd); // close since this is not the matching device
         }
     }
     if (!found)
@@ -291,7 +295,7 @@ bool VideoCaptureModuleV4L2::AllocateVideoBuffers()
     _buffersAllocatedByDevice = rbuffer.count;
 
     //Map the buffers
-    pool = new Buffer[rbuffer.count];
+    _pool = new Buffer[rbuffer.count];
 
     for (unsigned int i = 0; i < rbuffer.count; i++)
     {
@@ -306,17 +310,17 @@ bool VideoCaptureModuleV4L2::AllocateVideoBuffers()
             return false;
         }
 
-        pool[i].start = mmap(NULL, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,
-                             _deviceFd, buffer.m.offset);
+        _pool[i].start = mmap(NULL, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,
+                              _deviceFd, buffer.m.offset);
 
-        if (MAP_FAILED == pool[i].start)
+        if (MAP_FAILED == _pool[i].start)
         {
             for (unsigned int j = 0; j < i; j++)
-                munmap(pool[j].start, pool[j].length);
+                munmap(_pool[j].start, _pool[j].length);
             return false;
         }
 
-        pool[i].length = buffer.length;
+        _pool[i].length = buffer.length;
 
         if (ioctl(_deviceFd, VIDIOC_QBUF, &buffer) < 0)
         {
@@ -330,9 +334,9 @@ bool VideoCaptureModuleV4L2::DeAllocateVideoBuffers()
 {
     // unmap buffers
     for (int i = 0; i < _buffersAllocatedByDevice; i++)
-        munmap(pool[i].start, pool[i].length);
+        munmap(_pool[i].start, _pool[i].length);
 
-    delete[] pool;
+    delete[] _pool;
 
     // turn off stream
     enum v4l2_buf_type type;
@@ -417,7 +421,7 @@ bool VideoCaptureModuleV4L2::CaptureProcess()
         frameInfo.rawType = _captureVideoType;
 
         // convert to to I420 if needed
-        IncomingFrame((unsigned char*) pool[buf.index].start,
+        IncomingFrame((unsigned char*) _pool[buf.index].start,
                       buf.bytesused, frameInfo);
         // enqueue the buffer again
         if (ioctl(_deviceFd, VIDIOC_QBUF, &buf) == -1)

@@ -277,6 +277,13 @@ void RTCPSender::UpdateRemoteBitrateEstimate(unsigned int target_bitrate) {
   }
 }
 
+void RTCPSender::ReceivedRemb(unsigned int estimated_bitrate) {
+  CriticalSectionScoped lock(_criticalSectionRTCPSender);
+  if (_bitrate_observer) {
+    _bitrate_observer->OnReceivedRemb(estimated_bitrate);
+  }
+}
+
 bool
 RTCPSender::TMMBR() const
 {
@@ -1107,13 +1114,18 @@ RTCPSender::CalculateNewTargetBitrate(WebRtc_UWord32 RTT)
 {
     CriticalSectionScoped lock(_criticalSectionRTCPSender);
     WebRtc_UWord32 target_bitrate =
-        _remoteRateControl.TargetBitRate(RTT, _clock.GetTimeInMS());
+        _remoteRateControl.UpdateBandwidthEstimate(RTT, _clock.GetTimeInMS());
     _tmmbr_Send = target_bitrate / 1000;
     return target_bitrate;
 }
 
+WebRtc_UWord32 RTCPSender::LatestBandwidthEstimate() const {
+  CriticalSectionScoped lock(_criticalSectionRTCPSender);
+  return _remoteRateControl.LatestEstimate();
+}
+
 bool
-RTCPSender::ValidBitrateEstimate() {
+RTCPSender::ValidBitrateEstimate() const {
   CriticalSectionScoped lock(_criticalSectionRTCPSender);
   return _remoteRateControl.ValidEstimate();
 }

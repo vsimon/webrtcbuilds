@@ -146,7 +146,7 @@ const CodecInst ACMCodecDB::database_[] = {
   {kDynamicPayloadtypes[count_database++], "AMR-WB", 16000, 320, 1, 20000},
 #endif
 #ifdef WEBRTC_CODEC_CELT
-  {kDynamicPayloadtypes[count_database++], "CELT", 32000, 320, 1, 48000},
+  {kDynamicPayloadtypes[count_database++], "CELT", 32000, 320, 2, 64000},
 #endif
 #ifdef WEBRTC_CODEC_G722
   {9, "G722", 16000, 320, 1, 64000},
@@ -491,6 +491,9 @@ int ACMCodecDB::CodecNumber(const CodecInst* codec_inst, int* mirror_id) {
         ? codec_number : kInvalidRate;
   } else if (STR_CASE_CMP("speex", codec_inst->plname) == 0) {
     return IsSpeexRateValid(codec_inst->rate)
+        ? codec_number : kInvalidRate;
+  } else if (STR_CASE_CMP("celt", codec_inst->plname) == 0) {
+    return IsCeltRateValid(codec_inst->rate)
         ? codec_number : kInvalidRate;
   }
 
@@ -965,9 +968,19 @@ bool ACMCodecDB::IsG7291RateValid(int rate) {
     }
   }
 }
+
 // Checks if the bitrate is valid for Speex.
 bool ACMCodecDB::IsSpeexRateValid(int rate) {
   if (rate > 2000) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+// Checks if the bitrate is valid for Celt.
+bool ACMCodecDB::IsCeltRateValid(int rate) {
+  if ((rate >= 48000) && (rate <= 128000)) {
     return true;
   } else {
     return false;

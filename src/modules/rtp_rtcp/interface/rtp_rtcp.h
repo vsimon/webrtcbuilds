@@ -569,7 +569,13 @@ public:
     /*
      *  Get the send-side estimate of the available bandwidth.
      */
-    virtual int EstimatedBandwidth(
+    virtual int EstimatedSendBandwidth(
+        WebRtc_UWord32* available_bandwidth) const = 0;
+
+    /*
+     *  Get the receive-side estimate of the available bandwidth.
+     */
+    virtual int EstimatedReceiveBandwidth(
         WebRtc_UWord32* available_bandwidth) const = 0;
 
     /*
@@ -806,6 +812,10 @@ public:
     virtual WebRtc_Word32 SetREMBData(const WebRtc_UWord32 bitrate,
                                       const WebRtc_UWord8 numberOfSSRC,
                                       const WebRtc_UWord32* SSRC) = 0;
+
+    // Used to set maximum bitrate estimate received in a REMB packet.
+    virtual WebRtc_Word32 SetMaximumBitrateEstimate(
+        const WebRtc_UWord32 bitrate) = 0;
 
     // Registers an observer to call when the estimate of the incoming channel
     // changes.

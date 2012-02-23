@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -136,7 +136,9 @@ VideoCaptureImpl::VideoCaptureImpl(const WebRtc_Word32 id)
       _lastProcessTime(TickTime::Now()),
       _lastFrameRateCallbackTime(TickTime::Now()), _frameRateCallBack(false),
       _noPictureAlarmCallBack(false), _captureAlarm(Cleared), _setCaptureDelay(0),
-      _dataCallBack(NULL), _captureCallBack(NULL), _startImageFrameIntervall(0),
+      _dataCallBack(NULL), _captureCallBack(NULL),
+      _startImage(), _startImageFrameIntervall(0),
+      _lastSentStartImageTime(TickTime::Now()),
       _lastProcessFrameCount(TickTime::Now()), _rotateFrame(kRotateNone),
       last_capture_time_(TickTime::MillisecondTimestamp())
 
@@ -163,8 +165,6 @@ VideoCaptureImpl::~VideoCaptureImpl()
 WebRtc_Word32 VideoCaptureImpl::RegisterCaptureDataCallback(
                                         VideoCaptureDataCallback& dataCallBack)
 {
-    WEBRTC_TRACE(webrtc::kTraceModuleCall, webrtc::kTraceVideoCapture, _id,
-               "RegisterCaptureDataCallback");
     CriticalSectionScoped cs(_apiCs);
     CriticalSectionScoped cs2(_callBackCs);
     _dataCallBack = &dataCallBack;
@@ -174,8 +174,6 @@ WebRtc_Word32 VideoCaptureImpl::RegisterCaptureDataCallback(
 
 WebRtc_Word32 VideoCaptureImpl::DeRegisterCaptureDataCallback()
 {
-    WEBRTC_TRACE(webrtc::kTraceModuleCall, webrtc::kTraceVideoCapture, _id,
-               "DeRegisterCaptureDataCallback");
     CriticalSectionScoped cs(_apiCs);
     CriticalSectionScoped cs2(_callBackCs);
     _dataCallBack = NULL;
@@ -183,7 +181,6 @@ WebRtc_Word32 VideoCaptureImpl::DeRegisterCaptureDataCallback()
 }
 WebRtc_Word32 VideoCaptureImpl::RegisterCaptureCallback(VideoCaptureFeedBack& callBack)
 {
-    WEBRTC_TRACE(webrtc::kTraceModuleCall, webrtc::kTraceVideoCapture, _id, "RegisterCaptureCallback %x");
 
     CriticalSectionScoped cs(_apiCs);
     CriticalSectionScoped cs2(_callBackCs);
@@ -192,7 +189,6 @@ WebRtc_Word32 VideoCaptureImpl::RegisterCaptureCallback(VideoCaptureFeedBack& ca
 }
 WebRtc_Word32 VideoCaptureImpl::DeRegisterCaptureCallback()
 {
-    WEBRTC_TRACE(webrtc::kTraceModuleCall, webrtc::kTraceVideoCapture, _id, "DeRegisterCaptureCallback");
 
     CriticalSectionScoped cs(_apiCs);
     CriticalSectionScoped cs2(_callBackCs);
@@ -202,16 +198,12 @@ WebRtc_Word32 VideoCaptureImpl::DeRegisterCaptureCallback()
 }
 WebRtc_Word32 VideoCaptureImpl::SetCaptureDelay(WebRtc_Word32 delayMS)
 {
-    WEBRTC_TRACE(webrtc::kTraceModuleCall, webrtc::kTraceVideoCapture, _id, "SetCaptureDelay %d",
-               (int) delayMS);
     CriticalSectionScoped cs(_apiCs);
     _captureDelay = delayMS;
     return 0;
 }
 WebRtc_Word32 VideoCaptureImpl::CaptureDelay()
 {
-    WEBRTC_TRACE(webrtc::kTraceModuleCall, webrtc::kTraceVideoCapture, _id, "CaptureDelay %d",
-               (int) _captureDelay);
     CriticalSectionScoped cs(_apiCs);
     return _setCaptureDelay;
 }
@@ -415,8 +407,6 @@ WebRtc_Word32 VideoCaptureImpl::SetCaptureRotation(VideoCaptureRotation rotation
 WebRtc_Word32 VideoCaptureImpl::StartSendImage(const VideoFrame& videoFrame,
                                                      WebRtc_Word32 frameRate)
 {
-    WEBRTC_TRACE(webrtc::kTraceModuleCall, webrtc::kTraceVideoCapture, _id,
-               "StartSendImage, frameRate %d", (int) frameRate);
     CriticalSectionScoped cs(_apiCs);
     CriticalSectionScoped cs2(_callBackCs);
     if (frameRate < 1 || frameRate > kMaxFrameRate)

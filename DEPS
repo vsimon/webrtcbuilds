@@ -10,7 +10,8 @@ vars = {
   "webrtc_resources_revision": "8",
 }
 
-# NOTE: Prefer revision numbers to tags for svn deps.
+# NOTE: Prefer revision numbers to tags for svn deps. Use http rather than
+# https; the latter can cause problems for users behind proxies.
 deps = {
   "trunk/build":
     Var("chromium_trunk") + "/src/build@" + Var("chromium_revision"),
@@ -44,7 +45,7 @@ deps = {
     Var("chromium_trunk") + "/src/third_party/protobuf@" + Var("chromium_revision"),
 
   "trunk/third_party/libvpx/source/libvpx":
-    "http://git.chromium.org/webm/libvpx.git@e479379a",
+    "http://git.chromium.org/webm/libvpx.git@v1.0.0",
 
   "trunk/third_party/libjpeg_turbo/":
     Var("chromium_trunk") + "/deps/third_party/libjpeg_turbo@119959",
@@ -71,7 +72,7 @@ deps = {
   # TODO(andrew): roll to 164 after fixing:
   # http://code.google.com/p/webrtc/issues/detail?id=267
   "trunk/third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@121",
+    (Var("googlecode_url") % "libyuv") + "/trunk@182",
 
   # Used by tools/quality_tracking/dashboard and tools/python_charts
   "trunk/third_party/google-visualization-python":
@@ -79,11 +80,11 @@ deps = {
 
   # Used by tools/quality_tracking
   "trunk/third_party/oauth2":
-    "https://github.com/simplegeo/python-oauth2.git@a83f4a29",
+    "http://github.com/simplegeo/python-oauth2.git@a83f4a29",
 
   # Used by tools/quality_tracking
   "trunk/third_party/gaeunit":
-    "https://code.google.com/p/gaeunit.git@e16d5bd4",
+    "http://code.google.com/p/gaeunit.git@e16d5bd4",
 }
 
 deps_os = {

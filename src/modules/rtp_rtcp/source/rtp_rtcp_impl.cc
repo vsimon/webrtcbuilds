@@ -37,8 +37,19 @@ namespace webrtc {
 const WebRtc_UWord16 kDefaultRtt = 200;
 
 RtpRtcp* RtpRtcp::CreateRtpRtcp(const WebRtc_Word32 id,
-                                const bool audio) {
-  return CreateRtpRtcp(id, audio, ModuleRTPUtility::GetSystemClock());
+                                bool audio) {
+  if(audio) {
+    WEBRTC_TRACE(kTraceModuleCall, kTraceRtpRtcp, id, "CreateRtpRtcp(audio)");
+  } else {
+    WEBRTC_TRACE(kTraceModuleCall, kTraceRtpRtcp, id, "CreateRtpRtcp(video)");
+  }
+  // ModuleRTPUtility::GetSystemClock() creates a new instance of a system
+  // clock implementation. The OwnsClock() function informs the module that
+  // it is responsible for deleting the instance.
+  ModuleRtpRtcpImpl* rtp_rtcp_instance = new ModuleRtpRtcpImpl(id,
+      audio, ModuleRTPUtility::GetSystemClock());
+  rtp_rtcp_instance->OwnsClock();
+  return rtp_rtcp_instance;
 }
 
 RtpRtcp* RtpRtcp::CreateRtpRtcp(const WebRtc_Word32 id,
@@ -76,6 +87,7 @@ ModuleRtpRtcpImpl::ModuleRtpRtcpImpl(const WebRtc_Word32 id,
   _rtpReceiver(id, audio, clock, this),
   _rtcpSender(id, audio, clock, this),
   _rtcpReceiver(id, clock, this),
+  _owns_clock(false),
   _clock(*clock),
   _id(id),
   _audio(audio),
@@ -83,7 +95,6 @@ ModuleRtpRtcpImpl::ModuleRtpRtcpImpl(const WebRtc_Word32 id,
   _lastProcessTime(clock->GetTimeInMS()),
   _lastBitrateProcessTime(clock->GetTimeInMS()),
   _lastPacketTimeoutProcessTime(clock->GetTimeInMS()),
-
   _packetOverHead(28), // IPV4 UDP
   _criticalSectionModulePtrs(CriticalSectionWrapper::CreateCriticalSection()),
   _criticalSectionModulePtrsFeedback(
@@ -156,6 +167,9 @@ ModuleRtpRtcpImpl::~ModuleRtpRtcpImpl() {
 
   delete _criticalSectionModulePtrs;
   delete _criticalSectionModulePtrsFeedback;
+  if (_owns_clock) {
+    delete &_clock;
+  }
 }
 
 WebRtc_Word32 ModuleRtpRtcpImpl::ChangeUniqueId(const WebRtc_Word32 id) {
@@ -1647,6 +1661,17 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SetREMBData(const WebRtc_UWord32 bitrate,
   return _rtcpSender.SetREMBData(bitrate, numberOfSSRC, SSRC);
 }
 
+WebRtc_Word32 ModuleRtpRtcpImpl::SetMaximumBitrateEstimate(
+        const WebRtc_UWord32 bitrate) {
+  if(!_rtcpSender.REMB()) {
+    WEBRTC_TRACE(kTraceError, kTraceRtpRtcp, _id,
+                 "SetMaximumBitrateEstimate - REMB not enabled.");
+    return -1;
+  }
+  OnReceivedEstimatedMaxBitrate(bitrate);
+  return 0;
+}
+
 bool ModuleRtpRtcpImpl::SetRemoteBitrateObserver(
   RtpRemoteBitrateObserver* observer) {
   return _rtcpSender.SetRemoteBitrateObserver(observer);
@@ -2312,9 +2337,17 @@ void ModuleRtpRtcpImpl::BitrateSent(WebRtc_UWord32* totalRate,
     *nackRate = _rtpSender.NackOverheadRate();
 }
 
-int ModuleRtpRtcpImpl::EstimatedBandwidth(
-  WebRtc_UWord32* available_bandwidth) const {
+int ModuleRtpRtcpImpl::EstimatedSendBandwidth(
+    WebRtc_UWord32* available_bandwidth) const {
   return _bandwidthManagement.AvailableBandwidth(available_bandwidth);
+}
+
+int ModuleRtpRtcpImpl::EstimatedReceiveBandwidth(
+    WebRtc_UWord32* available_bandwidth) const {
+  if (!_rtcpSender.ValidBitrateEstimate())
+    return -1;
+  *available_bandwidth = _rtcpSender.LatestBandwidthEstimate();
+  return 0;
 }
 
 // for lip sync
@@ -2477,17 +2510,16 @@ void ModuleRtpRtcpImpl::OnReceivedIntraFrameRequest(const RtpRtcp* caller) {
 
 void ModuleRtpRtcpImpl::OnReceivedEstimatedMaxBitrate(
   const WebRtc_UWord32 maxBitrate) {
+  // TODO(mflodman) Split this function in two parts. One for the child module
+  // and one for the default module.
 
   // We received a REMB.
   if (_defaultModule) {
-    // Let the default module handle this.
-    CriticalSectionScoped lock(_criticalSectionModulePtrs);
-    if (_defaultModule) {
-      // if we use a default module pass this info to the default module
-      _defaultModule->OnReceivedEstimatedMaxBitrate(maxBitrate);
-      return;
-    }
+    // Send this update to the REMB instance to take actions.
+    _rtcpSender.ReceivedRemb(maxBitrate);
+    return;
   }
+
   WebRtc_UWord32 newBitrate = 0;
   WebRtc_UWord8 fractionLost = 0;
   WebRtc_UWord16 roundTripTime = 0;
@@ -2496,8 +2528,6 @@ void ModuleRtpRtcpImpl::OnReceivedEstimatedMaxBitrate(
                                                    &newBitrate,
                                                    &fractionLost,
                                                    &roundTripTime) == 0) {
-    // TODO(mflodman) When encoding two streams, we need to split the
-    // bitrate between REMB sending channels.
     _rtpReceiver.UpdateBandwidthManagement(newBitrate,
                                            fractionLost,
                                            roundTripTime);

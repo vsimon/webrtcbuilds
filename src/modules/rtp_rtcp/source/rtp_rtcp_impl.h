@@ -333,6 +333,9 @@ public:
                                       const WebRtc_UWord8 numberOfSSRC,
                                       const WebRtc_UWord32* SSRC);
 
+    virtual WebRtc_Word32 SetMaximumBitrateEstimate(
+        const WebRtc_UWord32 bitrate);
+
     virtual bool SetRemoteBitrateObserver(RtpRemoteBitrateObserver* observer);
     /*
     *   (IJ) Extended jitter report.
@@ -491,7 +494,11 @@ public:
                              WebRtc_UWord32* fecRate,
                              WebRtc_UWord32* nackRate) const;
 
-    virtual int EstimatedBandwidth(WebRtc_UWord32* available_bandwidth) const;
+    virtual int EstimatedSendBandwidth(
+        WebRtc_UWord32* available_bandwidth) const;
+
+    virtual int EstimatedReceiveBandwidth(
+        WebRtc_UWord32* available_bandwidth) const;
 
     virtual void SetRemoteSSRC(const WebRtc_UWord32 SSRC);
     
@@ -535,6 +542,10 @@ public:
 
     void OnRequestSendReport();
 
+    // Following function is only called when constructing the object so no
+    // need to worry about data race.
+    void OwnsClock() { _owns_clock = true; }
+
 protected:
     void RegisterChildModule(RtpRtcp* module);
 
@@ -560,6 +571,7 @@ protected:
     RTCPSender                _rtcpSender;
     RTCPReceiver              _rtcpReceiver;
 
+    bool                      _owns_clock;
     RtpRtcpClock&             _clock;
 private:
     void SendKeyFrame();
