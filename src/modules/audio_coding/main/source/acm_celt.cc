@@ -49,7 +49,7 @@ int16_t ACMCELT::DecodeSafe(uint8_t* /* bitStream */,
                             int16_t /* bitStreamLenByte */,
                             int16_t* /* audio */,
                             int16_t* /* audioSamples */,
-                            char* /* speechType */) {
+                            WebRtc_Word8* /* speechType */) {
   return -1;
 }
 
@@ -157,7 +157,7 @@ int16_t ACMCELT::DecodeSafe(uint8_t* /* bitStream */,
                             int16_t /* bitStreamLenByte */,
                             int16_t* /* audio */,
                             int16_t* /* audioSamples */,
-                            char* /* speechType */) {
+                            WebRtc_Word8* /* speechType */) {
   return 0;
 }
 
@@ -303,11 +303,21 @@ bool ACMCELT::IsTrueStereoCodec() {
 int16_t ACMCELT::SetBitRateSafe(const int32_t rate) {
   // Check that rate is in the valid range.
   if ((rate >= 48000) && (rate <= 128000)) {
+    // Store new rate.
     bitrate_ = rate;
-    return 0;
+
+    // Initiate encoder with new rate.
+    if (WebRtcCelt_EncoderInit(enc_inst_ptr_, channels_, bitrate_) >= 0) {
+      return 0;
+    } else {
+      WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
+                   "SetBitRateSafe: Failed to initiate Celt with rate %d",
+                   rate);
+      return -1;
+    }
   } else {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _uniqueID,
-                 "SetBitRateSafe: Invalid rate Celt");
+                 "SetBitRateSafe: Invalid rate Celt, %d", rate);
     return -1;
   }
 }

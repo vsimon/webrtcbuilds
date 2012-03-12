@@ -288,7 +288,7 @@ WebRtc_Word32 AudioDeviceLinuxPulse::Terminate()
         return 0;
     }
 
-    _critSect.Enter();
+    Lock();
 
     _mixerManager.Close();
 
@@ -297,11 +297,10 @@ WebRtc_Word32 AudioDeviceLinuxPulse::Terminate()
     {
         ThreadWrapper* tmpThread = _ptrThreadRec;
         _ptrThreadRec = NULL;
-        _critSect.Leave();
+        UnLock();
 
         tmpThread->SetNotAlive();
         _timeEventRec.Set();
-
         if (tmpThread->Stop())
         {
             delete tmpThread;
@@ -310,6 +309,8 @@ WebRtc_Word32 AudioDeviceLinuxPulse::Terminate()
             WEBRTC_TRACE(kTraceWarning, kTraceAudioDevice, _id,
                          "  failed to close down the rec audio thread");
         }
+        // Lock again since we need to protect _ptrThreadPlay.
+        Lock();
     }
 
     // PLAYOUT
@@ -321,7 +322,6 @@ WebRtc_Word32 AudioDeviceLinuxPulse::Terminate()
 
         tmpThread->SetNotAlive();
         _timeEventPlay.Set();
-
         if (tmpThread->Stop())
         {
             delete tmpThread;
@@ -330,6 +330,8 @@ WebRtc_Word32 AudioDeviceLinuxPulse::Terminate()
             WEBRTC_TRACE(kTraceWarning, kTraceAudioDevice, _id,
                          "  failed to close down the play audio thread");
         }
+    } else {
+      UnLock();
     }
 
     // Terminate PulseAudio
@@ -782,7 +784,14 @@ WebRtc_Word32 AudioDeviceLinuxPulse::MicrophoneBoost(bool& enabled) const
 WebRtc_Word32 AudioDeviceLinuxPulse::StereoRecordingIsAvailable(bool& available)
 {
 
+    if (_recChannels == 2 && _recording) {
+      available = true;
+      return 0;
+    }
+
+    available = false;
     bool wasInitialized = _mixerManager.MicrophoneIsInitialized();
+    int error = 0;
 
     if (!wasInitialized && InitMicrophone() == -1)
     {
@@ -792,10 +801,11 @@ WebRtc_Word32 AudioDeviceLinuxPulse::StereoRecordingIsAvailable(bool& available)
     }
 
 #ifndef WEBRTC_PA_GTALK
-    // Check if the selected microphone can record stereo
+    // Check if the selected microphone can record stereo.
     bool isAvailable(false);
-    _mixerManager.StereoRecordingIsAvailable(isAvailable);
-    available = isAvailable;
+    error = _mixerManager.StereoRecordingIsAvailable(isAvailable);
+    if (!error)
+      available = isAvailable;
 #endif
 
     // Close the initialized input mixer
@@ -804,7 +814,7 @@ WebRtc_Word32 AudioDeviceLinuxPulse::StereoRecordingIsAvailable(bool& available)
         _mixerManager.CloseMicrophone();
     }
 
-    return 0;
+    return error;
 }
 
 WebRtc_Word32 AudioDeviceLinuxPulse::SetStereoRecording(bool enable)
@@ -834,20 +844,27 @@ WebRtc_Word32 AudioDeviceLinuxPulse::StereoRecording(bool& enabled) const
 WebRtc_Word32 AudioDeviceLinuxPulse::StereoPlayoutIsAvailable(bool& available)
 {
 
+    if (_playChannels == 2 && _playing) {
+      available = true;
+      return 0;
+    }
+
+    available = false;
     bool wasInitialized = _mixerManager.SpeakerIsInitialized();
+    int error = 0;
 
     if (!wasInitialized && InitSpeaker() == -1)
     {
-        // Cannot open the specified device
-        available = false;
-        return 0;
+        // Cannot open the specified device.
+        return -1;
     }
 
 #ifndef WEBRTC_PA_GTALK
-    // Check if the selected microphone can record stereo
+    // Check if the selected speaker can play stereo.
     bool isAvailable(false);
-    _mixerManager.StereoPlayoutIsAvailable(isAvailable);
-    available = isAvailable;
+    error = _mixerManager.StereoPlayoutIsAvailable(isAvailable);
+    if (!error)
+      available = isAvailable;
 #endif
 
     // Close the initialized input mixer
@@ -856,7 +873,7 @@ WebRtc_Word32 AudioDeviceLinuxPulse::StereoPlayoutIsAvailable(bool& available)
         _mixerManager.CloseSpeaker();
     }
 
-    return 0;
+    return error;
 }
 
 WebRtc_Word32 AudioDeviceLinuxPulse::SetStereoPlayout(bool enable)
@@ -1054,8 +1071,8 @@ WebRtc_Word32 AudioDeviceLinuxPulse::SetPlayoutDevice(
 
 WebRtc_Word32 AudioDeviceLinuxPulse::PlayoutDeviceName(
     WebRtc_UWord16 index,
-    WebRtc_Word8 name[kAdmMaxDeviceNameSize],
-    WebRtc_Word8 guid[kAdmMaxGuidSize])
+    char name[kAdmMaxDeviceNameSize],
+    char guid[kAdmMaxGuidSize])
 {
 
     const WebRtc_UWord16 nDevices = PlayoutDevices();
@@ -1096,8 +1113,8 @@ WebRtc_Word32 AudioDeviceLinuxPulse::PlayoutDeviceName(
 
 WebRtc_Word32 AudioDeviceLinuxPulse::RecordingDeviceName(
     WebRtc_UWord16 index,
-    WebRtc_Word8 name[kAdmMaxDeviceNameSize],
-    WebRtc_Word8 guid[kAdmMaxGuidSize])
+    char name[kAdmMaxDeviceNameSize],
+    char guid[kAdmMaxGuidSize])
 {
 
     const WebRtc_UWord16 nDevices(RecordingDevices());
@@ -1750,42 +1767,50 @@ WebRtc_Word32 AudioDeviceLinuxPulse::CPULoad(WebRtc_UWord16& /*load*/) const
 
 bool AudioDeviceLinuxPulse::PlayoutWarning() const
 {
-    return (_playWarning > 0);
+  CriticalSectionScoped lock(_critSect);
+  return (_playWarning > 0);
 }
 
 bool AudioDeviceLinuxPulse::PlayoutError() const
 {
-    return (_playError > 0);
+  CriticalSectionScoped lock(_critSect);
+  return (_playError > 0);
 }
 
 bool AudioDeviceLinuxPulse::RecordingWarning() const
 {
-    return (_recWarning > 0);
+  CriticalSectionScoped lock(_critSect);
+  return (_recWarning > 0);
 }
 
 bool AudioDeviceLinuxPulse::RecordingError() const
 {
-    return (_recError > 0);
+  CriticalSectionScoped lock(_critSect);
+  return (_recError > 0);
 }
 
 void AudioDeviceLinuxPulse::ClearPlayoutWarning()
 {
-    _playWarning = 0;
+  CriticalSectionScoped lock(_critSect);
+  _playWarning = 0;
 }
 
 void AudioDeviceLinuxPulse::ClearPlayoutError()
 {
-    _playError = 0;
+  CriticalSectionScoped lock(_critSect);
+  _playError = 0;
 }
 
 void AudioDeviceLinuxPulse::ClearRecordingWarning()
 {
-    _recWarning = 0;
+  CriticalSectionScoped lock(_critSect);
+  _recWarning = 0;
 }
 
 void AudioDeviceLinuxPulse::ClearRecordingError()
 {
-    _recError = 0;
+  CriticalSectionScoped lock(_critSect);
+  _recError = 0;
 }
 
 // ============================================================================
@@ -2099,13 +2124,13 @@ WebRtc_Word32 AudioDeviceLinuxPulse::InitSamplingFrequency()
 }
 
 WebRtc_Word32 AudioDeviceLinuxPulse::GetDefaultDeviceInfo(bool recDevice,
-                                                          WebRtc_Word8* name,
+                                                          char* name,
                                                           WebRtc_UWord16& index)
 {
-    WebRtc_Word8 tmpName[kAdmMaxDeviceNameSize] = {0};
+    char tmpName[kAdmMaxDeviceNameSize] = {0};
     // subtract length of "default: "
     WebRtc_UWord16 nameLen = kAdmMaxDeviceNameSize - 9;
-    WebRtc_Word8* pName = NULL;
+    char* pName = NULL;
 
     if (name)
     {
@@ -2767,7 +2792,7 @@ bool AudioDeviceLinuxPulse::PlayThreadProcess()
         if (_outputDeviceIndex > 0)
         {
             // Get the playout device name
-            _playDeviceName = new WebRtc_Word8[kAdmMaxDeviceNameSize];
+            _playDeviceName = new char[kAdmMaxDeviceNameSize];
             _deviceIndex = _outputDeviceIndex;
             PlayoutDevices();
         }
@@ -3001,7 +3026,7 @@ bool AudioDeviceLinuxPulse::RecThreadProcess()
         if (_inputDeviceIndex > 0)
         {
             // Get the recording device name
-            _recDeviceName = new WebRtc_Word8[kAdmMaxDeviceNameSize];
+            _recDeviceName = new char[kAdmMaxDeviceNameSize];
             _deviceIndex = _inputDeviceIndex;
             RecordingDevices();
         }

@@ -374,7 +374,7 @@ WebRtc_Word32 MediaFileImpl::PlayoutStereoData(
 }
 
 WebRtc_Word32 MediaFileImpl::StartPlayingAudioFile(
-    const WebRtc_Word8* fileName,
+    const char* fileName,
     const WebRtc_UWord32 notificationTimeMs,
     const bool loop,
     const FileFormats format,
@@ -388,7 +388,7 @@ WebRtc_Word32 MediaFileImpl::StartPlayingAudioFile(
 }
 
 
-WebRtc_Word32 MediaFileImpl::StartPlayingVideoFile(const WebRtc_Word8* fileName,
+WebRtc_Word32 MediaFileImpl::StartPlayingVideoFile(const char* fileName,
                                                    const bool loop,
                                                    bool videoOnly,
                                                    const FileFormats format)
@@ -402,7 +402,7 @@ WebRtc_Word32 MediaFileImpl::StartPlayingVideoFile(const WebRtc_Word8* fileName,
 }
 
 WebRtc_Word32 MediaFileImpl::StartPlayingFile(
-    const WebRtc_Word8* fileName,
+    const char* fileName,
     const WebRtc_UWord32 notificationTimeMs,
     const bool loop,
     bool videoOnly,
@@ -492,7 +492,7 @@ WebRtc_Word32 MediaFileImpl::StartPlayingAudioStream(
 
 WebRtc_Word32 MediaFileImpl::StartPlayingStream(
     InStream& stream,
-    const WebRtc_Word8* filename,
+    const char* filename,
     bool loop,
     const WebRtc_UWord32 notificationTimeMs,
     const FileFormats format,
@@ -501,7 +501,6 @@ WebRtc_Word32 MediaFileImpl::StartPlayingStream(
     const WebRtc_UWord32 stopPointMs,
     bool videoOnly)
 {
-
     if(!ValidFileFormat(format,codecInst))
     {
         return -1;
@@ -520,7 +519,7 @@ WebRtc_Word32 MediaFileImpl::StartPlayingStream(
             kTraceFile,
             _id,
             "StartPlaying called, but already playing or recording file %s",
-            (_fileName == NULL) ? "NULL" : _fileName);
+            (_fileName[0] == '\0') ? "(name not set)" : _fileName);
         return -1;
     }
 
@@ -574,6 +573,9 @@ WebRtc_Word32 MediaFileImpl::StartPlayingStream(
         case kFileFormatPcm16kHzFile:
         case kFileFormatPcm32kHzFile:
         {
+            // ValidFileFormat() called in the beginneing of this function
+            // prevents codecInst from being NULL here.
+            assert(codecInst != NULL);
             if(!ValidFrequency(codecInst->plfreq) ||
                _ptrFileUtilityObj->InitPCMReading(stream, startPointMs,
                                                   stopPointMs,
@@ -590,6 +592,9 @@ WebRtc_Word32 MediaFileImpl::StartPlayingStream(
         }
         case kFileFormatPreencodedFile:
         {
+            // ValidFileFormat() called in the beginneing of this function
+            // prevents codecInst from being NULL here.
+            assert(codecInst != NULL);
             if(_ptrFileUtilityObj->InitPreEncodedReading(stream, *codecInst) ==
                -1)
             {
@@ -853,7 +858,7 @@ WebRtc_Word32 MediaFileImpl::IncomingAudioVideoData(
 }
 
 WebRtc_Word32 MediaFileImpl::StartRecordingAudioFile(
-    const WebRtc_Word8* fileName,
+    const char* fileName,
     const FileFormats format,
     const CodecInst& codecInst,
     const WebRtc_UWord32 notificationTimeMs,
@@ -866,7 +871,7 @@ WebRtc_Word32 MediaFileImpl::StartRecordingAudioFile(
 
 
 WebRtc_Word32 MediaFileImpl::StartRecordingVideoFile(
-    const WebRtc_Word8* fileName,
+    const char* fileName,
     const FileFormats format,
     const CodecInst& codecInst,
     const VideoCodec& videoCodecInst,
@@ -880,7 +885,7 @@ WebRtc_Word32 MediaFileImpl::StartRecordingVideoFile(
 }
 
 WebRtc_Word32 MediaFileImpl::StartRecordingFile(
-    const WebRtc_Word8* fileName,
+    const char* fileName,
     const FileFormats format,
     const CodecInst& codecInst,
     const VideoCodec& videoCodecInst,
@@ -956,7 +961,7 @@ WebRtc_Word32 MediaFileImpl::StartRecordingAudioStream(
 
 WebRtc_Word32 MediaFileImpl::StartRecordingStream(
     OutStream& stream,
-    const WebRtc_Word8* fileName,
+    const char* fileName,
     const FileFormats format,
     const CodecInst& codecInst,
     const VideoCodec& videoCodecInst,
@@ -1209,7 +1214,7 @@ WebRtc_Word32 MediaFileImpl::SetModuleFileCallback(FileCallback* callback)
     return 0;
 }
 
-WebRtc_Word32 MediaFileImpl::FileDurationMs(const WebRtc_Word8* fileName,
+WebRtc_Word32 MediaFileImpl::FileDurationMs(const char* fileName,
                                             WebRtc_UWord32& durationMs,
                                             const FileFormats format,
                                             const WebRtc_UWord32 freqInHz)
@@ -1321,7 +1326,7 @@ bool MediaFileImpl::ValidFileFormat(const FileFormats format,
     return true;
 }
 
-bool MediaFileImpl::ValidFileName(const WebRtc_Word8* fileName)
+bool MediaFileImpl::ValidFileName(const char* fileName)
 {
     if((fileName == NULL) ||(fileName[0] == '\0'))
     {

@@ -32,7 +32,7 @@ namespace webrtc
 namespace videocapturemodule
 {
 VideoCaptureModule* VideoCaptureImpl::Create(const WebRtc_Word32 id,
-                                             const WebRtc_UWord8* deviceUniqueId)
+                                             const char* deviceUniqueId)
 {
     RefCountImpl<videocapturemodule::VideoCaptureModuleV4L2>* implementation =
         new RefCountImpl<videocapturemodule::VideoCaptureModuleV4L2>(id);
@@ -62,10 +62,10 @@ VideoCaptureModuleV4L2::VideoCaptureModuleV4L2(const WebRtc_Word32 id)
 {
 }
 
-WebRtc_Word32 VideoCaptureModuleV4L2::Init(const WebRtc_UWord8* deviceUniqueIdUTF8)
+WebRtc_Word32 VideoCaptureModuleV4L2::Init(const char* deviceUniqueIdUTF8)
 {
     int len = strlen((const char*) deviceUniqueIdUTF8);
-    _deviceUniqueId = new (std::nothrow) WebRtc_UWord8[len + 1];
+    _deviceUniqueId = new (std::nothrow) char[len + 1];
     if (_deviceUniqueId)
     {
         memcpy(_deviceUniqueId, deviceUniqueIdUTF8, len + 1);
@@ -138,7 +138,7 @@ WebRtc_Word32 VideoCaptureModuleV4L2::StartCapture(
         }
     }
 
-    CriticalSectionScoped cs(*_captureCritSect);
+    CriticalSectionScoped cs(_captureCritSect);
     //first open /dev/video device
     char device[20];
     sprintf(device, "/dev/video%d", (int) _deviceId);
@@ -150,8 +150,20 @@ WebRtc_Word32 VideoCaptureModuleV4L2::StartCapture(
         return -1;
     }
 
-    int nFormats = 2;
-    unsigned int fmts[2] = { V4L2_PIX_FMT_YUV420, V4L2_PIX_FMT_YUYV };
+    // Supported video formats in preferred order.
+    // If the requested resolution is larger than VGA, we prefer MJPEG. Go for
+    // I420 otherwise.
+    const int nFormats = 3;
+    unsigned int fmts[nFormats];
+    if (capability.width > 640 || capability.height > 480) {
+        fmts[0] = V4L2_PIX_FMT_MJPEG;
+        fmts[1] = V4L2_PIX_FMT_YUV420;
+        fmts[2] = V4L2_PIX_FMT_YUYV;
+    } else {
+        fmts[0] = V4L2_PIX_FMT_YUV420;
+        fmts[1] = V4L2_PIX_FMT_YUYV;
+        fmts[2] = V4L2_PIX_FMT_MJPEG;
+    }
 
     struct v4l2_format video_fmt;
     memset(&video_fmt, 0, sizeof(struct v4l2_format));
@@ -180,10 +192,13 @@ WebRtc_Word32 VideoCaptureModuleV4L2::StartCapture(
                    "no supporting video formats found");
         return -1;
     }
+
     if (video_fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV)
         _captureVideoType = kVideoYUY2;
-    else
+    else if (video_fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_YUV420)
         _captureVideoType = kVideoI420;
+    else if (video_fmt.fmt.pix.pixelformat == V4L2_PIX_FMT_MJPEG)
+        _captureVideoType = kVideoMJPEG;
 
     //set format and frame size now
     if (ioctl(_deviceFd, VIDIOC_S_FMT, &video_fmt) < 0)
@@ -197,10 +212,11 @@ WebRtc_Word32 VideoCaptureModuleV4L2::StartCapture(
     _currentWidth = video_fmt.fmt.pix.width;
     _currentHeight = video_fmt.fmt.pix.height;
     _captureDelay = 120;
-    if(_currentWidth >= 800)
+    // No way of knowing frame rate, make a guess.
+    if(_currentWidth >= 800 && _captureVideoType != kVideoMJPEG)
       _currentFrameRate = 15;
     else
-      _currentFrameRate = 30; // No way of knowing on Linux.
+      _currentFrameRate = 30;
 
     if (!AllocateVideoBuffers())
     {
@@ -238,7 +254,7 @@ WebRtc_Word32 VideoCaptureModuleV4L2::StopCapture()
         _captureThread->SetNotAlive();// Make sure the capture thread stop stop using the critsect.
 
 
-    CriticalSectionScoped cs(*_captureCritSect);
+    CriticalSectionScoped cs(_captureCritSect);
 
     WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideoCapture, -1, "StopCapture(), was running: %d",
                _captureStarted);

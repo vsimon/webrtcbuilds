@@ -109,6 +109,10 @@ class VP8Encoder : public VideoEncoder {
   // Call encoder initialize function and set control settings.
   int InitAndSetControlSettings();
 
+  // Update frame size for codec.
+  int UpdateCodecFrameSize(WebRtc_UWord32 input_image_width,
+                           WebRtc_UWord32 input_image_height);
+
   void PopulateCodecSpecific(CodecSpecificInfo* codec_specific,
                              const vpx_codec_cx_pkt& pkt);
 
@@ -229,6 +233,7 @@ class VP8Decoder : public VideoDecoder {
   vpx_ref_frame_t* ref_frame_;
   int propagation_cnt_;
   bool latest_keyframe_complete_;
+  bool mfqe_enabled_;
 };  // end of VP8Decoder class
 }  // namespace webrtc
 

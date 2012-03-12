@@ -18,6 +18,7 @@
 #include "tb_external_transport.h"
 #include "tb_interfaces.h"
 #include "tb_video_channel.h"
+#include "testsupport/fileutils.h"
 #include "vie_autotest.h"
 #include "vie_autotest_defines.h"
 
@@ -111,7 +112,6 @@ void ViEAutoTest::ViERtpRtcpStandardTest()
     // ***************************************************************
     // Engine ready. Begin testing class
     // ***************************************************************
-
     unsigned short startSequenceNumber = 12345;
     ViETest::Log("Set start sequence number: %u", startSequenceNumber);
     EXPECT_EQ(0, ViE.rtp_rtcp->SetStartSequenceNumber(
@@ -278,13 +278,14 @@ void ViEAutoTest::ViERtpRtcpStandardTest()
     //                                      __FUNCTION__, __LINE__);
 
     EXPECT_EQ(0, ViE.base->StopReceive(tbChannel.videoChannel));
+    EXPECT_EQ(0, ViE.base->StopSend(tbChannel.videoChannel));
     EXPECT_EQ(0, ViE.rtp_rtcp->SetNACKStatus(tbChannel.videoChannel, false));
+
 
     //
     // Keepalive
     //
     ViETest::Log("Testing RTP keep alive...\n");
-    EXPECT_EQ(0, ViE.base->StopSend(tbChannel.videoChannel));
     EXPECT_EQ(0, ViE.base->StartReceive(tbChannel.videoChannel));
 
     myTransport.SetPacketLoss(0);
@@ -374,6 +375,98 @@ void ViEAutoTest::ViERtpRtcpStandardTest()
     // Deregister external transport
     EXPECT_EQ(0, ViE.network->DeregisterSendTransport(tbChannel.videoChannel));
 
+    // The linux virtual cam, vivi, gives a too simple image to encode,
+    // resulting in a low bitrate, and the REMB test below fails. Disabling the
+    // test if vivi is used while waiting for a better virtual device.
+    // BUG = 321.
+    if (tbCapture.device_name() != "vivi") {
+      // Create three channels. 1 and 2 are grouped together and will get a
+      // common REMB packet. 3 is in its own group and will get a separate REMB
+      // packet. To verify we receive a REMB, set a higher start bitrate for 2
+      // than 1 and verify the estimated send bitrate for 2 is lowered. Also,
+      // verify that the bitrate estimate for 3 is kept high and not lowered
+      // due to 1 and 2.
+      const unsigned int start_rate_1_bps = 100000;
+      const unsigned int start_rate_2_bps = 300000;
+      const unsigned int start_rate_3_bps = 1000000;
+
+      int channel_1 = -1;
+      int channel_2 = -1;
+      int channel_3 = -1;
+      EXPECT_EQ(0, ViE.base->CreateChannel(channel_1));
+      EXPECT_EQ(0, ViE.base->CreateChannel(channel_2, channel_1));
+      EXPECT_EQ(0, ViE.base->CreateChannel(channel_3));
+
+      //TbCaptureDevice tbCapture(ViE);
+      tbCapture.ConnectTo(channel_1);
+      tbCapture.ConnectTo(channel_2);
+      tbCapture.ConnectTo(channel_3);
+
+      TbExternalTransport transport_1(*(ViE.network));
+      TbExternalTransport transport_2(*(ViE.network));
+      TbExternalTransport transport_3(*(ViE.network));
+
+      EXPECT_EQ(0, ViE.network->RegisterSendTransport(channel_1, transport_1));
+      EXPECT_EQ(0, ViE.network->RegisterSendTransport(channel_2, transport_2));
+      EXPECT_EQ(0, ViE.network->RegisterSendTransport(channel_3, transport_3));
+
+      webrtc::VideoCodec video_codec;
+      for (int idx = 0; idx < ViE.codec->NumberOfCodecs(); ++idx) {
+        ViE.codec->GetCodec(idx, video_codec);
+        if (video_codec.codecType == webrtc::kVideoCodecVP8) {
+          break;
+        }
+      }
+      EXPECT_EQ(0, ViE.codec->SetReceiveCodec(channel_1, video_codec));
+      EXPECT_EQ(0, ViE.codec->SetReceiveCodec(channel_2, video_codec));
+      EXPECT_EQ(0, ViE.codec->SetReceiveCodec(channel_3, video_codec));
+
+      video_codec.startBitrate = start_rate_1_bps / 1000;
+      EXPECT_EQ(0, ViE.codec->SetSendCodec(channel_1, video_codec));
+      video_codec.startBitrate = start_rate_2_bps / 1000;
+      EXPECT_EQ(0, ViE.codec->SetSendCodec(channel_2, video_codec));
+      video_codec.startBitrate = start_rate_3_bps / 1000;
+      EXPECT_EQ(0, ViE.codec->SetSendCodec(channel_3, video_codec));
+
+      EXPECT_EQ(0, ViE.rtp_rtcp->SetRembStatus(channel_1, true, true));
+      EXPECT_EQ(0, ViE.rtp_rtcp->SetRembStatus(channel_2, true, true));
+      EXPECT_EQ(0, ViE.rtp_rtcp->SetRembStatus(channel_3, true, true));
+
+      EXPECT_EQ(0, ViE.base->StartReceive(channel_1));
+      EXPECT_EQ(0, ViE.base->StartReceive(channel_2));
+      EXPECT_EQ(0, ViE.base->StartReceive(channel_3));
+      EXPECT_EQ(0, ViE.base->StartSend(channel_1));
+      EXPECT_EQ(0, ViE.base->StartSend(channel_2));
+      EXPECT_EQ(0, ViE.base->StartSend(channel_3));
+
+      AutoTestSleep(KAutoTestSleepTimeMs);
+
+      EXPECT_EQ(0, ViE.base->StopReceive(channel_1));
+      EXPECT_EQ(0, ViE.base->StopReceive(channel_2));
+      EXPECT_EQ(0, ViE.base->StopReceive(channel_3));
+      EXPECT_EQ(0, ViE.base->StopSend(channel_1));
+      EXPECT_EQ(0, ViE.base->StopSend(channel_2));
+      EXPECT_EQ(0, ViE.base->StopSend(channel_3));
+
+      unsigned int bw_estimate_1 = 0;
+      unsigned int bw_estimate_2 = 0;
+      unsigned int bw_estimate_3 = 0;
+      ViE.rtp_rtcp->GetEstimatedSendBandwidth(channel_1, &bw_estimate_1);
+      ViE.rtp_rtcp->GetEstimatedSendBandwidth(channel_2, &bw_estimate_2);
+      ViE.rtp_rtcp->GetEstimatedSendBandwidth(channel_3, &bw_estimate_3);
+
+      EXPECT_LT(bw_estimate_1, start_rate_2_bps);
+      EXPECT_LT(bw_estimate_2, start_rate_2_bps);
+      EXPECT_NE(bw_estimate_1, start_rate_1_bps);
+
+      // Add some margin to avoid flaky test runs.
+      EXPECT_GT(bw_estimate_3, 0.75 * start_rate_3_bps);
+
+      EXPECT_EQ(0, ViE.base->DeleteChannel(channel_1));
+      EXPECT_EQ(0, ViE.base->DeleteChannel(channel_2));
+      EXPECT_EQ(0, ViE.base->DeleteChannel(channel_3));
+    }
+
     //***************************************************************
     //  Testing finished. Tear down Video Engine
     //***************************************************************
@@ -418,7 +511,7 @@ void ViEAutoTest::ViERtpRtcpExtendedTest()
 
     unsigned char subType = 3;
     unsigned int name = static_cast<unsigned int> (0x41424344); // 'ABCD';
-    const char* data = "ViEAutoTest Data of length 32 --";
+    const char* data = "ViEAutoTest Data of length 32 -\0";
     const unsigned short numBytes = 32;
 
     EXPECT_EQ(0, ViE.rtp_rtcp->SendApplicationDefinedRTCPPacket(
@@ -568,10 +661,10 @@ void ViEAutoTest::ViERtpRtcpAPITest()
     // RTP Keepalive
     //
     {
-        char setPT = 123;
+        int setPT = 123;
         unsigned int setDeltaTime = 10;
         bool enabled = false;
-        char getPT = 0;
+        int getPT = 0;
         unsigned int getDeltaTime = 0;
         EXPECT_EQ(0, ViE.rtp_rtcp->SetRTPKeepAliveStatus(
             tbChannel.videoChannel, true, 119));
@@ -588,7 +681,13 @@ void ViEAutoTest::ViERtpRtcpAPITest()
         EXPECT_EQ(setPT, getPT);
         EXPECT_EQ(setDeltaTime, getDeltaTime);
 
+        EXPECT_EQ(0, ViE.rtp_rtcp->SetRTPKeepAliveStatus(
+                    tbChannel.videoChannel, false, setPT, setDeltaTime));
+
         EXPECT_EQ(0, ViE.base->StartSend(tbChannel.videoChannel));
+
+        EXPECT_EQ(0, ViE.rtp_rtcp->SetRTPKeepAliveStatus(
+                    tbChannel.videoChannel, true, setPT, setDeltaTime));
 
         EXPECT_NE(0, ViE.rtp_rtcp->SetRTPKeepAliveStatus(
             tbChannel.videoChannel, true, setPT, setDeltaTime));
@@ -606,7 +705,9 @@ void ViEAutoTest::ViERtpRtcpAPITest()
 #ifdef WEBRTC_ANDROID
         const char* dumpName = "/sdcard/DumpFileName.rtp";
 #else
-        const char* dumpName = "DumpFileName.rtp";
+        std::string output_file = webrtc::test::OutputPath() +
+            "DumpFileName.rtp";
+        const char* dumpName = output_file.c_str();
 #endif
         EXPECT_EQ(0, ViE.rtp_rtcp->StartRTPDump(
             tbChannel.videoChannel, dumpName, webrtc::kRtpIncoming));

@@ -32,13 +32,19 @@ class ShowDashboard(webapp2.RequestHandler):
     build_status_loader = load_build_status.BuildStatusLoader()
     build_status_data = build_status_loader.load_build_status_data()
     last_updated_at = build_status_loader.load_last_modified_at()
+    if last_updated_at is None:
+      self._show_error_page("No data has yet been uploaded to the dashboard.")
+      return
+
     last_updated_at = last_updated_at.strftime("%Y-%m-%d %H:%M")
     lkgr = build_status_loader.compute_lkgr()
 
     coverage_loader = load_coverage.CoverageDataLoader()
-    coverage_json_data = coverage_loader.load_coverage_json_data()
+    small_medium_coverage_json_data = (
+        coverage_loader.load_coverage_json_data('small_medium_tests'))
+    large_coverage_json_data = (
+        coverage_loader.load_coverage_json_data('large_tests'))
 
-    # Fill in the template with the data and respond:
     page_template_filename = 'templates/dashboard_template.html'
     self.response.write(template.render(page_template_filename, vars()))
 

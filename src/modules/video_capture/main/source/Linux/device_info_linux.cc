@@ -80,11 +80,11 @@ WebRtc_UWord32 DeviceInfoLinux::NumberOfDevices()
 
 WebRtc_Word32 DeviceInfoLinux::GetDeviceName(
                                          WebRtc_UWord32 deviceNumber,
-                                         WebRtc_UWord8* deviceNameUTF8,
+                                         char* deviceNameUTF8,
                                          WebRtc_UWord32 deviceNameLength,
-                                         WebRtc_UWord8* deviceUniqueIdUTF8,
+                                         char* deviceUniqueIdUTF8,
                                          WebRtc_UWord32 deviceUniqueIdUTF8Length,
-                                         WebRtc_UWord8* /*productUniqueIdUTF8*/,
+                                         char* /*productUniqueIdUTF8*/,
                                          WebRtc_UWord32 /*productUniqueIdUTF8Length*/)
 {
     WEBRTC_TRACE(webrtc::kTraceApiCall, webrtc::kTraceVideoCapture, _id, "%s", __FUNCTION__);
@@ -161,7 +161,7 @@ WebRtc_Word32 DeviceInfoLinux::GetDeviceName(
 }
 
 WebRtc_Word32 DeviceInfoLinux::CreateCapabilityMap(
-                                        const WebRtc_UWord8* deviceUniqueIdUTF8)
+                                        const char* deviceUniqueIdUTF8)
 {
     int fd;
     char device[32];
@@ -232,7 +232,7 @@ WebRtc_Word32 DeviceInfoLinux::CreateCapabilityMap(
 
     // Store the new used device name
     _lastUsedDeviceNameLength = deviceUniqueIdUTF8Length;
-    _lastUsedDeviceName = (WebRtc_UWord8*) realloc(_lastUsedDeviceName,
+    _lastUsedDeviceName = (char*) realloc(_lastUsedDeviceName,
                                                    _lastUsedDeviceNameLength + 1);
     memcpy(_lastUsedDeviceName, deviceUniqueIdUTF8, _lastUsedDeviceNameLength + 1);
 
@@ -243,7 +243,7 @@ WebRtc_Word32 DeviceInfoLinux::CreateCapabilityMap(
 }
 
 bool DeviceInfoLinux::IsDeviceNameMatches(const char* name,
-                                                      const char* deviceUniqueIdUTF8)
+                                          const char* deviceUniqueIdUTF8)
 {
     if (strncmp(deviceUniqueIdUTF8, name, strlen(name)) == 0)
             return true;
@@ -260,8 +260,11 @@ WebRtc_Word32 DeviceInfoLinux::FillCapabilityMap(int fd)
     video_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     video_fmt.fmt.pix.sizeimage = 0;
 
-    int totalFmts = 2;
-    unsigned int videoFormats[] = { V4L2_PIX_FMT_YUV420, V4L2_PIX_FMT_YUYV };
+    int totalFmts = 3;
+    unsigned int videoFormats[] = {
+        V4L2_PIX_FMT_MJPEG,
+        V4L2_PIX_FMT_YUV420,
+        V4L2_PIX_FMT_YUYV };
 
     int sizes = 13;
     unsigned int size[][2] = { { 128, 96 }, { 160, 120 }, { 176, 144 },
@@ -292,10 +295,14 @@ WebRtc_Word32 DeviceInfoLinux::FillCapabilityMap(int fd)
                     {
                         cap->rawType = kVideoYUY2;
                     }
+                    else if (videoFormats[fmts] == V4L2_PIX_FMT_MJPEG)
+                    {
+                        cap->rawType = kVideoMJPEG;
+                    }
 
                     // get fps of current camera mode
                     // V4l2 does not have a stable method of knowing so we just guess.
-                    if(cap->width>=800)
+                    if(cap->width >= 800 && cap->rawType != kVideoMJPEG)
                     {
                         cap->maxFPS = 15;
                     }

@@ -100,7 +100,6 @@ void AudioDeviceBuffer::SetId(WebRtc_UWord32 id)
 
 WebRtc_Word32 AudioDeviceBuffer::RegisterAudioCallback(AudioTransport* audioCallback)
 {
-
     CriticalSectionScoped lock(_critSectCb);
     _ptrCbAudioTransport = audioCallback;
 
@@ -322,7 +321,8 @@ WebRtc_Word32 AudioDeviceBuffer::SetVQEData(WebRtc_UWord32 playDelayMS, WebRtc_U
 //  StartInputFileRecording
 // ----------------------------------------------------------------------------
 
-WebRtc_Word32 AudioDeviceBuffer::StartInputFileRecording(const WebRtc_Word8 fileName[kAdmMaxFileNameSize])
+WebRtc_Word32 AudioDeviceBuffer::StartInputFileRecording(
+    const char fileName[kAdmMaxFileNameSize])
 {
     WEBRTC_TRACE(kTraceMemory, kTraceAudioDevice, _id, "%s", __FUNCTION__);
 
@@ -354,7 +354,8 @@ WebRtc_Word32 AudioDeviceBuffer::StopInputFileRecording()
 //  StartOutputFileRecording
 // ----------------------------------------------------------------------------
 
-WebRtc_Word32 AudioDeviceBuffer::StartOutputFileRecording(const WebRtc_Word8 fileName[kAdmMaxFileNameSize])
+WebRtc_Word32 AudioDeviceBuffer::StartOutputFileRecording(
+    const char fileName[kAdmMaxFileNameSize])
 {
     WEBRTC_TRACE(kTraceMemory, kTraceAudioDevice, _id, "%s", __FUNCTION__);
 
@@ -397,7 +398,8 @@ WebRtc_Word32 AudioDeviceBuffer::StopOutputFileRecording()
 //  16-bit,48kHz stereo,10ms => nSamples=480 => _recSize=4*480=1920 bytes
 // ----------------------------------------------------------------------------
 
-WebRtc_Word32 AudioDeviceBuffer::SetRecordedBuffer(const WebRtc_Word8* audioBuffer, WebRtc_UWord32 nSamples)
+WebRtc_Word32 AudioDeviceBuffer::SetRecordedBuffer(const void* audioBuffer,
+                                                   WebRtc_UWord32 nSamples)
 {
     CriticalSectionScoped lock(_critSect);
 
@@ -609,7 +611,7 @@ WebRtc_Word32 AudioDeviceBuffer::RequestPlayoutData(WebRtc_UWord32 nSamples)
 //  GetPlayoutData
 // ----------------------------------------------------------------------------
 
-WebRtc_Word32 AudioDeviceBuffer::GetPlayoutData(WebRtc_Word8* audioBuffer)
+WebRtc_Word32 AudioDeviceBuffer::GetPlayoutData(void* audioBuffer)
 {
     CriticalSectionScoped lock(_critSect);
 
@@ -618,8 +620,8 @@ WebRtc_Word32 AudioDeviceBuffer::GetPlayoutData(WebRtc_Word8* audioBuffer)
        WEBRTC_TRACE(kTraceError, kTraceUtility, _id, "_playSize %i exceeds "
        "kMaxBufferSizeBytes in AudioDeviceBuffer::GetPlayoutData", _playSize);
        assert(false);
-       return -1;       
-    } 
+       return -1;
+    }
 
     memcpy(audioBuffer, &_playBuffer[0], _playSize);
 

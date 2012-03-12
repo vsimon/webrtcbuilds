@@ -21,7 +21,7 @@ namespace videocapturemodule
 {
 VideoCaptureModule* VideoCaptureImpl::Create(
     const WebRtc_Word32 id,
-    const WebRtc_UWord8* deviceUniqueIdUTF8)
+    const char* deviceUniqueIdUTF8)
 {
 
     RefCountImpl<videocapturemodule::VideoCaptureAndroid>* implementation =
@@ -299,16 +299,16 @@ VideoCaptureAndroid::VideoCaptureAndroid(const WebRtc_Word32 id)
 //  VideoCaptureAndroid.java
 // ----------------------------------------------------------------------------
 WebRtc_Word32 VideoCaptureAndroid::Init(const WebRtc_Word32 id,
-                                        const WebRtc_UWord8* deviceUniqueIdUTF8)
+                                        const char* deviceUniqueIdUTF8)
 {
-    const int nameLength = strlen((char*) deviceUniqueIdUTF8);
+    const int nameLength = strlen(deviceUniqueIdUTF8);
     if (nameLength >= kVideoCaptureUniqueNameLength)
     {
         return -1;
     }
 
     // Store the device name
-    _deviceUniqueId = new WebRtc_UWord8[nameLength + 1];
+    _deviceUniqueId = new char[nameLength + 1];
     memcpy(_deviceUniqueId, deviceUniqueIdUTF8, nameLength + 1);
 
     if (_capInfo.Init() != 0)
@@ -475,7 +475,7 @@ VideoCaptureAndroid::~VideoCaptureAndroid()
 WebRtc_Word32 VideoCaptureAndroid::StartCapture(
                                         const VideoCaptureCapability& capability)
 {
-    CriticalSectionScoped cs(_apiCs);
+    CriticalSectionScoped cs(&_apiCs);
     WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceVideoCapture, -1,
                  "%s: ", __FUNCTION__);
 
@@ -552,7 +552,7 @@ WebRtc_Word32 VideoCaptureAndroid::StartCapture(
 }
 WebRtc_Word32 VideoCaptureAndroid::StopCapture()
 {
-    CriticalSectionScoped cs(_apiCs);
+    CriticalSectionScoped cs(&_apiCs);
     WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceVideoCapture, -1,
                  "%s: ", __FUNCTION__);
 
@@ -613,7 +613,7 @@ WebRtc_Word32 VideoCaptureAndroid::StopCapture()
 
 bool VideoCaptureAndroid::CaptureStarted()
 {
-    CriticalSectionScoped cs(_apiCs);
+    CriticalSectionScoped cs(&_apiCs);
     WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceVideoCapture, -1,
                  "%s: ", __FUNCTION__);
     return _captureStarted;
@@ -621,7 +621,7 @@ bool VideoCaptureAndroid::CaptureStarted()
 WebRtc_Word32 VideoCaptureAndroid::CaptureSettings(
                                                VideoCaptureCapability& settings)
 {
-    CriticalSectionScoped cs(_apiCs);
+    CriticalSectionScoped cs(&_apiCs);
     WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceVideoCapture, -1,
                  "%s: ", __FUNCTION__);
     settings = _requestedCapability;
@@ -631,7 +631,7 @@ WebRtc_Word32 VideoCaptureAndroid::CaptureSettings(
 WebRtc_Word32 VideoCaptureAndroid::SetCaptureRotation(
                                                   VideoCaptureRotation rotation)
 {
-    CriticalSectionScoped cs(_apiCs);
+    CriticalSectionScoped cs(&_apiCs);
     if (VideoCaptureImpl::SetCaptureRotation(rotation) == 0)
     {
         if (!g_jvm)

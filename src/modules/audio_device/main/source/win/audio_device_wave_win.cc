@@ -1374,7 +1374,10 @@ WebRtc_Word32 AudioDeviceWindowsWave::SetPlayoutDevice(AudioDeviceModule::Window
 //  PlayoutDeviceName
 // ----------------------------------------------------------------------------
 
-WebRtc_Word32 AudioDeviceWindowsWave::PlayoutDeviceName(WebRtc_UWord16 index, WebRtc_Word8 name[kAdmMaxDeviceNameSize], WebRtc_Word8 guid[kAdmMaxGuidSize])
+WebRtc_Word32 AudioDeviceWindowsWave::PlayoutDeviceName(
+    WebRtc_UWord16 index,
+    char name[kAdmMaxDeviceNameSize],
+    char guid[kAdmMaxGuidSize])
 {
 
     WebRtc_UWord16 nDevices(PlayoutDevices());
@@ -1476,7 +1479,10 @@ WebRtc_Word32 AudioDeviceWindowsWave::PlayoutDeviceName(WebRtc_UWord16 index, We
 //  RecordingDeviceName
 // ----------------------------------------------------------------------------
 
-WebRtc_Word32 AudioDeviceWindowsWave::RecordingDeviceName(WebRtc_UWord16 index, WebRtc_Word8 name[kAdmMaxDeviceNameSize], WebRtc_Word8 guid[kAdmMaxGuidSize])
+WebRtc_Word32 AudioDeviceWindowsWave::RecordingDeviceName(
+    WebRtc_UWord16 index,
+    char name[kAdmMaxDeviceNameSize],
+    char guid[kAdmMaxGuidSize])
 {
 
     WebRtc_UWord16 nDevices(RecordingDevices());
@@ -1829,7 +1835,7 @@ WebRtc_Word32 AudioDeviceWindowsWave::InitPlayout()
     for (int n = 0; n < N_BUFFERS_OUT; n++)
     {
         // set up the output wave header
-        _waveHeaderOut[n].lpData          = _playBuffer[n];
+        _waveHeaderOut[n].lpData          = reinterpret_cast<LPSTR>(&_playBuffer[n]);
         _waveHeaderOut[n].dwBufferLength  = bytesPerSample*PLAY_BUF_SIZE_IN_SAMPLES;
         _waveHeaderOut[n].dwFlags         = 0;
         _waveHeaderOut[n].dwLoops         = 0;
@@ -2670,7 +2676,7 @@ WebRtc_Word32 AudioDeviceWindowsWave::PrepareStartPlayout()
 
     // A total of 30ms of data is immediately placed in the SC buffer
     //
-    WebRtc_Word8 zeroVec[4*PLAY_BUF_SIZE_IN_SAMPLES];  // max allocation
+    int8_t zeroVec[4*PLAY_BUF_SIZE_IN_SAMPLES];  // max allocation
     memset(zeroVec, 0, 4*PLAY_BUF_SIZE_IN_SAMPLES);
 
     {
@@ -2730,7 +2736,7 @@ WebRtc_Word32 AudioDeviceWindowsWave::PrepareStartRecording()
         const WebRtc_UWord8 nBytesPerSample = 2*_recChannels;
 
         // set up the input wave header
-        _waveHeaderIn[n].lpData          = _recBuffer[n];
+        _waveHeaderIn[n].lpData          = reinterpret_cast<LPSTR>(&_recBuffer[n]);
         _waveHeaderIn[n].dwBufferLength  = nBytesPerSample * REC_BUF_SIZE_IN_SAMPLES;
         _waveHeaderIn[n].dwFlags         = 0;
         _waveHeaderIn[n].dwBytesRecorded = 0;
@@ -3469,7 +3475,7 @@ WebRtc_Word32 AudioDeviceWindowsWave::RecProc(LONGLONG& consumedTime)
 int AudioDeviceWindowsWave::PlayProc(LONGLONG& consumedTime)
 {
     WebRtc_Word32 remTimeMS(0);
-    WebRtc_Word8 playBuffer[4*PLAY_BUF_SIZE_IN_SAMPLES];
+    int8_t playBuffer[4*PLAY_BUF_SIZE_IN_SAMPLES];
     WebRtc_UWord32 writtenSamples(0);
     WebRtc_UWord32 playedSamples(0);
 
@@ -3620,7 +3626,7 @@ int AudioDeviceWindowsWave::PlayProc(LONGLONG& consumedTime)
 //  Write
 // ----------------------------------------------------------------------------
 
-WebRtc_Word32 AudioDeviceWindowsWave::Write(WebRtc_Word8* data, WebRtc_UWord16 nSamples)
+WebRtc_Word32 AudioDeviceWindowsWave::Write(int8_t* data, WebRtc_UWord16 nSamples)
 {
     if (_hWaveOut == NULL)
     {

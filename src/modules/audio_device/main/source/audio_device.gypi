@@ -109,6 +109,14 @@
             'android/audio_device_utility_android.h',
           ],
           'conditions': [
+            ['OS=="android"', {
+              'link_settings': {
+                'libraries': [
+                  '-llog',
+                  '-lOpenSLES',
+                ],
+              },
+            }],
             ['OS=="linux"', {
               'defines': [
                 'LINUX_ALSA',
@@ -165,7 +173,7 @@
     },
   ],
   # Exclude the test targets when building with chromium.
-  'conditions': [   
+  'conditions': [
     ['build_with_chromium==0', {
       'targets': [
         {
@@ -174,6 +182,8 @@
          'dependencies': [
             'audio_device',
             'webrtc_utility',
+            '<(webrtc_root)/../test/test.gyp:test_support_main',
+            '<(webrtc_root)/../testing/gtest.gyp:gtest',
             '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
           ],
           'sources': [
@@ -190,6 +200,7 @@
             '<(webrtc_root)/common_audio/common_audio.gyp:resampler',
             '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
             '<(webrtc_root)/../test/test.gyp:test_support',
+            '<(webrtc_root)/../testing/gtest.gyp:gtest',
           ],
           'sources': [
             '../test/audio_device_test_func.cc',
