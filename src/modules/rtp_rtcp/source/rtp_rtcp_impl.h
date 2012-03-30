@@ -148,18 +148,6 @@ public:
     */
     virtual WebRtc_Word32 InitSender();
 
-    virtual WebRtc_Word32 SetRTPKeepaliveStatus(
-        const bool enable,
-        const int unknownPayloadType,
-        const WebRtc_UWord16 deltaTransmitTimeMS);
-
-    virtual WebRtc_Word32 RTPKeepaliveStatus(
-        bool* enable,
-        int* unknownPayloadType,
-        WebRtc_UWord16* deltaTransmitTimeMS) const;
-
-    virtual bool RTPKeepalive() const;
-
     virtual WebRtc_Word32 RegisterSendPayload(const CodecInst& voiceCodec);
 
     virtual WebRtc_Word32 RegisterSendPayload(const VideoCodec& videoCodec);
@@ -477,12 +465,9 @@ public:
                                          WebRtc_UWord8& payloadTypeRED,
                                          WebRtc_UWord8& payloadTypeFEC);
 
-
-    virtual WebRtc_Word32 SetFECCodeRate(const WebRtc_UWord8 keyFrameCodeRate,
-                                         const WebRtc_UWord8 deltaFrameCodeRate);
-
-    virtual WebRtc_Word32 SetFECUepProtection(const bool keyUseUepProtection,
-                                              const bool deltaUseUepProtection);
+    virtual WebRtc_Word32 SetFecParameters(
+        const FecProtectionParams* delta_params,
+        const FecProtectionParams* key_params);
 
     virtual WebRtc_Word32 LastReceivedNTP(WebRtc_UWord32& NTPsecs,
                                           WebRtc_UWord32& NTPfrac,

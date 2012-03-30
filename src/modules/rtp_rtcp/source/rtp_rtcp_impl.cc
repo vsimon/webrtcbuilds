@@ -425,13 +425,6 @@ WebRtc_Word32 ModuleRtpRtcpImpl::Process() {
     _rtcpSender.SendRTCP(kRtcpReport);
   }
 
-  if (_rtpSender.RTPKeepalive()) {
-    // check time to send RTP keep alive
-    if (_rtpSender.TimeToSendRTPKeepalive()) {
-      _rtpSender.SendRTPKeepalivePacket();
-    }
-  }
-
   if (UpdateRTCPReceiveInformationTimers()) {
     // a receiver has timed out
     UpdateTMMBR();
@@ -862,67 +855,6 @@ WebRtc_Word32 ModuleRtpRtcpImpl::InitSender() {
   return retVal;
 }
 
-bool ModuleRtpRtcpImpl::RTPKeepalive() const {
-  WEBRTC_TRACE(kTraceStream, kTraceRtpRtcp, _id, "RTPKeepalive()");
-
-  return _rtpSender.RTPKeepalive();
-}
-
-WebRtc_Word32 ModuleRtpRtcpImpl::RTPKeepaliveStatus(
-    bool* enable,
-    int* unknownPayloadType,
-    WebRtc_UWord16* deltaTransmitTimeMS) const {
-  WEBRTC_TRACE(kTraceModuleCall, kTraceRtpRtcp, _id, "RTPKeepaliveStatus()");
-
-  return _rtpSender.RTPKeepaliveStatus(enable,
-                                       unknownPayloadType,
-                                       deltaTransmitTimeMS);
-}
-
-WebRtc_Word32 ModuleRtpRtcpImpl::SetRTPKeepaliveStatus(
-  bool enable,
-  const int unknownPayloadType,
-  WebRtc_UWord16 deltaTransmitTimeMS) {
-  if (enable) {
-    WEBRTC_TRACE(
-      kTraceModuleCall,
-      kTraceRtpRtcp,
-      _id,
-      "SetRTPKeepaliveStatus(true, plType:%d deltaTransmitTimeMS:%u)",
-      unknownPayloadType,
-      deltaTransmitTimeMS);
-
-    // check the transmit keepalive delta time [1,60]
-    if (deltaTransmitTimeMS < 1000 || deltaTransmitTimeMS > 60000) {
-      WEBRTC_TRACE(kTraceError,
-                   kTraceRtpRtcp,
-                   _id,
-                   "\tinvalid deltaTransmitTimeSeconds (%d)",
-                   deltaTransmitTimeMS);
-      return -1;
-    }
-
-    // check the payload time [0,127]
-    if (unknownPayloadType < 0) {
-      WEBRTC_TRACE(kTraceError,
-                   kTraceRtpRtcp,
-                   _id,
-                   "\tinvalid unknownPayloadType (%d)",
-                   unknownPayloadType);
-      return -1;
-    }
-    // enable RTP keepalive mechanism
-    return _rtpSender.EnableRTPKeepalive(unknownPayloadType,
-                                         deltaTransmitTimeMS);
-  } else {
-    WEBRTC_TRACE(kTraceModuleCall,
-                 kTraceRtpRtcp,
-                 _id,
-                 "SetRTPKeepaliveStatus(disable)");
-    return _rtpSender.DisableRTPKeepalive();
-  }
-}
-
 WebRtc_Word32 ModuleRtpRtcpImpl::RegisterSendPayload(
   const CodecInst& voiceCodec) {
   WEBRTC_TRACE(kTraceModuleCall,
@@ -1098,14 +1030,6 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SetSendingStatus(const bool sending) {
     WEBRTC_TRACE(kTraceModuleCall, kTraceRtpRtcp, _id,
                  "SetSendingStatus(sending)");
   } else {
-    if (_rtpSender.RTPKeepalive()) {
-      WEBRTC_TRACE(
-          kTraceWarning,
-          kTraceRtpRtcp,
-          _id,
-          "Can't SetSendingStatus(stopped) when RTP Keepalive is active");
-      return -1;
-    }
     WEBRTC_TRACE(kTraceModuleCall, kTraceRtpRtcp, _id,
                  "SetSendingStatus(stopped)");
   }
@@ -2196,16 +2120,9 @@ WebRtc_Word32 ModuleRtpRtcpImpl::GenericFECStatus(
   return retVal;
 }
 
-WebRtc_Word32 ModuleRtpRtcpImpl::SetFECCodeRate(
-  const WebRtc_UWord8 keyFrameCodeRate,
-  const WebRtc_UWord8 deltaFrameCodeRate) {
-  WEBRTC_TRACE(kTraceModuleCall,
-               kTraceRtpRtcp,
-               _id,
-               "SetFECCodeRate(%u, %u)",
-               keyFrameCodeRate,
-               deltaFrameCodeRate);
-
+WebRtc_Word32 ModuleRtpRtcpImpl::SetFecParameters(
+    const FecProtectionParams* delta_params,
+    const FecProtectionParams* key_params) {
   const bool defaultInstance(_childModules.empty() ? false : true);
   if (defaultInstance)  {
     // for default we need to update all child modules too
@@ -2215,42 +2132,13 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SetFECCodeRate(
     while (it != _childModules.end()) {
       RtpRtcp* module = *it;
       if (module) {
-        module->SetFECCodeRate(keyFrameCodeRate, deltaFrameCodeRate);
+        module->SetFecParameters(delta_params, key_params);
       }
       it++;
     }
     return 0;
   }
-  return _rtpSender.SetFECCodeRate(keyFrameCodeRate, deltaFrameCodeRate);
-}
-
-WebRtc_Word32 ModuleRtpRtcpImpl::SetFECUepProtection(
-  const bool keyUseUepProtection,
-  const bool deltaUseUepProtection) {
-  WEBRTC_TRACE(kTraceModuleCall,
-               kTraceRtpRtcp, _id,
-               "SetFECUepProtection(%d, %d)",
-               keyUseUepProtection,
-               deltaUseUepProtection);
-
-  const bool defaultInstance(_childModules.empty() ? false : true);
-  if (defaultInstance)  {
-    // for default we need to update all child modules too
-    CriticalSectionScoped lock(_criticalSectionModulePtrs);
-
-    std::list<ModuleRtpRtcpImpl*>::iterator it = _childModules.begin();
-    while (it != _childModules.end()) {
-      RtpRtcp* module = *it;
-      if (module) {
-        module->SetFECUepProtection(keyUseUepProtection,
-                                    deltaUseUepProtection);
-      }
-      it++;
-    }
-    return 0;
-  }
-  return _rtpSender.SetFECUepProtection(keyUseUepProtection,
-                                        deltaUseUepProtection);
+  return _rtpSender.SetFecParameters(delta_params, key_params);
 }
 
 void ModuleRtpRtcpImpl::SetRemoteSSRC(const WebRtc_UWord32 SSRC) {

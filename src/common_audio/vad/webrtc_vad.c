@@ -65,30 +65,24 @@ int WebRtcVad_Init(VadInst* handle) {
   return WebRtcVad_InitCore((VadInstT*) handle);
 }
 
-int WebRtcVad_set_mode(VadInst *vad_inst, int mode)
-{
-    VadInstT* vad_ptr;
+// TODO(bjornv): Move WebRtcVad_set_mode_core() code here.
+int WebRtcVad_set_mode(VadInst* handle, int mode) {
+  VadInstT* self = (VadInstT*) handle;
 
-    if (vad_inst == NULL)
-    {
-        return -1;
-    }
+  if (handle == NULL) {
+    return -1;
+  }
+  if (self->init_flag != kInitCheck) {
+    return -1;
+  }
 
-    vad_ptr = (VadInstT*)vad_inst;
-    if (vad_ptr->init_flag != kInitCheck)
-    {
-        return -1;
-    }
-
-    return WebRtcVad_set_mode_core((VadInstT*)vad_inst, mode);
+  return WebRtcVad_set_mode_core(self, mode);
 }
 
-WebRtc_Word16 WebRtcVad_Process(VadInst *vad_inst,
-                                WebRtc_Word16 fs,
-                                WebRtc_Word16 *speech_frame,
-                                WebRtc_Word16 frame_length)
+int16_t WebRtcVad_Process(VadInst* vad_inst, int16_t fs, int16_t* speech_frame,
+                          int16_t frame_length)
 {
-    WebRtc_Word16 vad;
+    int16_t vad;
     VadInstT* vad_ptr;
 
     if (vad_inst == NULL)

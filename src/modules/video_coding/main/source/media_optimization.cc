@@ -9,6 +9,7 @@
  */
 
 #include "media_optimization.h"
+
 #include "content_metrics_processing.h"
 #include "frame_dropper.h"
 #include "qm_select.h"
@@ -24,8 +25,6 @@ _maxBitRate(0),
 _sendCodecType(kVideoCodecUnknown),
 _codecWidth(0),
 _codecHeight(0),
-_initCodecWidth(0),
-_initCodecHeight(0),
 _userFrameRate(0),
 _packetLossEnc(0),
 _fractionLost(0),
@@ -208,33 +207,29 @@ int VCMMediaOptimization::UpdateProtectionCallback(
     {
         return VCM_OK;
     }
+    FecProtectionParams delta_fec_params;
+    FecProtectionParams key_fec_params;
     // Get the FEC code rate for Key frames (set to 0 when NA)
-    const WebRtc_UWord8
-    codeRateKeyRTP  = selected_method->RequiredProtectionFactorK();
+    key_fec_params.fec_rate = selected_method->RequiredProtectionFactorK();
 
     // Get the FEC code rate for Delta frames (set to 0 when NA)
-    const WebRtc_UWord8
-    codeRateDeltaRTP = selected_method->RequiredProtectionFactorD();
+    delta_fec_params.fec_rate =
+        selected_method->RequiredProtectionFactorD();
 
     // Get the FEC-UEP protection status for Key frames: UEP on/off
-    const bool
-    useUepProtectionKeyRTP  = selected_method->RequiredUepProtectionK();
+    key_fec_params.use_uep_protection =
+        selected_method->RequiredUepProtectionK();
 
     // Get the FEC-UEP protection status for Delta frames: UEP on/off
-    const bool
-    useUepProtectionDeltaRTP = selected_method->RequiredUepProtectionD();
+    delta_fec_params.use_uep_protection =
+        selected_method->RequiredUepProtectionD();
 
-    // NACK is on for NACK and NackFec protection method: off for FEC method
-    bool nackStatus = (selected_method->Type() == kNackFec ||
-                       selected_method->Type() == kNack);
+    delta_fec_params.max_fec_frames = 1;
+    key_fec_params.max_fec_frames = 1;
 
     // TODO(Marco): Pass FEC protection values per layer.
-
-    return _videoProtectionCallback->ProtectionRequest(codeRateDeltaRTP,
-                                                       codeRateKeyRTP,
-                                                       useUepProtectionDeltaRTP,
-                                                       useUepProtectionKeyRTP,
-                                                       nackStatus,
+    return _videoProtectionCallback->ProtectionRequest(&delta_fec_params,
+                                                       &key_fec_params,
                                                        video_rate_bps,
                                                        nack_overhead_rate_bps,
                                                        fec_overhead_rate_bps);
@@ -286,8 +281,6 @@ VCMMediaOptimization::SetEncodingData(VideoCodecType sendCodecType,
     _userFrameRate = static_cast<float>(frameRate);
     _codecWidth = width;
     _codecHeight = height;
-    _initCodecWidth = width;
-    _initCodecHeight = height;
     _numLayers = (numLayers <= 1) ? 1 : numLayers;  // Can also be zero.
     WebRtc_Word32 ret = VCM_OK;
     ret = _qmResolution->Initialize((float)_targetBitRate, _userFrameRate,
@@ -577,41 +570,39 @@ VCMMediaOptimization::checkStatusForQMchange()
 
 bool VCMMediaOptimization::QMUpdate(VCMResolutionScale* qm) {
   // Check for no change
-  if (!qm->change_resolution) {
+  if (!qm->change_resolution_spatial && !qm->change_resolution_temporal) {
     return false;
   }
 
   // Check for change in frame rate.
-  if (qm->temporal_fact != 1.0f) {
-    _incomingFrameRate = _incomingFrameRate / qm->temporal_fact + 0.5f;
+  if (qm->change_resolution_temporal) {
+    _incomingFrameRate = qm->frame_rate;
+    // Reset frame rate estimate.
     memset(_incomingFrameTimes, -1, sizeof(_incomingFrameTimes));
   }
 
   // Check for change in frame size.
-  if (qm->spatial_height_fact != 1.0 || qm->spatial_width_fact != 1.0) {
-    _codecWidth = static_cast<uint16_t>(_codecWidth /
-        qm->spatial_width_fact);
-    _codecHeight = static_cast<uint16_t>(_codecHeight /
-        qm->spatial_height_fact);
-    // New frame sizes should not exceed original size from SetEncodingData().
-    assert(_codecWidth <= _initCodecWidth);
-    assert(_codecHeight <= _initCodecHeight);
-    // Check that new frame sizes are multiples of two.
-    assert(_codecWidth % 2 == 0);
-    assert(_codecHeight % 2 == 0);
+  if (qm->change_resolution_spatial) {
+    _codecWidth = qm->codec_width;
+    _codecHeight = qm->codec_height;
   }
 
   WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVideoCoding, _id,
-               "Quality Mode Update: W = %d, H = %d, FR = %f",
-               _codecWidth, _codecHeight, _incomingFrameRate);
+               "Resolution change from QM select: W = %d, H = %d, FR = %f",
+               qm->codec_width, qm->codec_height, qm->frame_rate);
 
-  // Update VPM with new target frame rate and size
-  _videoQMSettingsCallback->SetVideoQMSettings(_incomingFrameRate,
+  // Update VPM with new target frame rate and frame size.
+  // Note: use |qm->frame_rate| instead of |_incomingFrameRate| for updating
+  // target frame rate in VPM frame dropper. The quantity |_incomingFrameRate|
+  // will vary/fluctuate, and since we don't want to change the state of the
+  // VPM frame dropper, unless a temporal action was selected, we use the
+  // quantity |qm->frame_rate| for updating.
+  _videoQMSettingsCallback->SetVideoQMSettings(qm->frame_rate,
                                                _codecWidth,
                                                _codecHeight);
-
-  _content->UpdateFrameRate(_incomingFrameRate);
-  _qmResolution->UpdateCodecFrameSize(_codecWidth, _codecHeight);
+  _content->UpdateFrameRate(qm->frame_rate);
+  _qmResolution->UpdateCodecParameters(qm->frame_rate, _codecWidth,
+                                       _codecHeight);
   return true;
 }
 

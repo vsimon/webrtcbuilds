@@ -94,16 +94,6 @@ class MockRtpRtcp : public RtpRtcp {
       WebRtc_UWord16());
   MOCK_CONST_METHOD0(MaxDataPayloadLength,
       WebRtc_UWord16());
-  MOCK_METHOD3(SetRTPKeepaliveStatus,
-      WebRtc_Word32(const bool enable,
-                    const int unknownPayloadType,
-                    const WebRtc_UWord16 deltaTransmitTimeMS));
-  MOCK_CONST_METHOD3(RTPKeepaliveStatus,
-      WebRtc_Word32(bool* enable,
-                    int* unknownPayloadType,
-                    WebRtc_UWord16* deltaTransmitTimeMS));
-  MOCK_CONST_METHOD0(RTPKeepalive,
-      bool());
   MOCK_METHOD1(RegisterSendPayload,
       WebRtc_Word32(const CodecInst& voiceCodec));
   MOCK_METHOD1(RegisterSendPayload,
@@ -280,10 +270,9 @@ class MockRtpRtcp : public RtpRtcp {
       WebRtc_Word32(const bool enable, const WebRtc_UWord8 payloadTypeRED, const WebRtc_UWord8 payloadTypeFEC));
   MOCK_METHOD3(GenericFECStatus,
       WebRtc_Word32(bool& enable, WebRtc_UWord8& payloadTypeRED, WebRtc_UWord8& payloadTypeFEC));
-  MOCK_METHOD2(SetFECCodeRate,
-      WebRtc_Word32(const WebRtc_UWord8 keyFrameCodeRate, const WebRtc_UWord8 deltaFrameCodeRate));
-  MOCK_METHOD2(SetFECUepProtection,
-      WebRtc_Word32(const bool keyUseUepProtection, const bool deltaUseUepProtection));
+  MOCK_METHOD2(SetFecParameters,
+      WebRtc_Word32(const FecProtectionParams* delta_params,
+                    const FecProtectionParams* key_params));
   MOCK_METHOD1(SetKeyFrameRequestMethod,
       WebRtc_Word32(const KeyFrameRequestMethod method));
   MOCK_METHOD0(RequestKeyFrame,

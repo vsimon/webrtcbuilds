@@ -163,12 +163,7 @@ class ViEChannel
                          WebRtc_UWord32& fec_bitrate_sent,
                          WebRtc_UWord32& nackBitrateSent) const;
   int GetEstimatedReceiveBandwidth(WebRtc_UWord32* estimated_bandwidth) const;
-  WebRtc_Word32 SetKeepAliveStatus(const bool enable,
-                                   const int unknown_payload_type,
-                                   const WebRtc_UWord16 delta_transmit_timeMS);
-  WebRtc_Word32 GetKeepAliveStatus(bool& enable,
-                                   int& unknown_payload_type,
-                                   WebRtc_UWord16& delta_transmit_timeMS);
+
   WebRtc_Word32 StartRTPDump(const char file_nameUTF8[1024],
                              RTPDirections direction);
   WebRtc_Word32 StopRTPDump(RTPDirections direction);
@@ -397,6 +392,9 @@ class ViEChannel
   TickTime vcm_rttreported_;
 
   ViEFileRecorder file_recorder_;
+
+  // User set MTU, -1 if not set.
+  uint16_t mtu_;
 };
 
 }  // namespace webrtc

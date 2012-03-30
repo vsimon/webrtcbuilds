@@ -73,7 +73,8 @@ ViEChannel::ViEChannel(WebRtc_Word32 channel_id,
       effect_filter_(NULL),
       color_enhancement_(true),
       vcm_rttreported_(TickTime::Now()),
-      file_recorder_(channel_id) {
+      file_recorder_(channel_id),
+      mtu_(0) {
   WEBRTC_TRACE(kTraceMemory, kTraceVideo, ViEId(engine_id, channel_id),
                "ViEChannel::ViEChannel(channel_id: %d, engine_id: %d)",
                channel_id, engine_id);
@@ -311,6 +312,9 @@ WebRtc_Word32 ViEChannel::SetSendCodec(const VideoCodec& video_codec,
         WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
                      "%s: could not register payload type", __FUNCTION__);
         return -1;
+      }
+      if (mtu_ != 0) {
+        rtp_rtcp->SetMaxTransferUnit(mtu_);
       }
       if (restart_rtp) {
         rtp_rtcp->SetSendingStatus(true);
@@ -1053,78 +1057,6 @@ int ViEChannel::GetEstimatedReceiveBandwidth(
   return rtp_rtcp_.EstimatedReceiveBandwidth(estimated_bandwidth);
 }
 
-WebRtc_Word32 ViEChannel::SetKeepAliveStatus(
-    const bool enable,
-    const int unknown_payload_type,
-    const WebRtc_UWord16 delta_transmit_timeMS) {
-  WEBRTC_TRACE(kTraceInfo, kTraceVideo, ViEId(engine_id_, channel_id_),
-               "%s", __FUNCTION__);
-
-  if (enable && rtp_rtcp_.RTPKeepalive()) {
-    WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
-                 "%s: RTP keepalive already enabled", __FUNCTION__);
-    return -1;
-  } else if (!enable && !rtp_rtcp_.RTPKeepalive()) {
-    WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
-                 "%s: RTP keepalive already disabled", __FUNCTION__);
-    return -1;
-  }
-
-  if (rtp_rtcp_.SetRTPKeepaliveStatus(enable, unknown_payload_type,
-                                      delta_transmit_timeMS) != 0) {
-    WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
-                 "%s: Could not set RTP keepalive status %d", __FUNCTION__,
-                 enable);
-    if (enable == false && !rtp_rtcp_.DefaultModuleRegistered()) {
-      // Not sending media and we try to disable keep alive
-      rtp_rtcp_.ResetSendDataCountersRTP();
-      rtp_rtcp_.SetSendingStatus(false);
-    }
-    return -1;
-  }
-
-  if (enable && !rtp_rtcp_.Sending()) {
-    // Enable sending to start sending Sender reports instead of receive
-    // reports.
-    if (rtp_rtcp_.SetSendingStatus(true) != 0) {
-      rtp_rtcp_.SetRTPKeepaliveStatus(false, 0, 0);
-      WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
-                   "%s: Could not start sending", __FUNCTION__);
-      return -1;
-    }
-  } else if (!enable && !rtp_rtcp_.SendingMedia()) {
-    // Not sending media and we're disabling keep alive.
-    rtp_rtcp_.ResetSendDataCountersRTP();
-    if (rtp_rtcp_.SetSendingStatus(false) != 0) {
-      WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
-                   "%s: Could not stop sending", __FUNCTION__);
-      return -1;
-    }
-  }
-  return 0;
-}
-
-WebRtc_Word32 ViEChannel::GetKeepAliveStatus(
-    bool& enabled,
-    int& unknown_payload_type,
-    WebRtc_UWord16& delta_transmit_time_ms) {
-  WEBRTC_TRACE(kTraceInfo, kTraceVideo, ViEId(engine_id_, channel_id_), "%s",
-               __FUNCTION__);
-  if (rtp_rtcp_.RTPKeepaliveStatus(&enabled, &unknown_payload_type,
-                                   &delta_transmit_time_ms) != 0) {
-    WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
-                 "%s: Could not get RTP keepalive status", __FUNCTION__);
-    return -1;
-  }
-  WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
-               "%s: enabled = %d, unknown_payload_type = %d, "
-               "delta_transmit_time_ms = %ul",
-               __FUNCTION__, enabled, (WebRtc_Word32) unknown_payload_type,
-    delta_transmit_time_ms);
-
-  return 0;
-}
-
 WebRtc_Word32 ViEChannel::StartRTPDump(const char file_nameUTF8[1024],
                                        RTPDirections direction) {
   WEBRTC_TRACE(kTraceInfo, kTraceVideo, ViEId(engine_id_, channel_id_), "%s",
@@ -1421,11 +1353,7 @@ WebRtc_Word32 ViEChannel::StartSend() {
 #endif
   rtp_rtcp_.SetSendingMediaStatus(true);
 
-  if (rtp_rtcp_.Sending() && !rtp_rtcp_.RTPKeepalive()) {
-    if (rtp_rtcp_.RTPKeepalive()) {
-      // Sending Keep alive, don't trigger an error.
-      return 0;
-    }
+  if (rtp_rtcp_.Sending()) {
     // Already sending.
     WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
                  "%s: Already sending", __FUNCTION__);
@@ -1456,10 +1384,6 @@ WebRtc_Word32 ViEChannel::StopSend() {
        it++) {
     RtpRtcp* rtp_rtcp = *it;
     rtp_rtcp->SetSendingMediaStatus(false);
-  }
-  if (rtp_rtcp_.RTPKeepalive()) {
-    // Don't turn off sending since we'll send keep alive packets.
-    return 0;
   }
   if (!rtp_rtcp_.Sending()) {
     WEBRTC_TRACE(kTraceWarning, kTraceVideo, ViEId(engine_id_, channel_id_),
@@ -1932,6 +1856,7 @@ WebRtc_Word32 ViEChannel::SetMTU(WebRtc_UWord16 mtu) {
     RtpRtcp* rtp_rtcp = *it;
     rtp_rtcp->SetMaxTransferUnit(mtu);
   }
+  mtu_ = mtu;
   return 0;
 }
 

@@ -367,39 +367,6 @@ public:
     virtual WebRtc_UWord16 MaxDataPayloadLength() const = 0;
 
     /*
-    *   set RTPKeepaliveStatus
-    *
-    *   enable              - on/off
-    *   unknownPayloadType  - payload type to use for RTP keepalive
-    *   deltaTransmitTimeMS - delta time between RTP keepalive packets
-    *
-    *   return -1 on failure else 0
-    */
-    virtual WebRtc_Word32 SetRTPKeepaliveStatus(
-        const bool enable,
-        const int unknownPayloadType,
-        const WebRtc_UWord16 deltaTransmitTimeMS) = 0;
-
-    /*
-    *   Get RTPKeepaliveStatus
-    *
-    *   enable              - on/off
-    *   unknownPayloadType  - payload type in use for RTP keepalive
-    *   deltaTransmitTimeMS - delta time between RTP keepalive packets
-    *
-    *   return -1 on failure else 0
-    */
-    virtual WebRtc_Word32 RTPKeepaliveStatus(
-        bool* enable,
-        int* unknownPayloadType,
-        WebRtc_UWord16* deltaTransmitTimeMS) const = 0;
-
-    /*
-    *   check if RTPKeepaliveStatus is enabled
-    */
-    virtual bool RTPKeepalive() const = 0;
-
-    /*
     *   set codec name and payload type
     *
     *   return -1 on failure else 0
@@ -1049,32 +1016,9 @@ public:
                                          WebRtc_UWord8& payloadTypeFEC) = 0;
 
 
-    /*
-    *   Set FEC code rate of key and delta frames
-    *   codeRate on a scale of 0 to 255 where 255 is 100% added packets, hence protect up to 50% packet loss
-    *
-    *   return -1 on failure else 0
-    */
-    virtual WebRtc_Word32 SetFECCodeRate(const WebRtc_UWord8 keyFrameCodeRate,
-                                       const WebRtc_UWord8 deltaFrameCodeRate) = 0;
-
-
-    /*
-    *   Set FEC unequal protection (UEP) across packets,
-    *   for key and delta frames.
-    *
-    *   If keyUseUepProtection is true UEP is enabled for key frames.
-    *   If deltaUseUepProtection is true UEP is enabled for delta frames.
-    *
-    *   UEP skews the FEC protection towards being spent more on the
-    *   important packets, at the cost of less FEC protection for the
-    *   non-important packets.
-    *
-    *   return -1 on failure else 0
-    */
-    virtual WebRtc_Word32 SetFECUepProtection(const bool keyUseUepProtection,
-                                          const bool deltaUseUepProtection) = 0;
-
+    virtual WebRtc_Word32 SetFecParameters(
+        const FecProtectionParams* delta_params,
+        const FecProtectionParams* key_params) = 0;
 
     /*
     *   Set method for requestion a new key frame

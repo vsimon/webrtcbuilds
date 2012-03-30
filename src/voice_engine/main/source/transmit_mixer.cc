@@ -183,6 +183,7 @@ TransmitMixer::TransmitMixer(const WebRtc_UWord32 instanceId) :
     _callbackCritSect(*CriticalSectionWrapper::CreateCriticalSection()),
 #ifdef WEBRTC_VOICE_ENGINE_TYPING_DETECTION
     _timeActive(0),
+    _timeSinceLastTyping(0),
     _penaltyCounter(0),
     _typingNoiseWarning(0),
 #endif
@@ -1218,7 +1219,7 @@ WebRtc_Word32 TransmitMixer::RecordAudioToFile(
 WebRtc_Word32 TransmitMixer::MixOrReplaceAudioWithFile(
     const int mixingFrequency)
 {
-    WebRtc_Word16 fileBuffer[320];
+    scoped_array<WebRtc_Word16> fileBuffer(new WebRtc_Word16[640]);
 
     WebRtc_UWord32 fileSamples(0);
 
@@ -1233,7 +1234,7 @@ WebRtc_Word32 TransmitMixer::MixOrReplaceAudioWithFile(
             return -1;
         }
 
-        if (_filePlayerPtr->Get10msAudioFromFile(fileBuffer,
+        if (_filePlayerPtr->Get10msAudioFromFile(fileBuffer.get(),
                                                  fileSamples,
                                                  mixingFrequency) == -1)
         {
@@ -1244,19 +1245,27 @@ WebRtc_Word32 TransmitMixer::MixOrReplaceAudioWithFile(
         }
     }
 
+    assert(_audioFrame._payloadDataLengthInSamples == fileSamples);
+
     if (_mixFileWithMicrophone)
     {
+        // Currently file stream is always mono.
+        // TODO(xians): Change the code when FilePlayer supports real stereo.
         Utility::MixWithSat(_audioFrame._payloadData,
-                             fileBuffer,
-                             (WebRtc_UWord16) fileSamples);
-        assert(_audioFrame._payloadDataLengthInSamples == fileSamples);
+                            static_cast<int>(_audioFrame._audioChannel),
+                            fileBuffer.get(),
+                            1,
+                            static_cast<int>(fileSamples));
     } else
     {
-        // replace ACM audio with file
+        // Replace ACM audio with file.
+        // Currently file stream is always mono.
+        // TODO(xians): Change the code when FilePlayer supports real stereo.
         _audioFrame.UpdateFrame(-1,
                                 -1,
-                                fileBuffer,
-                                (WebRtc_UWord16) fileSamples, mixingFrequency,
+                                fileBuffer.get(),
+                                static_cast<WebRtc_UWord16>(fileSamples),
+                                mixingFrequency,
                                 AudioFrame::kNormalSpeech,
                                 AudioFrame::kVadUnknown,
                                 1);
@@ -1376,6 +1385,16 @@ int TransmitMixer::TypingDetection()
     else
         _timeActive = 0;
 
+    // Keep track if time since last typing event
+    if (keyPressed)
+    {
+      _timeSinceLastTyping = 0;
+    }
+    else
+    {
+      ++_timeSinceLastTyping;
+    }
+
     if (keyPressed && (_audioFrame._vadActivity == AudioFrame::kVadActive)
         && (_timeActive < 10))
     {
@@ -1410,6 +1429,18 @@ int TransmitMixer::GetMixingFrequency()
     assert(_mixingFrequency!=0);
     return (_mixingFrequency);
 }
+
+#ifdef WEBRTC_VOICE_ENGINE_TYPING_DETECTION
+int TransmitMixer::TimeSinceLastTyping(int &seconds)
+{
+  // We check in VoEAudioProcessingImpl that this is only called when
+  // typing detection is active.
+
+  // Round to whole seconds
+  seconds = (_timeSinceLastTyping + 50) / 100;
+  return(0);
+}
+#endif
 
 }  //  namespace voe
 
