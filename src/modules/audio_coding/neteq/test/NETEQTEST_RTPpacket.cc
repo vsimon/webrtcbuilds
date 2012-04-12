@@ -673,6 +673,12 @@ int NETEQTEST_RTPpacket::splitStereo(NETEQTEST_RTPpacket& slaveRtp, enum stereoM
             splitStereoFrame(slaveRtp);
             break;
         }
+    case stereoModeDuplicate:
+        {
+            // frame based codec, send the whole packet to both master and slave
+            splitStereoDouble(slaveRtp);
+            break;
+        }
     case stereoModeMono:
         {
             assert(false);
@@ -806,6 +812,17 @@ void NETEQTEST_RTPpacket::splitStereoFrame(NETEQTEST_RTPpacket& slaveRtp)
 
     _payloadLen /= 2;
     slaveRtp._payloadLen = _payloadLen;
+}
+void NETEQTEST_RTPpacket::splitStereoDouble(NETEQTEST_RTPpacket* slaveRtp)
+{
+    if(!_payloadPtr || !slaveRtp || !slaveRtp->_payloadPtr
+        || _payloadLen <= 0 || slaveRtp->_memSize < _memSize)
+    {
+        return;
+    }
+
+    memcpy(slaveRtp->_payloadPtr, _payloadPtr, _payloadLen);
+    slaveRtp->_payloadLen = _payloadLen;
 }
 
 // Get the RTP header for the RED payload indicated by argument index.
