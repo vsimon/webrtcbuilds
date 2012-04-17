@@ -45,6 +45,8 @@ class ViEEncoder
              ProcessThread& module_process_thread);
   ~ViEEncoder();
 
+  bool Init();
+
   // Returns the id of the owning channel.
   int Owner() const;
 
@@ -155,7 +157,7 @@ class ViEEncoder
   VideoCodec send_codec_;
 
   bool paused_;
-  WebRtc_Word64 time_last_intra_request_ms_[kMaxSimulcastStreams];
+  WebRtc_Word64 time_last_intra_request_ms_;
   WebRtc_Word32 channels_dropping_delta_frames_;
   bool drop_next_frame_;
 
