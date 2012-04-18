@@ -48,7 +48,7 @@ class VideoSyncTest : public AfterStreamingFixture {
 
   void CheckEstimatesConvergeReasonablyWell(int min_estimate) {
     float standard_deviation = CollectEstimatesDuring15Seconds(min_estimate);
-    EXPECT_LT(standard_deviation, 30.0f);
+    EXPECT_LT(standard_deviation, 20.0f);
   }
 
   // Computes the standard deviation by first estimating the sample variance
@@ -90,10 +90,7 @@ TEST_F(VideoSyncTest, CanSetInitSequenceNumberWhileStopped) {
   EXPECT_EQ(0, voe_vsync_->SetInitSequenceNumber(channel_, 123));
 }
 
-// TODO(phoglund): pending investigation in
-// http://code.google.com/p/webrtc/issues/detail?id=438
-TEST_F(VideoSyncTest,
-       DISABLED_DelayEstimatesStabilizeDuring15sAndAreNotTooLow) {
+TEST_F(VideoSyncTest, DelayEstimatesStabilizeDuring15sAndAreNotTooLow) {
   EXPECT_EQ(0, voe_base_->StopSend(channel_));
   EXPECT_EQ(0, voe_vsync_->SetInitTimestamp(channel_, 12345));
   EXPECT_EQ(0, voe_vsync_->SetInitSequenceNumber(channel_, 123));
@@ -102,10 +99,7 @@ TEST_F(VideoSyncTest,
   CheckEstimatesConvergeReasonablyWell(kMinimumReasonableDelayEstimateMs);
 }
 
-// TODO(phoglund): pending investigation in
-// http://code.google.com/p/webrtc/issues/detail?id=438
-TEST_F(VideoSyncTest,
-       DISABLED_DelayEstimatesStabilizeAfterNetEqMinDelayChanges45s) {
+TEST_F(VideoSyncTest, DelayEstimatesStabilizeAfterNetEqMinDelayChanges45s) {
   EXPECT_EQ(0, voe_base_->StopSend(channel_));
   EXPECT_EQ(0, voe_vsync_->SetInitTimestamp(channel_, 12345));
   EXPECT_EQ(0, voe_vsync_->SetInitSequenceNumber(channel_, 123));

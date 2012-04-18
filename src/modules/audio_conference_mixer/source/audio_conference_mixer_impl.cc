@@ -52,7 +52,7 @@ MixHistory::~MixHistory()
 
 WebRtc_Word32 MixHistory::IsMixed(bool& mixed) const
 {
-    mixed = _isMixed;
+    mixed = (_isMixed.Value() == 1);
     return 0;
 }
 
@@ -65,13 +65,13 @@ WebRtc_Word32 MixHistory::WasMixed(bool& wasMixed) const
 
 WebRtc_Word32 MixHistory::SetIsMixed(const bool mixed)
 {
-    _isMixed = mixed;
+    _isMixed = mixed ? 1 : 0;
     return 0;
 }
 
 void MixHistory::ResetMixedStatus()
 {
-    _isMixed = false;
+    _isMixed  = 0;
 }
 
 AudioConferenceMixer* AudioConferenceMixer::Create(int id)

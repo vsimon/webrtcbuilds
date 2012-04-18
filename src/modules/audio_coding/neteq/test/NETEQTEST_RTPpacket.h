@@ -20,8 +20,7 @@ enum stereoModes {
     stereoModeMono,
     stereoModeSample1,
     stereoModeSample2,
-    stereoModeFrame,
-    stereoModeDuplicate
+    stereoModeFrame
 };
 
 class NETEQTEST_RTPpacket
@@ -99,7 +98,6 @@ private:
     int calcPadLength(int i_P) const;
     void splitStereoSample(NETEQTEST_RTPpacket* slaveRtp, int stride);
     void splitStereoFrame(NETEQTEST_RTPpacket* slaveRtp);
-    void splitStereoDouble(NETEQTEST_RTPpacket* slaveRtp);
 };
 
 #endif //NETEQTEST_RTPPACKET_H

@@ -85,7 +85,8 @@ CpuWindows::CpuWindows()
 CpuWindows::~CpuWindows()
 {
     // All resources are reclaimed in StopPollingCpu().
-    StopPollingCpu();
+    const bool success = StopPollingCpu();
+    assert(success);
     DeAllocateComplexDataTypes();
 }
 
@@ -188,7 +189,8 @@ bool CpuWindows::ProcessImpl()
         CriticalSectionScoped cs(terminate_crit_);
         if (terminate_)
         {
-            Terminate();
+            const bool success = Terminate();
+            assert(success);
             terminate_cond_->WakeAll();
             return false;
         }
@@ -218,8 +220,10 @@ bool CpuWindows::ProcessImpl()
     }
 
     // UpdateCpuUsage() returns false if a single (or more) CPU read(s) failed.
-    // Not a major problem if it happens.
-    UpdateCpuUsage();
+    // Not a major problem if it happens but make sure it doesnt trigger in
+    // debug.
+    const bool success = UpdateCpuUsage();
+    assert(success);
     return true;
 }
 

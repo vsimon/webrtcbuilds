@@ -556,7 +556,7 @@ int decoder_GSMFR::loadToNetEQ(NETEQTEST_NetEQClass & neteq)
 decoder_SPEEX::decoder_SPEEX(WebRtc_UWord8 pt, WebRtc_UWord16 fs)
 :
 NETEQTEST_Decoder(fs == 8000 ? kDecoderSPEEX_8 : kDecoderSPEEX_16, 
-                  fs, "SPEEX", pt)
+                  fs, "SPEEX " + fs/1000, pt)
 {
     if (fs != 8000 && fs != 16000)
         throw std::exception("Wrong sample rate for SPEEX");
@@ -586,7 +586,7 @@ decoder_CELT::decoder_CELT(WebRtc_UWord8 pt, WebRtc_UWord16 fs)
 :
 NETEQTEST_Decoder(kDecoderCELT_32, fs, "CELT", pt)
 {
-   if (WebRtcCelt_CreateDec((CELT_decinst_t **) &_decoder, 2))
+   if (WebRtcCelt_CreateDec((CELT_decinst_t **) &_decoder, 1))
         exit(EXIT_FAILURE);
 }
 
@@ -601,27 +601,6 @@ int decoder_CELT::loadToNetEQ(NETEQTEST_NetEQClass & neteq)
 
     SET_CELT_FUNCTIONS(codecInst);
 
-    return(NETEQTEST_Decoder::loadToNetEQ(neteq, codecInst));
-}
-
-decoder_CELTslave::decoder_CELTslave(WebRtc_UWord8 pt, WebRtc_UWord16 fs)
-:
-NETEQTEST_Decoder(kDecoderCELT_32, fs, "CELT", pt)
-{
-   if (WebRtcCelt_CreateDec((CELT_decinst_t **) &_decoder, 2))
-        exit(EXIT_FAILURE);
-}
-
-decoder_CELTslave::~decoder_CELTslave()
-{
-    WebRtcCelt_FreeDec((CELT_decinst_t *) _decoder);
-}
-
-int decoder_CELTslave::loadToNetEQ(NETEQTEST_NetEQClass & neteq)
-{
-    WebRtcNetEQ_CodecDef codecInst;
-
-    SET_CELTSLAVE_FUNCTIONS(codecInst);
     return(NETEQTEST_Decoder::loadToNetEQ(neteq, codecInst));
 }
 #endif
@@ -653,7 +632,7 @@ int decoder_AVT::loadToNetEQ(NETEQTEST_NetEQClass & neteq)
 #include "webrtc_cng.h"
 decoder_CNG::decoder_CNG(WebRtc_UWord8 pt, WebRtc_UWord16 fs)
 :
-NETEQTEST_Decoder(kDecoderCNG, fs, "CNG", pt)
+NETEQTEST_Decoder(kDecoderCNG, fs, "CNG " + fs/1000, pt)
 {
     if (fs != 8000 && fs != 16000 && fs != 32000 && fs != 48000)
         exit(EXIT_FAILURE);

@@ -20,8 +20,9 @@ namespace webrtc {
 
 class CriticalSectionWrapper;
 
-class AndroidSurfaceViewChannel : public AndroidStream {
- public:
+class AndroidSurfaceViewChannel: public AndroidStream
+{
+public:
   AndroidSurfaceViewChannel(WebRtc_UWord32 streamId,
                             JavaVM* jvm,
                             VideoRenderAndroid& renderer,
@@ -66,8 +67,9 @@ class AndroidSurfaceViewChannel : public AndroidStream {
   unsigned int _bitmapHeight;
 };
 
-class AndroidSurfaceViewRenderer : private VideoRenderAndroid {
- public:
+class AndroidSurfaceViewRenderer: private VideoRenderAndroid
+{
+public:
   AndroidSurfaceViewRenderer(const WebRtc_Word32 id,
                              const VideoRenderType videoRenderType,
                              void* window,
@@ -87,6 +89,6 @@ class AndroidSurfaceViewRenderer : private VideoRenderAndroid {
   jclass _javaRenderClass;
 };
 
-}  // namespace webrtc
+} //namespace webrtc
 
-#endif  // WEBRTC_MODULES_VIDEO_RENDER_MAIN_SOURCE_ANDROID_VIDEO_RENDER_ANDROID_SURFACE_VIEW_H_
+#endif // WEBRTC_MODULES_VIDEO_RENDER_MAIN_SOURCE_ANDROID_VIDEO_RENDER_ANDROID_SURFACE_VIEW_H_

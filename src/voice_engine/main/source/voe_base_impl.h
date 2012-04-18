@@ -22,7 +22,8 @@ namespace webrtc
 
 class ProcessThread;
 
-class VoEBaseImpl: public VoEBase,
+class VoEBaseImpl: public virtual voe::SharedData,
+                   public VoEBase,
                    public voe::RefCount,
                    public AudioTransport,
                    public AudioDeviceObserver
@@ -118,7 +119,7 @@ public:
     virtual void OnWarningIsReported(const WarningCode warning);
 
 protected:
-    VoEBaseImpl(voe::SharedData* shared);
+    VoEBaseImpl();
     virtual ~VoEBaseImpl();
 
 private:
@@ -143,7 +144,6 @@ private:
     WebRtc_UWord32 _oldVoEMicLevel;
     WebRtc_UWord32 _oldMicLevel;
     AudioFrame _audioFrame;
-    voe::SharedData* _shared;
 
 };
 

@@ -501,6 +501,7 @@ void VideoRenderWindowsImpl::LogOSAndHardwareDetails()
 
     DWORD nInstanceCount = 0;
     DWORD nItem = 0;
+    DWORD nCurCount = 0;
 
     // Get the IDxDiagContainer object called "DxDiag_DisplayDevices".
     // This call may take some time while dxdiag gathers the info.
@@ -867,6 +868,7 @@ void VideoRenderWindowsImpl::CheckHWDriver(bool& badDriver,
     // Read the registry to check if HW acceleration is enabled or not.
     HKEY regKey;
     DWORD value = 0;
+    DWORD valueLength = 4;
 
     //Assume the best
     badDriver = false;
@@ -881,6 +883,7 @@ void VideoRenderWindowsImpl::CheckHWDriver(bool& badDriver,
         DWORD driverPathLen = 512;
         TCHAR driverPath[512];
         memset(driverPath, 0, driverPathLen * sizeof(TCHAR));
+        DWORD dwType = REG_SZ;
 
         long retVal = RegQueryValueEx(regKey, _T("\\Device\\Video0"), NULL,
                                       NULL, (BYTE*) driverPath, &driverPathLen);

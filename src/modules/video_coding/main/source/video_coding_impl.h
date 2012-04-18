@@ -147,7 +147,9 @@ public:
         const VideoContentMetrics* _contentMetrics = NULL,
         const CodecSpecificInfo* codecSpecificInfo = NULL);
 
-    virtual WebRtc_Word32 IntraFrameRequest();
+    // Next frame encoded should be of the type frameType.
+    virtual WebRtc_Word32 FrameTypeRequest(FrameType frameType,
+                                           WebRtc_UWord8 simulcastIdx);
 
     //Enable frame dropper
     virtual WebRtc_Word32 EnableFrameDropper(bool enable);
@@ -293,7 +295,7 @@ private:
     CriticalSectionWrapper*             _sendCritSect; // Critical section for send side
     VCMGenericEncoder*                  _encoder;
     VCMEncodedFrameCallback             _encodedFrameCallback;
-    FrameType                           _nextFrameType;
+    FrameType                           _nextFrameType[kMaxSimulcastStreams];
     VCMMediaOptimization                _mediaOpt;
     VideoCodecType                      _sendCodecType;
     VCMSendStatisticsCallback*          _sendStatsCallback;

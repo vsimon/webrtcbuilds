@@ -166,6 +166,20 @@ class RxCallback : public VoERxVadCallback {
   int _vadDecision;
 };
 
+#ifdef WEBRTC_VOICE_ENGINE_EXTERNAL_MEDIA_API
+class MyMedia : public VoEMediaProcess {
+ public:
+  virtual void Process(const int channel,
+                       const ProcessingTypes type,
+                       WebRtc_Word16 audio_10ms[],
+                       const int length,
+                       const int samplingFreqHz,
+                       const bool stereo);
+ private:
+  int f;
+};
+#endif
+
 class SubAPIManager {
  public:
   SubAPIManager()

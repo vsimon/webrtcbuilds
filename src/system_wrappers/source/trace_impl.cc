@@ -429,14 +429,8 @@ WebRtc_Word32 TraceImpl::AddMessage(
 void TraceImpl::AddMessageToList(
     const char traceMessage[WEBRTC_TRACE_MAX_MESSAGE_SIZE],
     const WebRtc_UWord16 length,
-    const TraceLevel level) {
-#ifdef WEBRTC_DIRECT_TRACE
-    if (_callback) {
-      _callback->Print(level, traceMessage, length);
-    }
-    return;
-#endif
-
+    const TraceLevel level)
+{
     CriticalSectionScoped lock(_critsectArray);
 
     if(_nextFreeIdx[_activeQueue] >= WEBRTC_TRACE_MAX_QUEUE)

@@ -3,7 +3,7 @@ vars = {
   # If you do not know, use the full path while defining your new deps entry.
   "googlecode_url": "http://%s.googlecode.com/svn",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
-  "chromium_revision": "132375",
+  "chromium_revision": "122775",
 
   # External resources like video and audio files used for testing purposes.
   # Downloaded on demand when needed.
@@ -48,7 +48,7 @@ deps = {
     "http://git.chromium.org/webm/libvpx.git@6b66c01c",
 
   "trunk/third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@216",
+    (Var("googlecode_url") % "libyuv") + "/trunk@192",
 
   "trunk/third_party/protobuf":
     Var("chromium_trunk") + "/src/third_party/protobuf@" + Var("chromium_revision"),
@@ -79,7 +79,7 @@ deps = {
 deps_os = {
   "win": {
     "trunk/third_party/cygwin":
-      From("trunk/chromium_deps", "src/third_party/cygwin"),
+      Var("chromium_trunk") + "/deps/third_party/cygwin@66844",
 
     # Used by libjpeg-turbo.
     "trunk/third_party/yasm/binaries":

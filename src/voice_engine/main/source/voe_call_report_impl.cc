@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -40,79 +40,81 @@ VoECallReport* VoECallReport::GetInterface(VoiceEngine* voiceEngine)
 
 #ifdef WEBRTC_VOICE_ENGINE_CALL_REPORT_API
 
-VoECallReportImpl::VoECallReportImpl(voe::SharedData* shared) :
-    _file(*FileWrapper::Create()), _shared(shared)
+VoECallReportImpl::VoECallReportImpl() :
+    _file(*FileWrapper::Create())
 {
-    WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_instanceId, -1),
                  "VoECallReportImpl() - ctor");
 }
 
 VoECallReportImpl::~VoECallReportImpl()
 {
-    WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_instanceId, -1),
                  "~VoECallReportImpl() - dtor");
     delete &_file;
 }
 
 int VoECallReportImpl::Release()
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId, -1),
                  "VoECallReportImpl::Release()");
     (*this)--;
     int refCount = GetCount();
     if (refCount < 0)
     {
         Reset();
-        _shared->SetLastError(VE_INTERFACE_NOT_FOUND, kTraceWarning);
+        _engineStatistics.SetLastError(VE_INTERFACE_NOT_FOUND,
+                                       kTraceWarning);
         return (-1);
     }
-    WEBRTC_TRACE(kTraceStateInfo, kTraceVoice,
-        VoEId(_shared->instance_id(), -1),
-        "VoECallReportImpl reference counter = %d", refCount);
+    WEBRTC_TRACE(kTraceStateInfo, kTraceVoice, VoEId(_instanceId, -1),
+                 "VoECallReportImpl reference counter = %d", refCount);
     return (refCount);
 }
 
 int VoECallReportImpl::ResetCallReportStatistics(int channel)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId, -1),
                  "ResetCallReportStatistics(channel=%d)", channel);
-    ANDROID_NOT_SUPPORTED(_shared->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 
-    if (!_shared->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        _shared->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
-    assert(_shared->audio_processing() != NULL);
+    assert(_audioProcessingModulePtr != NULL);
 
     bool echoMode =
-        _shared->audio_processing()->echo_cancellation()->are_metrics_enabled();
+        _audioProcessingModulePtr->echo_cancellation()->are_metrics_enabled();
 
-    WEBRTC_TRACE(kTraceInfo, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceInfo, kTraceVoice, VoEId(_instanceId, -1),
                  "  current AudioProcessingModule echo metric state %d)",
                  echoMode);
     // Reset the APM statistics
-    if (_shared->audio_processing()->echo_cancellation()->enable_metrics(true)
+    if (_audioProcessingModulePtr->echo_cancellation()->enable_metrics(true)
         != 0)
     {
-        _shared->SetLastError(VE_APM_ERROR, kTraceError,
-            "ResetCallReportStatistics() unable to "
-            "set the AudioProcessingModule echo metrics state");
+        _engineStatistics.SetLastError(VE_APM_ERROR, kTraceError,
+                                       "ResetCallReportStatistics() unable to "
+                                       "set the AudioProcessingModule echo "
+                                       "metrics state");
         return -1;
     }
     // Restore metric states
-    _shared->audio_processing()->echo_cancellation()->enable_metrics(echoMode);
+    _audioProcessingModulePtr->echo_cancellation()->enable_metrics(echoMode);
 
     // Reset channel dependent statistics
     if (channel != -1)
     {
-        voe::ScopedChannel sc(_shared->channel_manager(), channel);
+        voe::ScopedChannel sc(_channelManager, channel);
         voe::Channel* channelPtr = sc.ChannelPtr();
         if (channelPtr == NULL)
         {
-            _shared->SetLastError(VE_CHANNEL_NOT_VALID, kTraceError,
-                "ResetCallReportStatistics() failed to locate channel");
+            _engineStatistics.SetLastError(VE_CHANNEL_NOT_VALID, kTraceError,
+                                           "ResetCallReportStatistics() failed "
+                                           "to locate channel");
             return -1;
         }
         channelPtr->ResetDeadOrAliveCounters();
@@ -120,17 +122,16 @@ int VoECallReportImpl::ResetCallReportStatistics(int channel)
     }
     else
     {
-        WebRtc_Word32 numOfChannels =
-            _shared->channel_manager().NumOfChannels();
+        WebRtc_Word32 numOfChannels = _channelManager.NumOfChannels();
         if (numOfChannels <= 0)
         {
             return 0;
         }
         WebRtc_Word32* channelsArray = new WebRtc_Word32[numOfChannels];
-        _shared->channel_manager().GetChannelIds(channelsArray, numOfChannels);
+        _channelManager.GetChannelIds(channelsArray, numOfChannels);
         for (int i = 0; i < numOfChannels; i++)
         {
-            voe::ScopedChannel sc(_shared->channel_manager(), channelsArray[i]);
+            voe::ScopedChannel sc(_channelManager, channelsArray[i]);
             voe::Channel* channelPtr = sc.ChannelPtr();
             if (channelPtr)
             {
@@ -146,17 +147,17 @@ int VoECallReportImpl::ResetCallReportStatistics(int channel)
 
 int VoECallReportImpl::GetEchoMetricSummary(EchoStatistics& stats)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId, -1),
                  "GetEchoMetricSummary()");
-    ANDROID_NOT_SUPPORTED(_shared->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 
-    if (!_shared->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        _shared->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
-    assert(_shared->audio_processing() != NULL);
+    assert(_audioProcessingModulePtr != NULL);
 
     return (GetEchoMetricSummaryInternal(stats));
 }
@@ -171,31 +172,29 @@ int VoECallReportImpl::GetEchoMetricSummaryInternal(EchoStatistics& stats)
     // Ensure that echo metrics is enabled
 
     mode =
-        _shared->audio_processing()->echo_cancellation()->are_metrics_enabled();
+        _audioProcessingModulePtr->echo_cancellation()->are_metrics_enabled();
     if (mode != false)
     {
-        ret = _shared->audio_processing()->echo_cancellation()->
-              GetMetrics(&metrics);
+        ret =
+          _audioProcessingModulePtr->echo_cancellation()->GetMetrics(&metrics);
         if (ret != 0)
         {
-            WEBRTC_TRACE(kTraceWarning, kTraceVoice,
-                VoEId(_shared->instance_id(), -1),
-                "  AudioProcessingModule GetMetrics() => error");
+            WEBRTC_TRACE(kTraceWarning, kTraceVoice, VoEId(_instanceId, -1),
+                       "  AudioProcessingModule GetMetrics() => error");
         }
     }
     else
     {
-        WEBRTC_TRACE(kTraceWarning, kTraceVoice,
-            VoEId(_shared->instance_id(), -1),
-            "  AudioProcessingModule echo metrics is not enabled");
+        WEBRTC_TRACE(kTraceWarning, kTraceVoice, VoEId(_instanceId, -1),
+                   "  AudioProcessingModule echo metrics is not enabled");
     }
 
     if ((ret != 0) || (mode == false))
     {
         // Mark complete struct as invalid (-100 dB)
-        WEBRTC_TRACE(kTraceWarning, kTraceVoice,
-            VoEId(_shared->instance_id(), -1),
-            "  unable to retrieve echo metrics from the AudioProcessingModule");
+        WEBRTC_TRACE(kTraceWarning, kTraceVoice, VoEId(_instanceId, -1),
+                   "  unable to retrieve echo metrics from the "
+                   "AudioProcessingModule");
         stats.erl.min = -100;
         stats.erl.max = -100;
         stats.erl.average = -100;
@@ -216,53 +215,53 @@ int VoECallReportImpl::GetEchoMetricSummaryInternal(EchoStatistics& stats)
         stats.erl.min = metrics.echo_return_loss.minimum;
         stats.erl.max = metrics.echo_return_loss.maximum;
         stats.erl.average = metrics.echo_return_loss.average;
-        WEBRTC_TRACE(kTraceStateInfo, kTraceVoice,
-            VoEId(_shared->instance_id(), -1), "  erl: min=%d, max=%d, avg=%d",
-            stats.erl.min, stats.erl.max, stats.erl.average);
+        WEBRTC_TRACE(kTraceStateInfo, kTraceVoice, VoEId(_instanceId, -1),
+                   "  erl: min=%d, max=%d, avg=%d", stats.erl.min,
+                   stats.erl.max, stats.erl.average);
 
         stats.erle.min = metrics.echo_return_loss_enhancement.minimum;
         stats.erle.max = metrics.echo_return_loss_enhancement.maximum;
         stats.erle.average = metrics.echo_return_loss_enhancement.average;
-        WEBRTC_TRACE(kTraceStateInfo, kTraceVoice,
-            VoEId(_shared->instance_id(), -1), "  erle: min=%d, max=%d, avg=%d",
-            stats.erle.min, stats.erle.max, stats.erle.average);
+        WEBRTC_TRACE(kTraceStateInfo, kTraceVoice, VoEId(_instanceId, -1),
+                   "  erle: min=%d, max=%d, avg=%d", stats.erle.min,
+                   stats.erle.max, stats.erle.average);
 
         stats.rerl.min = metrics.residual_echo_return_loss.minimum;
         stats.rerl.max = metrics.residual_echo_return_loss.maximum;
         stats.rerl.average = metrics.residual_echo_return_loss.average;
-        WEBRTC_TRACE(kTraceStateInfo, kTraceVoice,
-            VoEId(_shared->instance_id(), -1), "  rerl: min=%d, max=%d, avg=%d",
-            stats.rerl.min, stats.rerl.max, stats.rerl.average);
+        WEBRTC_TRACE(kTraceStateInfo, kTraceVoice, VoEId(_instanceId, -1),
+                   "  rerl: min=%d, max=%d, avg=%d", stats.rerl.min,
+                   stats.rerl.max, stats.rerl.average);
 
         stats.a_nlp.min = metrics.a_nlp.minimum;
         stats.a_nlp.max = metrics.a_nlp.maximum;
         stats.a_nlp.average = metrics.a_nlp.average;
-        WEBRTC_TRACE(kTraceStateInfo, kTraceVoice,
-            VoEId(_shared->instance_id(), -1),
-            "  a_nlp: min=%d, max=%d, avg=%d",
-            stats.a_nlp.min, stats.a_nlp.max, stats.a_nlp.average);
+        WEBRTC_TRACE(kTraceStateInfo, kTraceVoice, VoEId(_instanceId, -1),
+                   "  a_nlp: min=%d, max=%d, avg=%d", stats.a_nlp.min,
+                   stats.a_nlp.max, stats.a_nlp.average);
     }
     return 0;
 }
 
 int VoECallReportImpl::GetRoundTripTimeSummary(int channel, StatVal& delaysMs)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId, -1),
                  "GetRoundTripTimeSummary()");
-    ANDROID_NOT_SUPPORTED(_shared->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 
-    if (!_shared->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        _shared->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
-    voe::ScopedChannel sc(_shared->channel_manager(), channel);
+    voe::ScopedChannel sc(_channelManager, channel);
     voe::Channel* channelPtr = sc.ChannelPtr();
     if (channelPtr == NULL)
     {
-        _shared->SetLastError(VE_CHANNEL_NOT_VALID, kTraceError,
-            "GetRoundTripTimeSummary() failed to locate channel");
+        _engineStatistics.SetLastError(VE_CHANNEL_NOT_VALID, kTraceError,
+                                       "GetRoundTripTimeSummary() failed to "
+                                       "locate channel");
         return -1;
     }
 
@@ -273,14 +272,14 @@ int VoECallReportImpl::GetDeadOrAliveSummary(int channel,
                                              int& numOfDeadDetections,
                                              int& numOfAliveDetections)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId, -1),
                  "GetDeadOrAliveSummary(channel=%d)", channel);
-    ANDROID_NOT_SUPPORTED(_shared->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 
-    if (!_shared->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        _shared->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
 
@@ -292,20 +291,21 @@ int VoECallReportImpl::GetDeadOrAliveSummaryInternal(int channel,
                                                      int& numOfDeadDetections,
                                                      int& numOfAliveDetections)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId, -1),
                  "GetDeadOrAliveSummary(channel=%d)", channel);
 
-    if (!_shared->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        _shared->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
-    voe::ScopedChannel sc(_shared->channel_manager(), channel);
+    voe::ScopedChannel sc(_channelManager, channel);
     voe::Channel* channelPtr = sc.ChannelPtr();
     if (channelPtr == NULL)
     {
-        _shared->SetLastError(VE_CHANNEL_NOT_VALID, kTraceError,
-            "GetRoundTripTimeSummary() failed to locate channel");
+        _engineStatistics.SetLastError(VE_CHANNEL_NOT_VALID, kTraceError,
+                                       "GetRoundTripTimeSummary() failed to "
+                                       "locate channel");
         return -1;
     }
 
@@ -315,21 +315,21 @@ int VoECallReportImpl::GetDeadOrAliveSummaryInternal(int channel,
 
 int VoECallReportImpl::WriteReportToFile(const char* fileNameUTF8)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId, -1),
                  "WriteReportToFile(fileNameUTF8=%s)", fileNameUTF8);
-    ANDROID_NOT_SUPPORTED(_shared->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 
-    if (!_shared->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        _shared->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
 
     if (NULL == fileNameUTF8)
     {
-        _shared->SetLastError(VE_INVALID_ARGUMENT, kTraceError,
-            "WriteReportToFile() invalid filename");
+        _engineStatistics.SetLastError(VE_INVALID_ARGUMENT, kTraceError,
+                                       "WriteReportToFile() invalid filename");
         return -1;
     }
 
@@ -341,8 +341,9 @@ int VoECallReportImpl::WriteReportToFile(const char* fileNameUTF8)
     // Open text file in write mode
     if (_file.OpenFile(fileNameUTF8, false, false, true) != 0)
     {
-        _shared->SetLastError(VE_BAD_FILE, kTraceError,
-            "WriteReportToFile() unable to open the file");
+        _engineStatistics.SetLastError(VE_BAD_FILE, kTraceError,
+                                       "WriteReportToFile() unable to open the "
+                                       "file");
         return -1;
     }
 
@@ -353,16 +354,16 @@ int VoECallReportImpl::WriteReportToFile(const char* fileNameUTF8)
     _file.WriteText("\nNetwork Packet Round Trip Time (RTT)\n");
     _file.WriteText("------------------------------------\n\n");
 
-    WebRtc_Word32 numOfChannels = _shared->channel_manager().NumOfChannels();
+    WebRtc_Word32 numOfChannels = _channelManager.NumOfChannels();
     if (numOfChannels <= 0)
     {
         return 0;
     }
     WebRtc_Word32* channelsArray = new WebRtc_Word32[numOfChannels];
-    _shared->channel_manager().GetChannelIds(channelsArray, numOfChannels);
+    _channelManager.GetChannelIds(channelsArray, numOfChannels);
     for (int ch = 0; ch < numOfChannels; ch++)
     {
-        voe::ScopedChannel sc(_shared->channel_manager(), channelsArray[ch]);
+        voe::ScopedChannel sc(_channelManager, channelsArray[ch]);
         voe::Channel* channelPtr = sc.ChannelPtr();
         if (channelPtr)
         {
@@ -380,7 +381,7 @@ int VoECallReportImpl::WriteReportToFile(const char* fileNameUTF8)
 
     for (int ch = 0; ch < numOfChannels; ch++)
     {
-        voe::ScopedChannel sc(_shared->channel_manager(), channelsArray[ch]);
+        voe::ScopedChannel sc(_channelManager, channelsArray[ch]);
         voe::Channel* channelPtr = sc.ChannelPtr();
         if (channelPtr)
         {

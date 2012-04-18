@@ -18,7 +18,8 @@
 
 namespace webrtc {
 
-class VoERTP_RTCPImpl : public VoERTP_RTCP,
+class VoERTP_RTCPImpl : public virtual voe::SharedData,
+                        public VoERTP_RTCP,
                         public voe::RefCount
 {
 public:
@@ -112,11 +113,8 @@ public:
                                      unsigned short payloadSize);
 
 protected:
-    VoERTP_RTCPImpl(voe::SharedData* shared);
+    VoERTP_RTCPImpl();
     virtual ~VoERTP_RTCPImpl();
-
-private:
-    voe::SharedData* _shared;
 };
 
 }  // namespace webrtc

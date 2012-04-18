@@ -701,6 +701,8 @@ int VideoRenderDirect3D9::SetTransparentColor(LPDIRECT3DTEXTURE9 pTexture,
 
             for (DWORD x = 0; x < width; x)
             {
+                DWORD a = (DWORD) 0;
+
                 DWORD temp = ((DWORD*) lr.pBits)[dwOffset + x];
                 if ((temp & 0x00FFFFFF)
                         == transparentColorKey->dwColorSpaceLowValue)
@@ -842,6 +844,7 @@ WebRtc_Word32 VideoRenderDirect3D9::DeleteChannel(const WebRtc_UWord32 streamId)
 
     std::map<int, D3D9Channel*>::iterator ddIt;
     ddIt = _d3dChannels.find(streamId & 0x0000ffff);
+    D3D9Channel* ddobj = NULL;
     if (ddIt != _d3dChannels.end())
     {
         delete ddIt->second;

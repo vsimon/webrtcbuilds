@@ -224,10 +224,8 @@ int VCMMediaOptimization::UpdateProtectionCallback(
     delta_fec_params.use_uep_protection =
         selected_method->RequiredUepProtectionD();
 
-    // The RTP module currently requires the same |max_fec_frames| for both
-    // key and delta frames.
-    delta_fec_params.max_fec_frames = selected_method->MaxFramesFec();
-    key_fec_params.max_fec_frames = selected_method->MaxFramesFec();
+    delta_fec_params.max_fec_frames = 1;
+    key_fec_params.max_fec_frames = 1;
 
     // TODO(Marco): Pass FEC protection values per layer.
     return _videoProtectionCallback->ProtectionRequest(&delta_fec_params,

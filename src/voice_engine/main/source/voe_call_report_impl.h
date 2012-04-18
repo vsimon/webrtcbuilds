@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -21,7 +21,8 @@ namespace webrtc
 {
 class FileWrapper;
 
-class VoECallReportImpl: public VoECallReport,
+class VoECallReportImpl: public virtual voe::SharedData,
+                         public VoECallReport,
                          public voe::RefCount
 {
 public:
@@ -40,7 +41,7 @@ public:
     virtual int WriteReportToFile(const char* fileNameUTF8);
 
 protected:
-    VoECallReportImpl(voe::SharedData* shared);
+    VoECallReportImpl();
     virtual ~VoECallReportImpl();
 
 private:
@@ -53,7 +54,6 @@ private:
     int GetSpeechAndNoiseSummaryInternal(LevelStatistics& stats);
 
     FileWrapper& _file;
-    voe::SharedData* _shared;
 };
 
 } // namespace webrtc

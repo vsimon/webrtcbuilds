@@ -103,9 +103,6 @@ int16_t ACMCELT::SetBitRateSafe(const int32_t /*rate*/) {
   return -1;
 }
 
-void ACMCELT::SplitStereoPacket(uint8_t* /*payload*/,
-                                int32_t* /*payload_length*/) {}
-
 #else  //===================== Actual Implementation =======================
 
 ACMCELT::ACMCELT(int16_t codecID)
@@ -328,19 +325,6 @@ int16_t ACMCELT::SetBitRateSafe(const int32_t rate) {
                  "SetBitRateSafe: Invalid rate Celt, %d", rate);
     return -1;
   }
-}
-
-// Copy the stereo packet so that NetEq will insert into both master and slave.
-void ACMCELT::SplitStereoPacket(uint8_t* payload, int32_t* payload_length) {
-  // Check for valid inputs.
-  assert(payload != NULL);
-  assert(*payload_length > 0);
-
-  // Duplicate the payload.
-  memcpy(&payload[*payload_length], &payload[0],
-         sizeof(uint8_t) * (*payload_length));
-  // Double the size of the packet.
-  *payload_length *= 2;
 }
 
 #endif

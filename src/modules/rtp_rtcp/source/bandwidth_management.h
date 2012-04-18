@@ -85,6 +85,8 @@ private:
 
     // bandwidth estimate
     WebRtc_UWord32        _bwEstimateIncoming;
+    WebRtc_Word16         _smoothedFractionLostQ4;
+    WebRtc_Word16         _sFLFactorQ4;  // forgetting factor for _smoothedFractionLostQ4
     WebRtc_Word64         _timeLastIncrease;
 };
 } // namespace webrtc

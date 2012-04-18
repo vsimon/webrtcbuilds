@@ -695,6 +695,9 @@ int main(int argc, char* argv[])
     printf("    RecIn complexity    : %.2f MCPS\n", NetEQvector[0]->getRecInTime() / ((float) 1000*(simClock-start_clock)));
     printf("    RecOut complexity   : %.2f MCPS\n", NetEQvector[0]->getRecOutTime() / ((float) 1000*(simClock-start_clock)));
 
+    delete rtp;
+    delete slaveRtp;
+
     free_coders(decoders);
     //free_coders(0 /* first channel */);
  //   if (stereoMode > stereoModeMono) {
@@ -1193,11 +1196,6 @@ void parsePtypeFile(FILE *ptypeFile, std::map<WebRtc_UWord8, decoderStruct>* dec
                             break;
                         }
 
-                    case kDecoderCELT_32:
-                    {
-                      tempDecoder.stereo = stereoModeDuplicate;
-                      break;
-                    }
                         // fixed-rate frame codecs
 //                    case kDecoderG729:
 //                    case NETEQ_CODEC_G729D:
@@ -1464,10 +1462,7 @@ void createAndInsertDecoders (NETEQTEST_NetEQClass *neteq, std::map<WebRtc_UWord
 #endif
 #ifdef CODEC_CELT_32
             case kDecoderCELT_32:
-              if (channelNumber == 0)
                 *dec = new decoder_CELT( pt, 32000 );
-              else
-                *dec = new decoder_CELTslave( pt, 32000 );
                 break;
 #endif
 #ifdef CODEC_RED

@@ -39,7 +39,7 @@ void AfterStreamingFixture::SwitchToManualMicrophone() {
 
   TEST_LOG("You need to speak manually into the microphone for this test.\n");
   TEST_LOG("Please start speaking now.\n");
-  Sleep(1000);
+  Sleep(2000);
 }
 
 void AfterStreamingFixture::RestartFakeMicrophone() {

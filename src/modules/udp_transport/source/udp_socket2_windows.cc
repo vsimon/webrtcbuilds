@@ -47,7 +47,7 @@ UdpSocket2Windows::UdpSocket2Windows(const WebRtc_Word32 id,
       _terminate(false),
       _addedToMgr(false),
       _safeTodelete(false),
-      _outstandingCallsDisabled(false),
+      _outstandingCallsDisabled(0),
       _clientHandle(NULL),
       _flowHandle(NULL),
       _filterHandle(NULL),
@@ -449,10 +449,10 @@ void UdpSocket2Windows::IOCompleted(PerIoContext* pIOContext,
             !pIOContext->ioInitiatedByThreadWrapper &&
             (error == ERROR_OPERATION_ABORTED) &&
             (pIOContext->ioOperation == OP_READ) &&
-            _outstandingCallsDisabled)
+            _outstandingCallsDisabled.Value() == 1)
         {
             // !pIOContext->initiatedIOByThreadWrapper indicate that the I/O
-            // was not initiated by a ThreadWrapper thread.
+            // was not initiaded by a ThreadWrapper thread.
             // This may happen if the thread that initiated receiving (e.g.
             // by calling StartListen())) is deleted before any packets have
             // been received.
@@ -462,10 +462,39 @@ void UdpSocket2Windows::IOCompleted(PerIoContext* pIOContext,
             //         that is controlled by the socket implementation.
             // Note 2: This is more likely to happen to RTCP packets as
             //         they are less frequent than RTP packets.
-            // Note 3: _outstandingCallsDisabled being false indicates
+            // Note 3: _outstandingCallsDisabled being false (= 1) indicates
             //         that the socket isn't being shut down.
-            // Note 4: This should only happen buffers set to receive packets
+            // Note 4: This should only happen buffers set to recevie packets
             //         (OP_READ).
+            if (_outstandingCallsDisabled.Value() != 1)
+            {
+                WEBRTC_TRACE(
+                    kTraceDebug,
+                    kTraceTransport,
+                    _id,
+                    "UdpSocket2Windows::IOCompleted(pIOContext=%p,\
+ ioSize=%.lu, error=%.lu) Received operation aborted but continuing since\
+ pIOContext->ioInitiatedByThreadWrapper == false",
+                    pIOContext,
+                    ioSize,
+                    error);
+                WebRtc_Word32 ioOp = pIOContext ?
+                    (WebRtc_Word32)pIOContext->ioOperation : -1;
+                WebRtc_Word32 ioInit = pIOContext ?
+                    (WebRtc_Word32)pIOContext->ioInitiatedByThreadWrapper : -1;
+                WEBRTC_TRACE(
+                    kTraceDebug,
+                    kTraceTransport,
+                    _id,
+                    "pIOContext->ioOperation=%d,\
+ pIOContext->ioInitiatedByThreadWrapper=%d, _outstandingCallsDisabled=%d,\
+ _incomingCb=%p, this=%p",
+                    ioOp,
+                    ioInit,
+                    (WebRtc_Word32)_outstandingCallsDisabled.Value(),
+                    _incomingCb,
+                    this);
+            }
         } else {
             if(pIOContext == NULL)
             {
@@ -1271,9 +1300,9 @@ WebRtc_Word32 UdpSocket2Windows::CreateFlowSpec(WebRtc_Word32 serviceType,
 
 bool UdpSocket2Windows::NewOutstandingCall()
 {
-    assert(!_outstandingCallsDisabled);
+    assert(_outstandingCallsDisabled.Value() == 0);
 
-    ++_outstandingCalls;
+    const WebRtc_Word32 outstandingCalls = ++_outstandingCalls;
     return true;
 }
 
@@ -1281,9 +1310,9 @@ void UdpSocket2Windows::OutstandingCallCompleted()
 {
     _ptrDestRWLock->AcquireLockShared();
     ++_outstandingCallComplete;
-    if((--_outstandingCalls == 0) && _outstandingCallsDisabled)
+    if((--_outstandingCalls == 0) && (_outstandingCallsDisabled.Value() == 1))
     {
-        // When there are no outstanding calls and new outstanding calls are
+        // When there are no outstanding calls and new outstandning calls are
         // disabled it is time to terminate.
         _terminate = true;
     }
@@ -1303,13 +1332,13 @@ void UdpSocket2Windows::OutstandingCallCompleted()
 void UdpSocket2Windows::DisableNewOutstandingCalls()
 {
     _ptrDestRWLock->AcquireLockExclusive();
-    if(_outstandingCallsDisabled)
+    if(_outstandingCallsDisabled.Value() == 1)
     {
         // Outstandning calls are already disabled.
         _ptrDestRWLock->ReleaseLockExclusive();
         return;
     }
-    _outstandingCallsDisabled = true;
+    _outstandingCallsDisabled = 1;
     const bool noOutstandingCalls = (_outstandingCalls.Value() == 0);
     _ptrDestRWLock->ReleaseLockExclusive();
 
@@ -1335,7 +1364,7 @@ void UdpSocket2Windows::WaitForOutstandingCalls()
 void UdpSocket2Windows::RemoveSocketFromManager()
 {
     // New outstanding calls should be disabled at this point.
-    assert(_outstandingCallsDisabled);
+    assert(_outstandingCallsDisabled.Value() != 0);
 
     if(_addedToMgr)
     {

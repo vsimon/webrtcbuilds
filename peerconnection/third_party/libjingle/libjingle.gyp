@@ -4,7 +4,6 @@
 
 {
   # TODO(wu): Use the libjingle.gyp from chromium and get rid of this file.
-  # WebRTC no longer supports the inside_chromium_build variable.
   'variables': {
     'no_libjingle_logging%': 0,
     'conditions': [

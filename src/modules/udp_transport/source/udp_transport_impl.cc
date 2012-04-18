@@ -69,8 +69,7 @@ namespace webrtc {
 UdpTransport* UdpTransport::Create(const WebRtc_Word32 id,
                                    WebRtc_UWord8& numSocketThreads)
 {
-  return new UdpTransportImpl(id, numSocketThreads,
-                              &UdpSocketWrapper::CreateSocket);
+    return new UdpTransportImpl(id, numSocketThreads);
 }
 
 void UdpTransport::Destroy(UdpTransport* module)
@@ -82,10 +81,8 @@ void UdpTransport::Destroy(UdpTransport* module)
 }
 
 UdpTransportImpl::UdpTransportImpl(const WebRtc_Word32 id,
-                                   WebRtc_UWord8& numSocketThreads,
-                                   SocketMaker* maker)
+                                   WebRtc_UWord8& numSocketThreads)
     : _id(id),
-      _socket_creator(maker),
       _crit(CriticalSectionWrapper::CreateCriticalSection()),
       _critFilter(CriticalSectionWrapper::CreateCriticalSection()),
       _critPacketCallback(CriticalSectionWrapper::CreateCriticalSection()),
@@ -352,13 +349,13 @@ WebRtc_Word32 UdpTransportImpl::InitializeReceiveSockets(
     _tos=0;
     _pcp=0;
 
-    _ptrRtpSocket = _socket_creator(_id, _mgr, this,
-                                    IncomingRTPCallback,
-                                    IpV6Enabled(), false);
+    _ptrRtpSocket = UdpSocketWrapper::CreateSocket(_id, _mgr, this,
+                                                   IncomingRTPCallback,
+                                                   IpV6Enabled());
 
-    _ptrRtcpSocket = _socket_creator(_id, _mgr, this,
-                                     IncomingRTCPCallback,
-                                     IpV6Enabled(), false);
+    _ptrRtcpSocket = UdpSocketWrapper::CreateSocket(_id, _mgr, this,
+                                                    IncomingRTCPCallback,
+                                                    IpV6Enabled());
 
     ErrorCode retVal = BindLocalRTPSocket();
     if(retVal != kNoSocketError)
@@ -832,13 +829,13 @@ WebRtc_Word32 UdpTransportImpl::SetToS(WebRtc_Word32 DSCP, bool useSetSockOpt)
                 {
                     CloseSendSockets();
                     _ptrSendRtpSocket =
-                        _socket_creator(_id, _mgr, NULL,
-                                        NULL, IpV6Enabled(),
-                                        true);
+                        UdpSocketWrapper::CreateSocket(_id, _mgr, NULL,
+                                                       NULL, IpV6Enabled(),
+                                                       true);
                     _ptrSendRtcpSocket =
-                        _socket_creator(_id, _mgr, NULL,
-                                        NULL, IpV6Enabled(),
-                                        true);
+                        UdpSocketWrapper::CreateSocket(_id, _mgr, NULL,
+                                                       NULL, IpV6Enabled(),
+                                                       true);
                     rtpSock=_ptrSendRtpSocket;
                     rtcpSock=_ptrSendRtcpSocket;
                     ErrorCode retVal = BindRTPSendSocket();
@@ -867,12 +864,12 @@ WebRtc_Word32 UdpTransportImpl::SetToS(WebRtc_Word32 DSCP, bool useSetSockOpt)
                         }
                     }
                     CloseReceiveSockets();
-                    _ptrRtpSocket = _socket_creator(_id, _mgr, this,
-                                                    IncomingRTPCallback,
-                                                    IpV6Enabled(), true);
-                    _ptrRtcpSocket = _socket_creator(_id, _mgr, this,
-                                                     IncomingRTCPCallback,
-                                                     IpV6Enabled(),true);
+                    _ptrRtpSocket = UdpSocketWrapper::CreateSocket(
+                        _id, _mgr, this, IncomingRTPCallback,
+                        IpV6Enabled(), true);
+                    _ptrRtcpSocket = UdpSocketWrapper::CreateSocket(
+                        _id, _mgr, this, IncomingRTCPCallback,
+                        IpV6Enabled(),true);
                     rtpSock=_ptrRtpSocket;
                     rtcpSock=_ptrRtcpSocket;
                     ErrorCode retVal = BindLocalRTPSocket();
@@ -1530,10 +1527,10 @@ WebRtc_Word32 UdpTransportImpl::InitializeSourcePorts(WebRtc_UWord16 rtpPort,
     _tos=0;
     _pcp=0;
 
-    _ptrSendRtpSocket = _socket_creator(_id, _mgr, NULL, NULL,
-                                        IpV6Enabled(), false);
-    _ptrSendRtcpSocket = _socket_creator(_id, _mgr, NULL, NULL,
-                                         IpV6Enabled(), false);
+    _ptrSendRtpSocket = UdpSocketWrapper::CreateSocket(_id, _mgr, NULL, NULL,
+                                                       IpV6Enabled());
+    _ptrSendRtcpSocket = UdpSocketWrapper::CreateSocket(_id, _mgr, NULL, NULL,
+                                                        IpV6Enabled());
 
     ErrorCode retVal = BindRTPSendSocket();
     if(retVal != kNoSocketError)
@@ -1983,9 +1980,9 @@ int UdpTransportImpl::SendPacket(int /*channel*/, const void* data, int length)
             "Creating RTP socket since no receive or source socket is\
  configured");
 
-        _ptrRtpSocket = _socket_creator(_id, _mgr, this,
-                                        IncomingRTPCallback,
-                                        IpV6Enabled(), false);
+        _ptrRtpSocket = UdpSocketWrapper::CreateSocket(_id, _mgr, this,
+                                                       IncomingRTPCallback,
+                                                       IpV6Enabled());
 
         // Don't bind to a specific IP address.
         if(! IpV6Enabled())
@@ -2049,9 +2046,9 @@ int UdpTransportImpl::SendRTCPPacket(int /*channel*/, const void* data,
             "Creating RTCP socket since no receive or source socket is\
  configured");
 
-        _ptrRtcpSocket = _socket_creator(_id, _mgr, this,
-                                         IncomingRTCPCallback,
-                                         IpV6Enabled(), false);
+        _ptrRtcpSocket = UdpSocketWrapper::CreateSocket(_id, _mgr, this,
+                                                        IncomingRTCPCallback,
+                                                        IpV6Enabled());
 
         // Don't bind to a specific IP address.
         if(! IpV6Enabled())

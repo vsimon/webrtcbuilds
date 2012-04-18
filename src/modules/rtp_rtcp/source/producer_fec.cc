@@ -10,6 +10,8 @@
 
 #include "modules/rtp_rtcp/source/producer_fec.h"
 
+#include <stdio.h>
+
 #include "modules/rtp_rtcp/source/forward_error_correction.h"
 #include "modules/rtp_rtcp/source/rtp_utility.h"
 
@@ -77,10 +79,8 @@ ProducerFec::ProducerFec(ForwardErrorCorrection* fec)
       num_frames_(0),
       incomplete_frame_(false),
       num_first_partition_(0),
-      params_(),
-      new_params_() {
+      params_() {
   memset(&params_, 0, sizeof(params_));
-  memset(&new_params_, 0, sizeof(new_params_));
 }
 
 ProducerFec::~ProducerFec() {
@@ -96,9 +96,7 @@ void ProducerFec::SetFecParameters(const FecProtectionParams* params,
       num_first_partition =
           ForwardErrorCorrection::kMaxMediaPackets;
   }
-  // Store the new params and apply them for the next set of FEC packets being
-  // produced.
-  new_params_ = *params;
+  params_ = *params;
   num_first_partition_ = num_first_partition;
 }
 
@@ -120,9 +118,6 @@ int ProducerFec::AddRtpPacketAndGenerateFec(const uint8_t* data_buffer,
                                             int payload_length,
                                             int rtp_header_length) {
   assert(fec_packets_.empty());
-  if (media_packets_fec_.empty()) {
-    params_ = new_params_;
-  }
   incomplete_frame_ = true;
   const bool marker_bit = (data_buffer[1] & kRtpMarkerBitMask) ? true : false;
   if (media_packets_fec_.size() < ForwardErrorCorrection::kMaxMediaPackets) {
@@ -136,9 +131,6 @@ int ProducerFec::AddRtpPacketAndGenerateFec(const uint8_t* data_buffer,
     ++num_frames_;
     incomplete_frame_ = false;
   }
-  // Produce FEC over at most |params_.max_fec_frames| frames, or as soon as
-  // the wasted overhead (actual overhead - requested protection) is less than
-  // |kMaxOverhead|.
   if (!incomplete_frame_ &&
       (num_frames_ == params_.max_fec_frames ||
           (Overhead() - params_.fec_rate) < kMaxOverhead)) {
@@ -191,17 +183,13 @@ RedPacket* ProducerFec::GetFecPacket(int red_pl_type, int fec_pl_type,
 }
 
 int ProducerFec::Overhead() const {
-  // Overhead is defined as relative to the number of media packets, and not
-  // relative to total number of packets. This definition is inhereted from the
-  // protection factor produced by video_coding module and how the FEC
-  // generation is implemented.
-  assert(!media_packets_fec_.empty());
   int num_fec_packets = params_.fec_rate * media_packets_fec_.size();
   // Ceil.
   int rounding = (num_fec_packets % (1 << 8) > 0) ? (1 << 8) : 0;
   num_fec_packets = (num_fec_packets + rounding) >> 8;
   // Return the overhead in Q8.
-  return (num_fec_packets << 8) / media_packets_fec_.size();
+  return (num_fec_packets << 8) /
+      (media_packets_fec_.size() + num_fec_packets);
 }
 
 void ProducerFec::DeletePackets() {

@@ -79,91 +79,47 @@ ViEEncoder::ViEEncoder(WebRtc_Word32 engine_id, WebRtc_Word32 channel_id,
     picture_id_sli_(0),
     has_received_rpsi_(false),
     picture_id_rpsi_(0),
-    file_recorder_(channel_id),
-    qm_callback_(NULL) {
+    file_recorder_(channel_id) {
   WEBRTC_TRACE(webrtc::kTraceMemory, webrtc::kTraceVideo,
                ViEId(engine_id, channel_id),
                "%s(engine_id: %d) 0x%p - Constructor", __FUNCTION__, engine_id,
                this);
-
-  time_last_intra_request_ms_ = 0;
-
-}
-
-bool ViEEncoder::Init() {
-  if (vcm_.InitializeSender() != 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
-                 ViEId(engine_id_, channel_id_),
-                 "%s InitializeSender failure", __FUNCTION__);
-    return false;
+  for (int i = 0; i < kMaxSimulcastStreams; i++) {
+    time_last_intra_request_ms_[i] = 0;
   }
+  vcm_.InitializeSender();
   vpm_.EnableTemporalDecimation(true);
 
   // Enable/disable content analysis: off by default for now.
   vpm_.EnableContentAnalysis(false);
 
-  if (module_process_thread_.RegisterModule(&vcm_) != 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
-                 ViEId(engine_id_, channel_id_),
-                 "%s RegisterModule failure", __FUNCTION__);
-    return false;
-  }
+  module_process_thread_.RegisterModule(&vcm_);
   if (default_rtp_rtcp_.InitSender() != 0) {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                  ViEId(engine_id_, channel_id_),
-                 "%s InitSender failure", __FUNCTION__);
-    return false;
+                 "ViEEncoder: RTP::InitSender failure");
+    assert(false);
   }
-  if (default_rtp_rtcp_.RegisterIncomingVideoCallback(this) != 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
-                 ViEId(engine_id_, channel_id_),
-                 "%s RegisterIncomingVideoCallback failure", __FUNCTION__);
-    return false;
-  }
-  if (default_rtp_rtcp_.RegisterIncomingRTCPCallback(this) != 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
-                 ViEId(engine_id_, channel_id_),
-                 "%s RegisterIncomingRTCPCallback failure", __FUNCTION__);
-    return false;
-  }
-  if (module_process_thread_.RegisterModule(&default_rtp_rtcp_) != 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
-                 ViEId(engine_id_, channel_id_),
-                 "%s RegisterModule failure", __FUNCTION__);
-    return false;
-  }
+  default_rtp_rtcp_.RegisterIncomingVideoCallback(this);
+  default_rtp_rtcp_.RegisterIncomingRTCPCallback(this);
+  module_process_thread_.RegisterModule(&default_rtp_rtcp_);
 
-  if (qm_callback_) {
-    delete qm_callback_;
-  }
   qm_callback_ = new QMVideoSettingsCallback(
       engine_id_,
       channel_id_,
       &vpm_,
       &vcm_,
-      number_of_cores_,
+      number_of_cores,
       default_rtp_rtcp_.MaxDataPayloadLength());
 
 #ifdef VIDEOCODEC_VP8
   VideoCodec video_codec;
-  if (vcm_.Codec(webrtc::kVideoCodecVP8, &video_codec) != VCM_OK) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
-                 ViEId(engine_id_, channel_id_),
-                 "%s Codec failure", __FUNCTION__);
-    return false;
-  }
-  if (vcm_.RegisterSendCodec(&video_codec, number_of_cores_,
-                             default_rtp_rtcp_.MaxDataPayloadLength()) != 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
-                 ViEId(engine_id_, channel_id_),
-                 "%s RegisterSendCodec failure", __FUNCTION__);
-    return false;
-  }
-  if (default_rtp_rtcp_.RegisterSendPayload(video_codec) != 0) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
-                 ViEId(engine_id_, channel_id_),
-                 "%s RegisterSendPayload failure", __FUNCTION__);
-    return false;
+  if (vcm_.Codec(webrtc::kVideoCodecVP8, &video_codec) == VCM_OK) {
+    vcm_.RegisterSendCodec(&video_codec, number_of_cores_,
+                           default_rtp_rtcp_.MaxDataPayloadLength());
+    default_rtp_rtcp_.RegisterSendPayload(video_codec);
+  } else {
+    assert(false);
   }
 #else
   VideoCodec video_codec;
@@ -172,7 +128,7 @@ bool ViEEncoder::Init() {
                            default_rtp_rtcp_.MaxDataPayloadLength());
     default_rtp_rtcp_.RegisterSendPayload(video_codec);
   } else {
-    return false;
+    assert(false);
   }
 #endif
 
@@ -180,21 +136,18 @@ bool ViEEncoder::Init() {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                  ViEId(engine_id_, channel_id_),
                  "ViEEncoder: VCM::RegisterTransportCallback failure");
-    return false;
   }
   if (vcm_.RegisterSendStatisticsCallback(this) != 0) {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                  ViEId(engine_id_, channel_id_),
                  "ViEEncoder: VCM::RegisterSendStatisticsCallback failure");
-    return false;
   }
+
   if (vcm_.RegisterVideoQMCallback(qm_callback_) != 0) {
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceVideo,
                  ViEId(engine_id_, channel_id_),
                  "VCM::RegisterQMCallback failure");
-    return false;
   }
-  return true;
 }
 
 ViEEncoder::~ViEEncoder() {
@@ -601,10 +554,10 @@ int ViEEncoder::GetPreferedFrameSettings(int& width,
   return 0;
 }
 
-int ViEEncoder::SendKeyFrame() {
+WebRtc_Word32 ViEEncoder::SendKeyFrame() {
   WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideo,
                ViEId(engine_id_, channel_id_), "%s", __FUNCTION__);
-  return vcm_.IntraFrameRequest();
+  return vcm_.FrameTypeRequest(kVideoFrameKey, 0);  // Simulcast idx = 0.
 }
 
 WebRtc_Word32 ViEEncoder::SendCodecStatistics(
@@ -811,23 +764,25 @@ void ViEEncoder::OnRPSIReceived(const WebRtc_Word32 id,
   has_received_rpsi_ = true;
 }
 
-void ViEEncoder::OnReceivedIntraFrameRequest(const WebRtc_Word32 /*id*/,
-                                             const FrameType /*type*/,
-                                             const WebRtc_UWord8 /*idx*/) {
+void ViEEncoder::OnReceivedIntraFrameRequest(const WebRtc_Word32 id,
+                                             const FrameType type,
+                                             const WebRtc_UWord8 stream_idx) {
+  assert(stream_idx < kMaxSimulcastStreams);
+
   // Key frame request from remote side, signal to VCM.
   WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceVideo,
                ViEId(engine_id_, channel_id_), "%s", __FUNCTION__);
 
   WebRtc_Word64 now = TickTime::MillisecondTimestamp();
-  if (time_last_intra_request_ms_ + kViEMinKeyRequestIntervalMs >
+  if (time_last_intra_request_ms_[stream_idx] + kViEMinKeyRequestIntervalMs >
       now) {
     WEBRTC_TRACE(webrtc::kTraceStream, webrtc::kTraceVideo,
                  ViEId(engine_id_, channel_id_),
                  "%s: Not not encoding new intra due to timing", __FUNCTION__);
     return;
   }
-  vcm_.IntraFrameRequest();
-  time_last_intra_request_ms_ = now;
+  vcm_.FrameTypeRequest(type, stream_idx);
+  time_last_intra_request_ms_[stream_idx] = now;
 }
 
 void ViEEncoder::OnNetworkChanged(const WebRtc_Word32 id,

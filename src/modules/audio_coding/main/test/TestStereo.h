@@ -11,19 +11,11 @@
 #ifndef TEST_STEREO_H
 #define TEST_STEREO_H
 
-#include <math.h>
-
 #include "ACMTest.h"
 #include "Channel.h"
 #include "PCMFile.h"
 
 namespace webrtc {
-
-enum StereoMonoMode {
-    kNotSet,
-    kMono,
-    kStereo
-};
 
 class TestPackStereo : public AudioPacketizationCallback
 {
@@ -43,8 +35,8 @@ public:
     WebRtc_UWord16 GetPayloadSize();
     WebRtc_UWord32 GetTimeStampDiff();
     void ResetPayloadSize();
-    void set_codec_mode(StereoMonoMode mode);
-    void set_lost_packet(bool lost);
+    void SetCodecType(int codecType);
+
 
 private:
     AudioCodingModule* _receiverACM;
@@ -54,9 +46,8 @@ private:
     WebRtc_UWord32           _lastInTimestamp;
     WebRtc_UWord64           _totalBytes;
     WebRtc_UWord16           _payloadSize;
-    StereoMonoMode           _codec_mode;
-    // Simulate packet losses
-    bool _lost_packet;
+    WebRtc_UWord16           _noChannels;
+    int                    _codecType;
 };
 
 class TestStereo : public ACMTest
@@ -78,8 +69,7 @@ private:
         int channels,
         int payload_type);
 
-    void Run(TestPackStereo* channel, int in_channels, int out_channels,
-             int percent_loss = 0);
+    void Run(TestPackStereo* channel, int in_channels, int out_channels);
     void OpenOutFile(WebRtc_Word16 testNumber);
     void DisplaySendReceiveCodec();
 
@@ -105,6 +95,7 @@ private:
     WebRtc_UWord16         _packSizeSamp;
     WebRtc_UWord16         _packSizeBytes;
     int                    _counter;
+    int                    _codecType;
 
     // Payload types for stereo codecs and CNG
     int g722_pltype_;

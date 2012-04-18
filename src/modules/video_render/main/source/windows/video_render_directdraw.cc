@@ -1045,21 +1045,26 @@ int DirectDrawChannel::DeliverFrame(unsigned char* buffer, int bufferSize,
                     break;
                 }
                 default:
-                  assert(false &&
-                      "DirectDrawChannel::DeliverFrame unknown blitVideoType");
-                  WEBRTC_TRACE(kTraceError, kTraceVideo, -1,
-                               "%s unknown blitVideoType %d",
-                               __FUNCTION__, _blitVideoType);
+                    assert(!"DirectDrawChannel::DeliverFrame unknown blitVideoType");
+                    WEBRTC_TRACE(
+                                 kTraceError,
+                                 kTraceVideo,
+                                 -1,
+                                 "DirectDrawChannel::DeliverFrame unknown blitVideoType %d",
+                                 _blitVideoType);
             }
             break;
         }
         default:
-            assert(false &&
-                "DirectDrawChannel::DeliverFrame wrong incomming video type");
-            WEBRTC_TRACE(kTraceError, kTraceVideo, -1,
-                         "%s wrong incomming video type:%d",
-                         __FUNCTION__, _incomingVideoType);
+            assert(!"DirectDrawChannel::DeliverFrame wrong incomming video type");
+            WEBRTC_TRACE(
+                         kTraceError,
+                         kTraceVideo,
+                         -1,
+                         "DirectDrawChannel::DeliverFrame wrong incomming %d",
+                         _incomingVideoType);
     }
+
     _offScreenSurfaceUpdated = true;
     offScreenSurface->Unlock(NULL);
     return 0;
@@ -3024,6 +3029,7 @@ bool VideoRenderDirectDraw::RemoteRenderingProcess()
     {
         if (it->second)
         {
+            int channel = it->first;
             _frameChanged = it->second->IsOffScreenSurfaceUpdated(this);
         }
         it++;

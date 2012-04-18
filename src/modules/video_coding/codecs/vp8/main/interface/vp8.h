@@ -74,7 +74,7 @@ class VP8Encoder : public VideoEncoder {
 
   virtual int Encode(const RawImage& input_image,
                      const CodecSpecificInfo* codec_specific_info,
-                     const VideoFrameType frame_type);
+                     const VideoFrameType* frame_types);
 
   // Register an encode complete callback object.
   //

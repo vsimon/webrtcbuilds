@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -18,7 +18,8 @@
 
 namespace webrtc {
 
-class VoENetEqStatsImpl : public VoENetEqStats,
+class VoENetEqStatsImpl : public virtual voe::SharedData,
+                          public VoENetEqStats,
                           public voe::RefCount
 {
 public:
@@ -28,11 +29,8 @@ public:
                                      NetworkStatistics& stats);
 
 protected:
-    VoENetEqStatsImpl(voe::SharedData* shared);
+    VoENetEqStatsImpl();
     virtual ~VoENetEqStatsImpl();
-
-private:
-    voe::SharedData* _shared;
 };
 
 }  // namespace webrtc

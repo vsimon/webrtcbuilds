@@ -181,8 +181,10 @@ int ViEAutoTestWindowManager::ViECreateWindow(HWND &hwndMain, int xPos,
                             hinst,  // instance handle
                             NULL);  // no window creation data
 
-  if (!hwndMain)
+  if (!hwndMain) {
+    int error = GetLastError();
     return -1;
+  }
 
   // Show the window using the flag specified by the program
   // that started the application, and send the application

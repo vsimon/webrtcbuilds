@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -10,7 +10,6 @@
 
 #include "modules/video_coding/main/source/media_opt_util.h"
 
-#include <algorithm>
 #include <math.h>
 #include <float.h>
 #include <limits.h>
@@ -56,8 +55,7 @@ VCMNackFecMethod::VCMNackFecMethod(int lowRttNackThresholdMs,
                                    int highRttNackThresholdMs)
     : VCMFecMethod(),
       _lowRttNackMs(lowRttNackThresholdMs),
-      _highRttNackMs(highRttNackThresholdMs),
-      _maxFramesFec(1) {
+      _highRttNackMs(highRttNackThresholdMs) {
   assert(lowRttNackThresholdMs >= -1 && highRttNackThresholdMs >= -1);
   assert(highRttNackThresholdMs == -1 ||
          lowRttNackThresholdMs <= highRttNackThresholdMs);
@@ -112,35 +110,6 @@ VCMNackFecMethod::ProtectionFactor(const VCMProtectionParameters* parameters)
     return true;
 }
 
-int VCMNackFecMethod::ComputeMaxFramesFec(
-    const VCMProtectionParameters* parameters) {
-  if (parameters->numLayers > 2) {
-    // For more than 2 temporal layers we will only have FEC on the base layer,
-    // and the base layers will be pretty far apart. Therefore we force one
-    // frame FEC.
-    return 1;
-  }
-  // We set the max number of frames to base the FEC on so that on average
-  // we will have complete frames in one RTT. Note that this is an upper
-  // bound, and that the actual number of frames used for FEC is decided by the
-  // RTP module based on the actual number of packets and the protection factor.
-  float base_layer_framerate = parameters->frameRate /
-      static_cast<float>(1 << (parameters->numLayers - 1));
-  int max_frames_fec = std::max(static_cast<int>(
-      2.0f * base_layer_framerate * parameters->rtt /
-      1000.0f + 0.5f), 1);
-  // |kUpperLimitFramesFec| is the upper limit on how many frames we
-  // allow any FEC to be based on.
-  if (max_frames_fec > kUpperLimitFramesFec) {
-    max_frames_fec = kUpperLimitFramesFec;
-  }
-  return max_frames_fec;
-}
-
-int VCMNackFecMethod::MaxFramesFec() const {
-  return _maxFramesFec;
-}
-
 bool
 VCMNackFecMethod::EffectivePacketLoss(const VCMProtectionParameters* parameters)
 {
@@ -155,7 +124,6 @@ VCMNackFecMethod::UpdateParameters(const VCMProtectionParameters* parameters)
 {
     ProtectionFactor(parameters);
     EffectivePacketLoss(parameters);
-    _maxFramesFec = ComputeMaxFramesFec(parameters);
 
     // Efficiency computation is based on FEC and NACK
 

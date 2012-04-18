@@ -38,34 +38,34 @@ VoEExternalMedia* VoEExternalMedia::GetInterface(VoiceEngine* voiceEngine)
 
 #ifdef WEBRTC_VOICE_ENGINE_EXTERNAL_MEDIA_API
 
-VoEExternalMediaImpl::VoEExternalMediaImpl(voe::SharedData* shared)
-    : playout_delay_ms_(0), shared_(shared)
+VoEExternalMediaImpl::VoEExternalMediaImpl()
+    : playout_delay_ms_(0)
 {
-    WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_instanceId,-1),
                  "VoEExternalMediaImpl() - ctor");
 }
 
 VoEExternalMediaImpl::~VoEExternalMediaImpl()
 {
-    WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_instanceId,-1),
                  "~VoEExternalMediaImpl() - dtor");
 }
 
 int VoEExternalMediaImpl::Release()
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId,-1),
                  "VoEExternalMedia::Release()");
     (*this)--;
     int refCount = GetCount();
     if (refCount < 0)
     {
         Reset();
-        shared_->SetLastError(VE_INTERFACE_NOT_FOUND, kTraceWarning);
+        _engineStatistics.SetLastError(VE_INTERFACE_NOT_FOUND,
+                                       kTraceWarning);
         return (-1);
     }
-    WEBRTC_TRACE(kTraceStateInfo, kTraceVoice,
-        VoEId(shared_->instance_id(), -1),
-        "VoEExternalMedia reference counter = %d", refCount);
+    WEBRTC_TRACE(kTraceStateInfo, kTraceVoice, VoEId(_instanceId,-1),
+                 "VoEExternalMedia reference counter = %d", refCount);
     return (refCount);
 }
 
@@ -74,14 +74,14 @@ int VoEExternalMediaImpl::RegisterExternalMediaProcessing(
     ProcessingTypes type,
     VoEMediaProcess& processObject)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId,-1),
                  "RegisterExternalMediaProcessing(channel=%d, type=%d, "
                  "processObject=0x%x)", channel, type, &processObject);
-    ANDROID_NOT_SUPPORTED(shared_->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
-    if (!shared_->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        shared_->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
     switch (type)
@@ -89,13 +89,14 @@ int VoEExternalMediaImpl::RegisterExternalMediaProcessing(
         case kPlaybackPerChannel:
         case kRecordingPerChannel:
         {
-            voe::ScopedChannel sc(shared_->channel_manager(), channel);
+            voe::ScopedChannel sc(_channelManager, channel);
             voe::Channel* channelPtr = sc.ChannelPtr();
             if (channelPtr == NULL)
             {
-                shared_->SetLastError(VE_CHANNEL_NOT_VALID, kTraceError,
-                    "RegisterExternalMediaProcessing() failed to locate "
-                    "channel");
+                _engineStatistics.SetLastError(
+                    VE_CHANNEL_NOT_VALID, kTraceError,
+                    "RegisterExternalMediaProcessing() "
+                    "failed to locate channel");
                 return -1;
             }
             return channelPtr->RegisterExternalMediaProcessing(type,
@@ -103,12 +104,12 @@ int VoEExternalMediaImpl::RegisterExternalMediaProcessing(
         }
         case kPlaybackAllChannelsMixed:
         {
-            return shared_->output_mixer()->RegisterExternalMediaProcessing(
+            return _outputMixerPtr->RegisterExternalMediaProcessing(
                 processObject);
         }
         case kRecordingAllChannelsMixed:
         {
-            return shared_->transmit_mixer()->RegisterExternalMediaProcessing(
+            return _transmitMixerPtr->RegisterExternalMediaProcessing(
                 processObject);
         }
     }
@@ -119,13 +120,13 @@ int VoEExternalMediaImpl::DeRegisterExternalMediaProcessing(
     int channel,
     ProcessingTypes type)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId,-1),
                  "DeRegisterExternalMediaProcessing(channel=%d)", channel);
-    ANDROID_NOT_SUPPORTED(shared_->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
-    if (!shared_->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        shared_->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
     switch (type)
@@ -133,11 +134,12 @@ int VoEExternalMediaImpl::DeRegisterExternalMediaProcessing(
         case kPlaybackPerChannel:
         case kRecordingPerChannel:
         {
-            voe::ScopedChannel sc(shared_->channel_manager(), channel);
+            voe::ScopedChannel sc(_channelManager, channel);
             voe::Channel* channelPtr = sc.ChannelPtr();
             if (channelPtr == NULL)
             {
-                shared_->SetLastError(VE_CHANNEL_NOT_VALID, kTraceError,
+                _engineStatistics.SetLastError(
+                    VE_CHANNEL_NOT_VALID, kTraceError,
                     "RegisterExternalMediaProcessing() "
                     "failed to locate channel");
                 return -1;
@@ -146,13 +148,11 @@ int VoEExternalMediaImpl::DeRegisterExternalMediaProcessing(
         }
         case kPlaybackAllChannelsMixed:
         {
-            return shared_->output_mixer()->
-                DeRegisterExternalMediaProcessing();
+            return _outputMixerPtr->DeRegisterExternalMediaProcessing();
         }
         case kRecordingAllChannelsMixed:
         {
-            return shared_->transmit_mixer()->
-                DeRegisterExternalMediaProcessing();
+            return _transmitMixerPtr->DeRegisterExternalMediaProcessing();
         }
     }
     return -1;
@@ -160,21 +160,25 @@ int VoEExternalMediaImpl::DeRegisterExternalMediaProcessing(
 
 int VoEExternalMediaImpl::SetExternalRecordingStatus(bool enable)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId,-1),
                  "SetExternalRecordingStatus(enable=%d)", enable);
-    ANDROID_NOT_SUPPORTED(shared_->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 #ifdef WEBRTC_VOE_EXTERNAL_REC_AND_PLAYOUT
-    if (shared_->audio_device()->Recording())
+    if (_audioDevicePtr->Recording())
     {
-        shared_->SetLastError(VE_ALREADY_SENDING, kTraceError,
+        _engineStatistics.SetLastError(
+            VE_ALREADY_SENDING,
+            kTraceError,
             "SetExternalRecordingStatus() cannot set state while sending");
         return -1;
     }
-    shared_->set_ext_recording(enable);
+    _externalRecording = enable;
     return 0;
 #else
-    shared_->SetLastError(VE_FUNC_NOT_SUPPORTED, kTraceError,
+    _engineStatistics.SetLastError(
+        VE_FUNC_NOT_SUPPORTED,
+        kTraceError,
         "SetExternalRecordingStatus() external recording is not supported");
     return -1;
 #endif
@@ -186,49 +190,59 @@ int VoEExternalMediaImpl::ExternalRecordingInsertData(
         int samplingFreqHz,
         int current_delay_ms)
 {
-    WEBRTC_TRACE(kTraceStream, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceStream, kTraceVoice, VoEId(_instanceId,-1),
                  "ExternalRecordingInsertData(speechData10ms=0x%x,"
                  " lengthSamples=%u, samplingFreqHz=%d, current_delay_ms=%d)",
                  &speechData10ms[0], lengthSamples, samplingFreqHz,
               current_delay_ms);
-    ANDROID_NOT_SUPPORTED(shared_->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 
 #ifdef WEBRTC_VOE_EXTERNAL_REC_AND_PLAYOUT
-    if (!shared_->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        shared_->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
-    if (!shared_->ext_recording())
+    if (!_externalRecording)
     {
-       shared_->SetLastError(VE_INVALID_OPERATION, kTraceError,
+       _engineStatistics.SetLastError(
+           VE_INVALID_OPERATION,
+           kTraceError,
            "ExternalRecordingInsertData() external recording is not enabled");
         return -1;
     }
-    if (shared_->NumOfSendingChannels() == 0)
+    if (NumOfSendingChannels() == 0)
     {
-        shared_->SetLastError(VE_ALREADY_SENDING, kTraceError,
+        _engineStatistics.SetLastError(
+            VE_ALREADY_SENDING,
+            kTraceError,
             "SetExternalRecordingStatus() no channel is sending");
         return -1;
     }
     if ((16000 != samplingFreqHz) && (32000 != samplingFreqHz) &&
         (48000 != samplingFreqHz) && (44000 != samplingFreqHz))
     {
-         shared_->SetLastError(VE_INVALID_ARGUMENT, kTraceError,
+         _engineStatistics.SetLastError(
+             VE_INVALID_ARGUMENT,
+             kTraceError,
              "SetExternalRecordingStatus() invalid sample rate");
         return -1;
     }
     if ((0 == lengthSamples) ||
         ((lengthSamples % (samplingFreqHz / 100)) != 0))
     {
-         shared_->SetLastError(VE_INVALID_ARGUMENT, kTraceError,
+         _engineStatistics.SetLastError(
+             VE_INVALID_ARGUMENT,
+             kTraceError,
              "SetExternalRecordingStatus() invalid buffer size");
         return -1;
     }
     if (current_delay_ms < 0)
     {
-        shared_->SetLastError(VE_INVALID_ARGUMENT, kTraceError,
+        _engineStatistics.SetLastError(
+            VE_INVALID_ARGUMENT,
+            kTraceError,
             "SetExternalRecordingStatus() invalid delay)");
         return -1;
     }
@@ -240,11 +254,12 @@ int VoEExternalMediaImpl::ExternalRecordingInsertData(
 
     for (WebRtc_UWord32 i = 0; i < nBlocks; i++)
     {
-        if (!shared_->ext_playout())
+        if (!_externalPlayout)
         {
             // Use real playout delay if external playout is not enabled.
-            if (shared_->audio_device()->PlayoutDelay(&playoutDelayMS) != 0) {
-              shared_->SetLastError(VE_AUDIO_DEVICE_MODULE_ERROR, kTraceWarning,
+            if (_audioDevicePtr->PlayoutDelay(&playoutDelayMS) != 0) {
+              _engineStatistics.SetLastError(
+                  VE_AUDIO_DEVICE_MODULE_ERROR, kTraceWarning,
                   "PlayoutDelay() unable to get the playout delay");
             }
             totalDelayMS = current_delay_ms + playoutDelayMS;
@@ -259,7 +274,7 @@ int VoEExternalMediaImpl::ExternalRecordingInsertData(
             if (totalDelayMS < 0)
                 totalDelayMS = 0;
         }
-        shared_->transmit_mixer()->PrepareDemux(
+        _transmitMixerPtr->PrepareDemux(
             (const WebRtc_Word8*)(&speechData10ms[i*blockSize]),
             blockSize,
             1,
@@ -268,12 +283,14 @@ int VoEExternalMediaImpl::ExternalRecordingInsertData(
             0,
             0);
 
-        shared_->transmit_mixer()->DemuxAndMix();
-        shared_->transmit_mixer()->EncodeAndSend();
+        _transmitMixerPtr->DemuxAndMix();
+        _transmitMixerPtr->EncodeAndSend();
     }
     return 0;
 #else
-       shared_->SetLastError(VE_FUNC_NOT_SUPPORTED, kTraceError,
+       _engineStatistics.SetLastError(
+        VE_FUNC_NOT_SUPPORTED,
+        kTraceError,
         "ExternalRecordingInsertData() external recording is not supported");
     return -1;
 #endif
@@ -281,21 +298,25 @@ int VoEExternalMediaImpl::ExternalRecordingInsertData(
 
 int VoEExternalMediaImpl::SetExternalPlayoutStatus(bool enable)
 {
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_instanceId,-1),
                  "SetExternalPlayoutStatus(enable=%d)", enable);
-    ANDROID_NOT_SUPPORTED(shared_->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 #ifdef WEBRTC_VOE_EXTERNAL_REC_AND_PLAYOUT
-    if (shared_->audio_device()->Playing())
+    if (_audioDevicePtr->Playing())
     {
-        shared_->SetLastError(VE_ALREADY_SENDING, kTraceError,
+        _engineStatistics.SetLastError(
+            VE_ALREADY_SENDING,
+            kTraceError,
             "SetExternalPlayoutStatus() cannot set state while playing");
         return -1;
     }
-    shared_->set_ext_playout(enable);
+    _externalPlayout = enable;
     return 0;
 #else
-    shared_->SetLastError(VE_FUNC_NOT_SUPPORTED, kTraceError,
+    _engineStatistics.SetLastError(
+        VE_FUNC_NOT_SUPPORTED,
+        kTraceError,
         "SetExternalPlayoutStatus() external playout is not supported");
     return -1;
 #endif
@@ -307,34 +328,40 @@ int VoEExternalMediaImpl::ExternalPlayoutGetData(
     int current_delay_ms,
     int& lengthSamples)
 {
-    WEBRTC_TRACE(kTraceStream, kTraceVoice, VoEId(shared_->instance_id(), -1),
+    WEBRTC_TRACE(kTraceStream, kTraceVoice, VoEId(_instanceId,-1),
                  "ExternalPlayoutGetData(speechData10ms=0x%x, samplingFreqHz=%d"
                  ",  current_delay_ms=%d)", &speechData10ms[0], samplingFreqHz,
                  current_delay_ms);
-    ANDROID_NOT_SUPPORTED(shared_->statistics());
+    ANDROID_NOT_SUPPORTED(_engineStatistics);
     IPHONE_NOT_SUPPORTED();
 #ifdef WEBRTC_VOE_EXTERNAL_REC_AND_PLAYOUT
-    if (!shared_->statistics().Initialized())
+    if (!_engineStatistics.Initialized())
     {
-        shared_->SetLastError(VE_NOT_INITED, kTraceError);
+        _engineStatistics.SetLastError(VE_NOT_INITED, kTraceError);
         return -1;
     }
-    if (!shared_->ext_playout())
+    if (!_externalPlayout)
     {
-       shared_->SetLastError(VE_INVALID_OPERATION, kTraceError,
+       _engineStatistics.SetLastError(
+           VE_INVALID_OPERATION,
+           kTraceError,
            "ExternalPlayoutGetData() external playout is not enabled");
         return -1;
     }
     if ((16000 != samplingFreqHz) && (32000 != samplingFreqHz) &&
         (48000 != samplingFreqHz) && (44000 != samplingFreqHz))
     {
-        shared_->SetLastError(VE_INVALID_ARGUMENT, kTraceError,
+        _engineStatistics.SetLastError(
+            VE_INVALID_ARGUMENT,
+            kTraceError,
             "ExternalPlayoutGetData() invalid sample rate");
         return -1;
     }
     if (current_delay_ms < 0)
     {
-        shared_->SetLastError(VE_INVALID_ARGUMENT, kTraceError,
+        _engineStatistics.SetLastError(
+            VE_INVALID_ARGUMENT,
+            kTraceError,
             "ExternalPlayoutGetData() invalid delay)");
         return -1;
     }
@@ -342,9 +369,9 @@ int VoEExternalMediaImpl::ExternalPlayoutGetData(
     AudioFrame audioFrame;
 
     // Retrieve mixed output at the specified rate
-    shared_->output_mixer()->MixActiveChannels();
-    shared_->output_mixer()->DoOperationsOnCombinedSignal();
-    shared_->output_mixer()->GetMixedAudio(samplingFreqHz, 1, audioFrame);
+    _outputMixerPtr->MixActiveChannels();
+    _outputMixerPtr->DoOperationsOnCombinedSignal();
+    _outputMixerPtr->GetMixedAudio(samplingFreqHz, 1, audioFrame);
 
     // Deliver audio (PCM) samples to the external sink
     memcpy(speechData10ms,
@@ -357,7 +384,9 @@ int VoEExternalMediaImpl::ExternalPlayoutGetData(
 
     return 0;
 #else
-    shared_->SetLastError(VE_FUNC_NOT_SUPPORTED, kTraceError,
+    _engineStatistics.SetLastError(
+       VE_FUNC_NOT_SUPPORTED,
+       kTraceError,
        "ExternalPlayoutGetData() external playout is not supported");
     return -1;
 #endif
