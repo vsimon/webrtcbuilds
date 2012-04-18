@@ -19,8 +19,7 @@
 namespace webrtc {
 
 class VoEAudioProcessingImpl
-    : public virtual voe::SharedData,
-      public VoEAudioProcessing,
+    : public VoEAudioProcessing,
       public voe::RefCount {
  public:
   virtual int Release();
@@ -91,12 +90,18 @@ class VoEAudioProcessingImpl
 
   virtual int TimeSinceLastTyping(int &seconds);
 
+  virtual int SetTypingDetectionParameters(int timeWindow,
+                                           int costPerTyping,
+                                           int reportingThreshold,
+                                           int penaltyDecay);
+
  protected:
-  VoEAudioProcessingImpl();
+  VoEAudioProcessingImpl(voe::SharedData* shared);
   virtual ~VoEAudioProcessingImpl();
 
  private:
   bool _isAecMode;
+  voe::SharedData* _shared;
 };
 
 }  //  namespace webrtc

@@ -2073,6 +2073,8 @@ WebRtc_Word32 ViEChannel::FrameToRender(VideoFrame& video_frame) {
     arr_ofCSRC[0] = rtp_rtcp_.RemoteSSRC();
     no_of_csrcs = 1;
   }
+  WEBRTC_TRACE(kTraceStream, kTraceVideo, ViEId(engine_id_, channel_id_),
+               "%s(timestamp:%u)", __FUNCTION__, video_frame.TimeStamp());
   DeliverFrame(video_frame, no_of_csrcs, arr_ofCSRC);
   return 0;
 }
@@ -2199,7 +2201,7 @@ WebRtc_Word32 ViEChannel::StopDecodeThread() {
     // Couldn't stop the thread, leak instead of crash.
     WEBRTC_TRACE(kTraceWarning, kTraceVideo, ViEId(engine_id_, channel_id_),
                  "%s: could not stop decode thread", __FUNCTION__);
-    assert(!"could not stop decode thread");
+    assert(false && "could not stop decode thread");
   }
   decode_thread_ = NULL;
   return 0;

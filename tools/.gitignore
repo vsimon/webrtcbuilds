@@ -13,6 +13,7 @@
 /continuous_build/depot_tools
 /third_party/gaeunit
 /third_party/oauth2
+/third_party/google-visualization-python
 
 # Buildbot creates these files:
 .manhole
@@ -28,17 +29,12 @@ state.sqlite-wal
 twistd.log*
 twistd.pid
 
-# Output by buildbot into public_html:
-bg_gradient.jpg
-default.css
-favicon.ico.new
-robots.txt
-
 # Chrome buildbot scripts
 /continuous_build/build
 
 # Buildbot slave log directories:
 /continuous_build/build_internal/masters/master.webrtc/android
+/continuous_build/build_internal/masters/master.webrtc/android-ndk
 /continuous_build/build_internal/masters/master.webrtc/chromeos
 /continuous_build/build_internal/masters/master.webrtc/linux-chrome
 /continuous_build/build_internal/masters/master.webrtc/linux-clang
@@ -50,6 +46,7 @@ robots.txt
 /continuous_build/build_internal/masters/master.webrtc/linux-valgrind
 /continuous_build/build_internal/masters/master.webrtc/mac-slave-2
 /continuous_build/build_internal/masters/master.webrtc/mac-slave-3
+/continuous_build/build_internal/masters/master.webrtc/public_html
 /continuous_build/build_internal/masters/master.webrtc/win-32-dbg
 /continuous_build/build_internal/masters/master.webrtc/win-32-release
 /continuous_build/build_internal/masters/master.webrtc/video
@@ -57,6 +54,7 @@ robots.txt
 /continuous_build/build_internal/masters/master.tryserver.webrtc/linux-trybot-2
 /continuous_build/build_internal/masters/master.tryserver.webrtc/mac-trybot-1
 /continuous_build/build_internal/masters/master.tryserver.webrtc/mac-trybot-2
+/continuous_build/build_internal/masters/master.tryserver.webrtc/public_html
 /continuous_build/build_internal/masters/master.tryserver.webrtc/win-trybot-1
 /continuous_build/build_internal/masters/master.tryserver.webrtc/win-trybot-2
 
