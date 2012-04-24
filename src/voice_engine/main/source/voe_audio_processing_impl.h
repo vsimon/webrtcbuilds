@@ -99,6 +99,9 @@ class VoEAudioProcessingImpl
                                            int reportingThreshold,
                                            int penaltyDecay);
 
+  virtual void EnableStereoChannelSwapping(bool enable);
+  virtual bool IsStereoChannelSwappingEnabled();
+
  protected:
   VoEAudioProcessingImpl();
   virtual ~VoEAudioProcessingImpl();
