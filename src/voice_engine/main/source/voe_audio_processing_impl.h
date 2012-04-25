@@ -65,6 +65,9 @@ class VoEAudioProcessingImpl
 
   virtual int GetAecmMode(AecmModes& mode, bool& enabledCNG);
 
+  virtual int EnableHighPassFilter(bool enable);
+  virtual bool IsHighPassFilterEnabled();
+
   virtual int RegisterRxVadObserver(int channel,
                                     VoERxVadCallback& observer);
 
@@ -94,6 +97,9 @@ class VoEAudioProcessingImpl
                                            int costPerTyping,
                                            int reportingThreshold,
                                            int penaltyDecay);
+
+  virtual void EnableStereoChannelSwapping(bool enable);
+  virtual bool IsStereoChannelSwappingEnabled();
 
  protected:
   VoEAudioProcessingImpl(voe::SharedData* shared);

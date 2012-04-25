@@ -18,6 +18,13 @@
 #include "voe_errors.h"
 #include "voice_engine_impl.h"
 
+// TODO(andrew): move to a common place.
+#define WEBRTC_TRACE_VOICE_API()                                   \
+  do {                                                             \
+    WEBRTC_TRACE(kTraceApiCall, kTraceVoice,                       \
+                 VoEId(_shared->instance_id(), -1), __FUNCTION__); \
+  } while (0)
+
 namespace webrtc {
 
 #if defined(WEBRTC_ANDROID) || defined(MAC_IPHONE) || defined(MAC_IPHONE_SIM)
@@ -734,6 +741,25 @@ int VoEAudioProcessingImpl::GetAecmMode(AecmModes& mode, bool& enabledCNG) {
 #endif
 }
 
+int VoEAudioProcessingImpl::EnableHighPassFilter(bool enable) {
+  WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+               "EnableHighPassFilter(%d)", enable);
+  if (_shared->audio_processing()->high_pass_filter()->Enable(enable) !=
+      AudioProcessing::kNoError) {
+    _shared->SetLastError(VE_APM_ERROR, kTraceError,
+        "HighPassFilter::Enable() failed.");
+    return -1;
+  }
+
+  return 0;
+}
+
+bool VoEAudioProcessingImpl::IsHighPassFilterEnabled() {
+  WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+               "IsHighPassFilterEnabled()");
+  return _shared->audio_processing()->high_pass_filter()->is_enabled();
+}
+
 int VoEAudioProcessingImpl::RegisterRxVadObserver(
   int channel,
   VoERxVadCallback& observer) {
@@ -1087,6 +1113,17 @@ int VoEAudioProcessingImpl::SetTypingDetectionParameters(int timeWindow,
   return -1;
 #endif
 
+}
+
+void VoEAudioProcessingImpl::EnableStereoChannelSwapping(bool enable) {
+  WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
+               "EnableStereoChannelSwapping(enable=%d)", enable);
+  _shared->transmit_mixer()->EnableStereoChannelSwapping(enable);
+}
+
+bool VoEAudioProcessingImpl::IsStereoChannelSwappingEnabled() {
+  WEBRTC_TRACE_VOICE_API();
+  return _shared->transmit_mixer()->IsStereoChannelSwappingEnabled();
 }
 
 

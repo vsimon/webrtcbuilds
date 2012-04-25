@@ -112,6 +112,11 @@ public:
     // Gets settings for the AECM.
     virtual int GetAecmMode(AecmModes& mode, bool& enabledCNG) = 0;
 
+    // Enables a high pass filter on the capture signal. This removes DC bias
+    // and low-frequency noise. Recommended to be enabled.
+    virtual int EnableHighPassFilter(bool enable) = 0;
+    virtual bool IsHighPassFilterEnabled() = 0;
+
     // Sets status and mode of the receiving-side (Rx) NS.
     // The Rx NS reduces noise in the received signal for the specified
     // |channel|. Intended for advanced usage only.
@@ -200,6 +205,16 @@ public:
                                              int costPerTyping,
                                              int reportingThreshold,
                                              int penaltyDecay) = 0;
+
+    // Swaps the capture-side left and right audio channels when enabled. It
+    // only has an effect when using a stereo send codec. The setting is
+    // persistent; it will be applied whenever a stereo send codec is enabled.
+    //
+    // The swap is applied only to the captured audio, and not mixed files. The
+    // swap will appear in file recordings and when accessing audio through the
+    // external media interface.
+    virtual void EnableStereoChannelSwapping(bool enable) = 0;
+    virtual bool IsStereoChannelSwappingEnabled() = 0;
 
 protected:
     VoEAudioProcessing() {}

@@ -34,10 +34,6 @@ deps = {
   "trunk/third_party/google-gflags/src":
     (Var("googlecode_url") % "google-gflags") + "/trunk/src@45",
 
-  # Used by tools/quality_tracking/dashboard and tools/python_charts.
-  "trunk/third_party/google-visualization-python":
-    (Var("googlecode_url") % "google-visualization-python") + "/trunk@15",
-
   "trunk/third_party/libjpeg":
     Var("chromium_trunk") + "/src/third_party/libjpeg@" + Var("chromium_revision"),
 
@@ -45,7 +41,7 @@ deps = {
     From("trunk/chromium_deps", "src/third_party/libjpeg_turbo"),
 
   "trunk/third_party/libvpx/source/libvpx":
-    "http://git.chromium.org/webm/libvpx.git@6b66c01c",
+    "http://git.chromium.org/webm/libvpx.git@dba05389",
 
   "trunk/third_party/libyuv":
     (Var("googlecode_url") % "libyuv") + "/trunk@216",

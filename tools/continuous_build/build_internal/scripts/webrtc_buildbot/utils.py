@@ -212,7 +212,7 @@ class WebRTCFactory(factory.BuildFactory):
              default behavior, which is to just run the binary specified in
              test without arguments.
     """
-    pass
+    raise NotImplementedError('Must be overridden')
 
   def EnableTest(self, test):
     """Makes a test run in the build sequence. May be overridden.
@@ -225,8 +225,14 @@ class WebRTCFactory(factory.BuildFactory):
     """
     self.AddCommonTestRunStep(test)
 
-  def AddGclientSyncStep(self):
-    """Helper method for invoking gclient sync."""
+  def AddGclientSyncStep(self, alwaysUseLatest=False):
+    """Helper method for invoking gclient sync.
+
+    Args:
+        alwaysUseLatest: Set to true to always use the latest build, otherwise
+                         the highest revision in the changeset will be used
+                         for sync.
+    """
     gclient_spec = self._ConfigureWhatToBuild()
     env = self._GetEnvironmentWithDisabledDepotToolsUpdate()
 
@@ -238,8 +244,8 @@ class WebRTCFactory(factory.BuildFactory):
     # Removal can take a long time. Allow 15 minutes.
     rm_timeout = 60 * 15
     self.addStep(chromium_step.GClient,
+                 alwaysUseLatest=alwaysUseLatest,
                  gclient_spec=gclient_spec,
-                 svnurl=WEBRTC_SVN_LOCATION,
                  workdir='build',
                  mode='update',
                  env=env,
@@ -467,7 +473,7 @@ class WebRTCAndroidFactory(WebRTCFactory):
     cmd = ' ; '.join(cleanup_list)
     self.AddCommonStep(cmd, descriptor='cleanup')
 
-    cmd = 'svn checkout %s external/webrtc' % WEBRTC_SVN_LOCATION
+    cmd = 'svn checkout %s external/webrtc' % self.svn_url
     self.AddCommonStep(cmd, descriptor='svn (checkout)')
 
     cmd = ('source build/envsetup.sh && lunch full_%s-eng '
@@ -513,16 +519,17 @@ class WebRTCChromeFactory(WebRTCFactory):
   def EnableBuild(self, release=False, enable_profiling=False):
     self.AddCommonStep(['rm', '-rf', 'src'], workdir=WEBRTC_BUILD_DIR,
                        descriptor='Cleanup')
-    self.AddGclientSyncStep()
+    self.AddGclientSyncStep(alwaysUseLatest=True)
     if enable_profiling:
       self.AddCommonStep(['./build/gyp_chromium', '-Dprofiling=1'],
                          descriptor="gyp_chromium",
                          warn_on_failure=True, workdir='build/src')
 
+    chrome_targets = ['chrome', 'pyautolib']
     if release:
-      self.AddCommonMakeStep('chrome', 'BUILDTYPE=Release')
+      self.AddCommonMakeStep(chrome_targets, 'BUILDTYPE=Release')
     else:
-      self.AddCommonMakeStep('chrome')
+      self.AddCommonMakeStep(chrome_targets)
 
     self.build_enabled = True
     self.release = release
@@ -550,14 +557,28 @@ class WebRTCChromeFactory(WebRTCFactory):
                        warn_on_failure=True, workdir='build/src',
                        timeout=7200)
 
-  def AddCommonMakeStep(self, target, make_extra=None):
-    descriptor = ['make ' + target]
-    cmd = ['make', target, '-j100']
+  def AddCommonMakeStep(self, targets, make_extra=None):
+    descriptor = ['make'] + targets
+    cmd = ['make', '-j100'] + targets
     if make_extra is not None:
       cmd.append(make_extra)
     self.AddCommonStep(cmd=cmd, descriptor=descriptor,
                        warn_on_failure=True, workdir='build/src')
 
+  def AddCommonTestRunStep(self, test):
+    # We currently only support PyAuto tests on this bot.
+    self._AddPyAutoTestRunStep(test)
+
+  def _AddPyAutoTestRunStep(self, test):
+    assert self.build_enabled
+
+    # Set up the test under Xvfb since it will probably launch browser windows.
+    # Replace any slashes in the test's path with underscores for the name since
+    # the buildbot web pages will become confused otherwise.
+    descriptor = test.replace('/', '_')
+    pyauto_flags = ' --chrome-flags --enable-media-stream'
+    cmd = MakeCommandToRunTestInXvfb(test + pyauto_flags)
+    self.AddCommonStep(cmd=cmd, descriptor=descriptor, workdir='build/src')
 
 class WebRTCLinuxFactory(WebRTCFactory):
   """Sets up the Linux build.
@@ -640,9 +661,7 @@ class WebRTCLinuxFactory(WebRTCFactory):
 
   def AddXvfbTestRunStep(self, test_name, test_binary, test_arguments=''):
     """ Adds a test to be run inside a XVFB window manager."""
-    cmd = ('xvfb-run '
-           '--server-args="-screen 0 800x600x24 -extension Composite" '
-           '%s %s' % (test_binary, test_arguments))
+    cmd = MakeCommandToRunTestInXvfb("%s %s" % (test_binary, test_arguments))
     self.AddCommonTestRunStep(test=test_name, cmd=cmd)
 
   def AddCommonMakeStep(self, target, extra_text=None, make_extra=None):
@@ -916,6 +935,10 @@ def PosixPathJoin(*args):
 
 def WindowsPathJoin(*args):
   return ntpath.normpath(ntpath.join(*args))
+
+def MakeCommandToRunTestInXvfb(cmd):
+  return ('xvfb-run --server-args="-screen 0 800x600x24 -extension Composite" '
+          '%s' % cmd)
 
 
 class UnsupportedConfigurationError(Exception):
