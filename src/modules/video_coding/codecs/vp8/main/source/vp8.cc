@@ -79,7 +79,6 @@ int VP8Encoder::Release() {
   }
   if (raw_ != NULL) {
     vpx_img_free(raw_);
-    delete raw_;
     raw_ = NULL;
   }
 #if WEBRTC_LIBVPX_VERSION >= 971
@@ -153,9 +152,6 @@ int VP8Encoder::InitEncode(const VideoCodec* inst,
   if (config_ == NULL) {
     config_ = new vpx_codec_enc_cfg_t;
   }
-  if (raw_ == NULL) {
-    raw_ = new vpx_image_t;
-  }
   timestamp_ = 0;
 
   codec_ = *inst;
@@ -178,7 +174,7 @@ int VP8Encoder::InitEncode(const VideoCodec* inst,
   encoded_image_._buffer = new uint8_t[encoded_image_._size];
   encoded_image_._completeFrame = true;
 
-  vpx_img_alloc(raw_, IMG_FMT_I420, codec_.width, codec_.height, 1);
+  raw_ = vpx_img_alloc(NULL, IMG_FMT_I420, codec_.width, codec_.height, 32);
   // populate encoder configuration with default values
   if (vpx_codec_enc_config_default(vpx_codec_vp8_cx(), config_, 0)) {
     return WEBRTC_VIDEO_CODEC_ERROR;
@@ -268,6 +264,11 @@ int VP8Encoder::InitEncode(const VideoCodec* inst,
       cpu_speed_ = -6;
       break;
   }
+#ifdef WEBRTC_ANDROID
+  // On mobile platform, always set to -12 to leverage between cpu usage
+  // and video quality
+  cpu_speed_ = -12;
+#endif
   rps_->Init();
   return InitAndSetControlSettings(inst);
 }
@@ -624,10 +625,9 @@ int VP8Decoder::InitDecode(const VideoCodec* inst, int number_of_cores) {
 
 #if WEBRTC_LIBVPX_VERSION >= 971
   vp8_postproc_cfg_t  ppcfg;
-  // Disable deblocking for now due to uninitialized memory being returned.
-  ppcfg.post_proc_flag = 0;
+  ppcfg.post_proc_flag = VP8_DEMACROBLOCK | VP8_DEBLOCK;
   // Strength of deblocking filter. Valid range:[0,16]
-  //ppcfg.deblocking_level = 3;
+  ppcfg.deblocking_level = 3;
   vpx_codec_control(decoder_, VP8_SET_POSTPROC, &ppcfg);
 #endif
 
@@ -672,7 +672,8 @@ int VP8Decoder::Decode(const EncodedImage& input_image,
     // header says.
     mfqe_enabled_ = true;
     vp8_postproc_cfg_t  ppcfg;
-    ppcfg.post_proc_flag = VP8_MFQE;
+    ppcfg.post_proc_flag = VP8_MFQE | VP8_DEMACROBLOCK | VP8_DEBLOCK;
+    ppcfg.deblocking_level = 3;
     vpx_codec_control(decoder_, VP8_SET_POSTPROC, &ppcfg);
   }
 #endif
@@ -704,7 +705,8 @@ int VP8Decoder::Decode(const EncodedImage& input_image,
         propagation_cnt_ = 0;
       return WEBRTC_VIDEO_CODEC_ERROR;
     }
-    img = vpx_codec_get_frame(decoder_, &iter);
+    // We don't render this frame.
+    vpx_codec_get_frame(decoder_, &iter);
     iter = NULL;
   }
 
@@ -965,7 +967,7 @@ VideoDecoder* VP8Decoder::Copy() {
 
     if (!vpx_img_alloc(&ref_frame_->img,
                        static_cast<vpx_img_fmt_t>(image_format_),
-                       decoded_image_._width, decoded_image_._height, 1)) {
+                       decoded_image_._width, decoded_image_._height, 32)) {
       assert(false);
       delete copy;
       return NULL;

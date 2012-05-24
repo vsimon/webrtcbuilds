@@ -63,14 +63,14 @@ void Sender::Setup(AudioCodingModule *acm, RTPStream *rtpStream) {
     // Set the codec, input file, and parameters for the current test.
     codecNo = codeId;
     // Use same input file for now.
-    char fileName[] = "./test/data/audio_coding/testfile32kHz.pcm";
+    char fileName[] = "./data/audio_coding/testfile32kHz.pcm";
     _pcmFile.Open(fileName, 32000, "rb");
   } else if (testMode == 0) {
     // Set the codec, input file, and parameters for the current test.
     codecNo = codeId;
     acm->Codec(codecNo, sendCodec);
     // Use same input file for now.
-    char fileName[] = "./test/data/audio_coding/testfile32kHz.pcm";
+    char fileName[] = "./data/audio_coding/testfile32kHz.pcm";
     _pcmFile.Open(fileName, 32000, "rb");
   } else {
     printf("List of supported codec.\n");
@@ -80,7 +80,7 @@ void Sender::Setup(AudioCodingModule *acm, RTPStream *rtpStream) {
     }
     printf("Choose your codec:");
     ASSERT_GT(scanf("%d", &codecNo), 0);
-    char fileName[] = "./test/data/audio_coding/testfile32kHz.pcm";
+    char fileName[] = "./data/audio_coding/testfile32kHz.pcm";
     _pcmFile.Open(fileName, 32000, "rb");
   }
 
@@ -242,8 +242,8 @@ bool Receiver::PlayoutData() {
   if (_playoutLengthSmpls == 0) {
     return false;
   }
-  _pcmFile.Write10MsData(audioFrame._payloadData,
-                         audioFrame._payloadDataLengthInSamples);
+  _pcmFile.Write10MsData(audioFrame.data_,
+                         audioFrame.samples_per_channel_);
   return true;
 }
 

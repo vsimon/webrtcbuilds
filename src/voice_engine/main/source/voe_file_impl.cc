@@ -31,11 +31,9 @@ VoEFile* VoEFile::GetInterface(VoiceEngine* voiceEngine)
     {
         return NULL;
     }
-    VoiceEngineImpl* s =
-        reinterpret_cast<VoiceEngineImpl*> (voiceEngine);
-    VoEFileImpl* d = s;
-    (*d)++;
-    return (d);
+    VoiceEngineImpl* s = reinterpret_cast<VoiceEngineImpl*>(voiceEngine);
+    s->AddRef();
+    return s;
 #endif
 }
 
@@ -51,24 +49,6 @@ VoEFileImpl::~VoEFileImpl()
 {
     WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_shared->instance_id(), -1),
                  "VoEFileImpl::~VoEFileImpl() - dtor");
-}
-
-int VoEFileImpl::Release()
-{
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
-                 "VoEFile::Release()");
-    (*this)--;
-    int refCount = GetCount();
-    if (refCount < 0)
-    {
-        Reset();
-        _shared->SetLastError(VE_INTERFACE_NOT_FOUND, kTraceWarning);
-        return (-1);
-    }
-    WEBRTC_TRACE(kTraceStateInfo, kTraceVoice,
-        VoEId(_shared->instance_id(), -1),
-        "VoEFile reference counter = %d", refCount);
-    return (refCount);
 }
 
 int VoEFileImpl::StartPlayingFileLocally(
@@ -648,6 +628,8 @@ int VoEFileImpl::StopRecordingMicrophone()
     return _shared->transmit_mixer()->StopRecordingMicrophone();
 }
 
+// TODO(andrew): a cursory inspection suggests there's a large amount of
+// overlap in these convert functions which could be refactored to a helper.
 int VoEFileImpl::ConvertPCMToWAV(const char* fileNameInUTF8,
                                  const char* fileNameOutUTF8)
 {
@@ -697,7 +679,7 @@ int VoEFileImpl::ConvertPCMToWAV(const char* fileNameInUTF8,
     // Run throught the file
     AudioFrame audioFrame;
     WebRtc_Word16 decodedData[160];
-    WebRtc_UWord32 decLength=0;
+    int decLength=0;
     const WebRtc_UWord32 frequency = 16000;
 
     while(!playerObj.Get10msAudioFromFile(decodedData,decLength,frequency))
@@ -787,7 +769,7 @@ int VoEFileImpl::ConvertPCMToWAV(InStream* streamIn, OutStream* streamOut)
     // Run throught the file
     AudioFrame audioFrame;
     WebRtc_Word16 decodedData[160];
-    WebRtc_UWord32 decLength=0;
+    int decLength=0;
     const WebRtc_UWord32 frequency = 16000;
 
     while(!playerObj.Get10msAudioFromFile(decodedData,decLength,frequency))
@@ -875,7 +857,7 @@ int VoEFileImpl::ConvertWAVToPCM(const char* fileNameInUTF8,
     // Run throught the file
     AudioFrame audioFrame;
     WebRtc_Word16 decodedData[160];
-    WebRtc_UWord32 decLength=0;
+    int decLength=0;
     const WebRtc_UWord32 frequency = 16000;
 
     while(!playerObj.Get10msAudioFromFile(decodedData,decLength,frequency))
@@ -967,7 +949,7 @@ int VoEFileImpl::ConvertWAVToPCM(InStream* streamIn, OutStream* streamOut)
     // Run throught the file
     AudioFrame audioFrame;
     WebRtc_Word16 decodedData[160];
-    WebRtc_UWord32 decLength=0;
+    int decLength=0;
     const WebRtc_UWord32 frequency = 16000;
 
     while(!playerObj.Get10msAudioFromFile(decodedData,decLength,frequency))
@@ -1053,7 +1035,7 @@ int VoEFileImpl::ConvertPCMToCompressed(const char* fileNameInUTF8,
     // Run throught the file
     AudioFrame audioFrame;
     WebRtc_Word16 decodedData[160];
-    WebRtc_UWord32 decLength=0;
+    int decLength=0;
     const WebRtc_UWord32 frequency = 16000;
 
     while(!playerObj.Get10msAudioFromFile(decodedData,decLength,frequency))
@@ -1145,7 +1127,7 @@ int VoEFileImpl::ConvertPCMToCompressed(InStream* streamIn,
     // Run throught the file
     AudioFrame audioFrame;
     WebRtc_Word16 decodedData[160];
-    WebRtc_UWord32 decLength=0;
+    int decLength=0;
     const WebRtc_UWord32 frequency = 16000;
 
     while(!playerObj.Get10msAudioFromFile(decodedData,decLength,frequency))
@@ -1235,7 +1217,7 @@ int VoEFileImpl::ConvertCompressedToPCM(const char* fileNameInUTF8,
     // Run throught the file
     AudioFrame audioFrame;
     WebRtc_Word16 decodedData[160];
-    WebRtc_UWord32 decLength=0;
+    int decLength=0;
     const WebRtc_UWord32 frequency = 16000;
 
     while(!playerObj.Get10msAudioFromFile(decodedData,decLength,frequency))
@@ -1332,7 +1314,7 @@ int VoEFileImpl::ConvertCompressedToPCM(InStream* streamIn,
     // Run throught the file
     AudioFrame audioFrame;
     WebRtc_Word16 decodedData[160];
-    WebRtc_UWord32 decLength=0;
+    int decLength=0;
     const WebRtc_UWord32 frequency = 16000;
 
     while(!playerObj.Get10msAudioFromFile(decodedData,decLength,frequency))

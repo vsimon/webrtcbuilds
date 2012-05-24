@@ -141,7 +141,7 @@ TestAllCodecs::~TestAllCodecs()
 void TestAllCodecs::Perform()
 {
 
-    char file[] = "./test/data/audio_coding/testfile32kHz.pcm";
+    char file[] = "./data/audio_coding/testfile32kHz.pcm";
     _inFileA.Open(file, 32000, "rb");
 
     if(_testMode == 0)
@@ -831,7 +831,7 @@ void TestAllCodecs::Run(TestPack* channel)
         CHECK_ERROR(_acmB->PlayoutData10Ms(outFreqHzB, audioFrame));
 
         // Write output speech to file
-        _outFileB.Write10MsData(audioFrame._payloadData, audioFrame._payloadDataLengthInSamples);
+        _outFileB.Write10MsData(audioFrame.data_, audioFrame.samples_per_channel_);
     }
 
     if (errorCount) 

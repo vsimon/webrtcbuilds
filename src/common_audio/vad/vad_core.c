@@ -17,40 +17,40 @@
 #include "vad_sp.h"
 
 // Spectrum Weighting
-static const int16_t kSpectrumWeight[6] = { 6, 8, 10, 12, 14, 16 };
+static const int16_t kSpectrumWeight[kNumChannels] = { 6, 8, 10, 12, 14, 16 };
 static const int16_t kNoiseUpdateConst = 655; // Q15
 static const int16_t kSpeechUpdateConst = 6554; // Q15
 static const int16_t kBackEta = 154; // Q8
 // Minimum difference between the two models, Q5
-static const int16_t kMinimumDifference[6] = {
+static const int16_t kMinimumDifference[kNumChannels] = {
     544, 544, 576, 576, 576, 576 };
 // Upper limit of mean value for speech model, Q7
-static const int16_t kMaximumSpeech[6] = {
+static const int16_t kMaximumSpeech[kNumChannels] = {
     11392, 11392, 11520, 11520, 11520, 11520 };
 // Minimum value for mean value
-static const int16_t kMinimumMean[2] = { 640, 768 };
+static const int16_t kMinimumMean[kNumGaussians] = { 640, 768 };
 // Upper limit of mean value for noise model, Q7
-static const int16_t kMaximumNoise[6] = {
+static const int16_t kMaximumNoise[kNumChannels] = {
     9216, 9088, 8960, 8832, 8704, 8576 };
 // Start values for the Gaussian models, Q7
 // Weights for the two Gaussians for the six channels (noise)
-static const int16_t kNoiseDataWeights[12] = {
+static const int16_t kNoiseDataWeights[kTableSize] = {
     34, 62, 72, 66, 53, 25, 94, 66, 56, 62, 75, 103 };
 // Weights for the two Gaussians for the six channels (speech)
-static const int16_t kSpeechDataWeights[12] = {
+static const int16_t kSpeechDataWeights[kTableSize] = {
     48, 82, 45, 87, 50, 47, 80, 46, 83, 41, 78, 81 };
 // Means for the two Gaussians for the six channels (noise)
-static const int16_t kNoiseDataMeans[12] = {
+static const int16_t kNoiseDataMeans[kTableSize] = {
     6738, 4892, 7065, 6715, 6771, 3369, 7646, 3863, 7820, 7266, 5020, 4362 };
 // Means for the two Gaussians for the six channels (speech)
-static const int16_t kSpeechDataMeans[12] = {
+static const int16_t kSpeechDataMeans[kTableSize] = {
     8306, 10085, 10078, 11823, 11843, 6309, 9473, 9571, 10879, 7581, 8180, 7483
 };
 // Stds for the two Gaussians for the six channels (noise)
-static const int16_t kNoiseDataStds[12] = {
+static const int16_t kNoiseDataStds[kTableSize] = {
     378, 1064, 493, 582, 688, 593, 474, 697, 475, 688, 421, 455 };
 // Stds for the two Gaussians for the six channels (speech)
-static const int16_t kSpeechDataStds[12] = {
+static const int16_t kSpeechDataStds[kTableSize] = {
     555, 505, 567, 524, 585, 1231, 509, 828, 492, 1540, 1079, 850 };
 
 // Constants used in GmmProbability().
@@ -90,6 +90,26 @@ static const int16_t kOverHangMax2VAG[3] = { 9, 5, 3 };
 static const int16_t kLocalThresholdVAG[3] = { 94, 94, 94 };
 static const int16_t kGlobalThresholdVAG[3] = { 1100, 1050, 1100 };
 
+// Calculates the weighted average w.r.t. number of Gaussians. The |data| are
+// updated with an |offset| before averaging.
+//
+// - data     [i/o] : Data to average.
+// - offset   [i]   : An offset added to |data|.
+// - weights  [i]   : Weights used for averaging.
+//
+// returns          : The weighted average.
+static int32_t WeightedAverage(int16_t* data, int16_t offset,
+                               const int16_t* weights) {
+  int k;
+  int32_t weighted_average = 0;
+
+  for (k = 0; k < kNumGaussians; k++) {
+    data[k * kNumChannels] += offset;
+    weighted_average += data[k * kNumChannels] * weights[k * kNumChannels];
+  }
+  return weighted_average;
+}
+
 // Calculates the probabilities for both speech and background noise using
 // Gaussian Mixture Models (GMM). A hypothesis-test is performed to decide which
 // type of signal is most probable.
@@ -105,7 +125,7 @@ static int16_t GmmProbability(VadInstT* self, int16_t* feature_vector,
   int n, k;
   int16_t feature_minimum;
   int16_t h0, h1;
-  int16_t log_likelihood_ratio, feature;
+  int16_t log_likelihood_ratio;
   int16_t vadflag = 0;
   int16_t shifts0, shifts1;
   int16_t tmp_s16, tmp1_s16, tmp2_s16;
@@ -145,39 +165,32 @@ static int16_t GmmProbability(VadInstT* self, int16_t* feature_vector,
 
   if (total_power > kMinEnergy) {
     // We have a signal present.
-    // Set pointers to the Gaussian parameters.
-    nmean1ptr = &self->noise_means[0];
-    nmean2ptr = &self->noise_means[kNumChannels];
-    smean1ptr = &self->speech_means[0];
-    smean2ptr = &self->speech_means[kNumChannels];
-    nstd1ptr = &self->noise_stds[0];
-    nstd2ptr = &self->noise_stds[kNumChannels];
-    sstd1ptr = &self->speech_stds[0];
-    sstd2ptr = &self->speech_stds[kNumChannels];
 
     for (n = 0; n < kNumChannels; n++) {
       // Perform for all channels.
       pos = (n << 1);
-      feature = feature_vector[n];
+      h0_test = 0;
+      h1_test = 0;
 
-      // Probability for Noise, Q7 * Q20 = Q27.
-      tmp1_s32 = WebRtcVad_GaussianProbability(feature, *nmean1ptr++,
-                                               *nstd1ptr++, &deltaN[pos]);
-      noise_probability[0] = kNoiseDataWeights[n] * tmp1_s32;
-      tmp1_s32 = WebRtcVad_GaussianProbability(feature, *nmean2ptr++,
-                                               *nstd2ptr++, &deltaN[pos + 1]);
-      noise_probability[1] = kNoiseDataWeights[n + kNumChannels] * tmp1_s32;
-      h0_test = noise_probability[0] + noise_probability[1];  // Q27
+      for (k = 0; k < kNumGaussians; k++) {
+        nr = n + k * kNumChannels;
+        // Probability for Noise, Q7 * Q20 = Q27.
+        tmp1_s32 = WebRtcVad_GaussianProbability(feature_vector[n],
+                                                 self->noise_means[nr],
+                                                 self->noise_stds[nr],
+                                                 &deltaN[pos + k]);
+        noise_probability[k] = kNoiseDataWeights[nr] * tmp1_s32;
+        h0_test += noise_probability[k];  // Q27
+
+        // Probability for Speech.
+        tmp1_s32 = WebRtcVad_GaussianProbability(feature_vector[n],
+                                                 self->speech_means[nr],
+                                                 self->speech_stds[nr],
+                                                 &deltaS[pos + k]);
+        speech_probability[k] = kSpeechDataWeights[nr] * tmp1_s32;
+        h1_test += speech_probability[k];  // Q27
+      }
       h0 = (int16_t) (h0_test >> 12);  // Q15
-
-      // Probability for Speech.
-      tmp1_s32 = WebRtcVad_GaussianProbability(feature, *smean1ptr++,
-                                               *sstd1ptr++, &deltaS[pos]);
-      speech_probability[0] = kSpeechDataWeights[n] * tmp1_s32;
-      tmp1_s32 = WebRtcVad_GaussianProbability(feature, *smean2ptr++,
-                                               *sstd2ptr++, &deltaS[pos + 1]);
-      speech_probability[1] = kSpeechDataWeights[n + kNumChannels] * tmp1_s32;
-      h1_test = speech_probability[0] + speech_probability[1];  // Q27
       h1 = (int16_t) (h1_test >> 12);  // Q15
 
       // Calculate the log likelihood ratio. Approximate log2(H1/H0) with
@@ -248,11 +261,8 @@ static int16_t GmmProbability(VadInstT* self, int16_t* feature_vector,
       feature_minimum = WebRtcVad_FindMinimum(self, feature_vector[n], n);
 
       // Compute the "global" mean, that is the sum of the two means weighted.
-      noise_global_mean = WEBRTC_SPL_MUL_16_16(kNoiseDataWeights[n],
-                                               *nmean1ptr);  // Q7 * Q7
-      noise_global_mean +=
-          WEBRTC_SPL_MUL_16_16(kNoiseDataWeights[n + kNumChannels],
-                               *(nmean1ptr + kNumChannels));
+      noise_global_mean = WeightedAverage(&self->noise_means[n], 0,
+                                          &kNoiseDataWeights[n]);
       tmp1_s16 = (int16_t) (noise_global_mean >> 6);  // Q8
 
       for (k = 0; k < kNumGaussians; k++) {
@@ -388,18 +398,12 @@ static int16_t GmmProbability(VadInstT* self, int16_t* feature_vector,
 
       // Separate models if they are too close.
       // |noise_global_mean| in Q14 (= Q7 * Q7).
-      noise_global_mean = WEBRTC_SPL_MUL_16_16(kNoiseDataWeights[n],
-                                               *nmean1ptr);
-      noise_global_mean +=
-          WEBRTC_SPL_MUL_16_16(kNoiseDataWeights[n + kNumChannels],
-                               *nmean2ptr);
+      noise_global_mean = WeightedAverage(&self->noise_means[n], 0,
+                                          &kNoiseDataWeights[n]);
 
       // |speech_global_mean| in Q14 (= Q7 * Q7).
-      speech_global_mean = WEBRTC_SPL_MUL_16_16(kSpeechDataWeights[n],
-                                                *smean1ptr);
-      speech_global_mean +=
-          WEBRTC_SPL_MUL_16_16(kSpeechDataWeights[n + kNumChannels],
-                               *smean2ptr);
+      speech_global_mean = WeightedAverage(&self->speech_means[n], 0,
+                                           &kSpeechDataWeights[n]);
 
       // |diff| = "global" speech mean - "global" noise mean.
       // (Q14 >> 9) - (Q14 >> 9) = Q5.
@@ -413,28 +417,17 @@ static int16_t GmmProbability(VadInstT* self, int16_t* feature_vector,
         tmp1_s16 = (int16_t) WEBRTC_SPL_MUL_16_16_RSFT(13, tmp_s16, 2);
         tmp2_s16 = (int16_t) WEBRTC_SPL_MUL_16_16_RSFT(3, tmp_s16, 2);
 
-        // First Gaussian, speech model.
-        tmp_s16 = tmp1_s16 + *smean1ptr;
-        *smean1ptr = tmp_s16;
-        speech_global_mean = WEBRTC_SPL_MUL_16_16(tmp_s16,
-                                                  kSpeechDataWeights[n]);
+        // Move Gaussian means for speech model by |tmp1_s16| and update
+        // |speech_global_mean|. Note that |self->speech_means[n]| is changed
+        // after the call.
+        speech_global_mean = WeightedAverage(&self->speech_means[n], tmp1_s16,
+                                             &kSpeechDataWeights[n]);
 
-        // Second Gaussian, speech model.
-        tmp_s16 = tmp1_s16 + *smean2ptr;
-        *smean2ptr = tmp_s16;
-        speech_global_mean +=
-            WEBRTC_SPL_MUL_16_16(tmp_s16, kSpeechDataWeights[n + kNumChannels]);
-
-        // First Gaussian, noise model.
-        tmp_s16 = *nmean1ptr - tmp2_s16;
-        *nmean1ptr = tmp_s16;
-        noise_global_mean = WEBRTC_SPL_MUL_16_16(tmp_s16, kNoiseDataWeights[n]);
-
-        // Second Gaussian, noise model.
-        tmp_s16 = *nmean2ptr - tmp2_s16;
-        *nmean2ptr = tmp_s16;
-        noise_global_mean +=
-            WEBRTC_SPL_MUL_16_16(tmp_s16, kNoiseDataWeights[n + kNumChannels]);
+        // Move Gaussian means for noise model by -|tmp2_s16| and update
+        // |noise_global_mean|. Note that |self->noise_means[n]| is changed
+        // after the call.
+        noise_global_mean = WeightedAverage(&self->noise_means[n], -tmp2_s16,
+                                            &kNoiseDataWeights[n]);
       }
 
       // Control that the speech & noise means do not drift to much.

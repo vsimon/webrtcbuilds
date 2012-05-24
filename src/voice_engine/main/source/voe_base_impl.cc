@@ -40,10 +40,9 @@ VoEBase* VoEBase::GetInterface(VoiceEngine* voiceEngine)
     {
         return NULL;
     }
-    VoiceEngineImpl* s = reinterpret_cast<VoiceEngineImpl*> (voiceEngine);
-    VoEBaseImpl* d = s;
-    (*d)++;
-    return (d);
+    VoiceEngineImpl* s = reinterpret_cast<VoiceEngineImpl*>(voiceEngine);
+    s->AddRef();
+    return s;
 }
 
 VoEBaseImpl::VoEBaseImpl(voe::SharedData* shared) :
@@ -64,24 +63,6 @@ VoEBaseImpl::~VoEBaseImpl()
     TerminateInternal();
 
     delete &_callbackCritSect;
-}
-
-int VoEBaseImpl::Release()
-{
-    WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
-                 "VoEBaseImpl::Release()");
-    (*this)--;
-    int refCount = GetCount();
-    if (refCount < 0)
-    {
-        Reset();
-        _shared->SetLastError(VE_INTERFACE_NOT_FOUND, kTraceWarning);
-        return (-1);
-    }
-    WEBRTC_TRACE(kTraceStateInfo, kTraceVoice,
-        VoEId(_shared->instance_id(), -1),
-        "VoEBaseImpl reference counter = %d", refCount);
-    return (refCount);
 }
 
 void VoEBaseImpl::OnErrorIsReported(const ErrorCode error)
@@ -275,18 +256,18 @@ WebRtc_Word32 VoEBaseImpl::NeedMorePlayData(
     _shared->output_mixer()->GetMixedAudio(samplesPerSec, nChannels,
         _audioFrame);
 
-    assert(nSamples == _audioFrame._payloadDataLengthInSamples);
+    assert(static_cast<int>(nSamples) == _audioFrame.samples_per_channel_);
     assert(samplesPerSec ==
-        static_cast<WebRtc_UWord32>(_audioFrame._frequencyInHz));
+        static_cast<WebRtc_UWord32>(_audioFrame.sample_rate_hz_));
 
     // Deliver audio (PCM) samples to the ADM
     memcpy(
            (WebRtc_Word16*) audioSamples,
-           (const WebRtc_Word16*) _audioFrame._payloadData,
-           sizeof(WebRtc_Word16) * (_audioFrame._payloadDataLengthInSamples
-                   * _audioFrame._audioChannel));
+           (const WebRtc_Word16*) _audioFrame.data_,
+           sizeof(WebRtc_Word16) * (_audioFrame.samples_per_channel_
+                   * _audioFrame.num_channels_));
 
-    nSamplesOut = _audioFrame._payloadDataLengthInSamples;
+    nSamplesOut = _audioFrame.samples_per_channel_;
 
     return 0;
 }

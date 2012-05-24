@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -264,7 +264,7 @@ APITest::SetUp()
     printf("Hit enter to accept the default values indicated in []\n\n");
 
     //--- Input A
-    strcpy(fileName, "./test/data/audio_coding/testfile32kHz.pcm");
+    strcpy(fileName, "./data/audio_coding/testfile32kHz.pcm");
     frequencyHz = 32000;
     printf("Enter input file at side A [%s]: ", fileName);
     PCMFile::ChooseFile(fileName, 499, &frequencyHz);
@@ -278,7 +278,7 @@ APITest::SetUp()
     _outFileA.Open(fileName, frequencyHz, "wb");
 
     //--- Input B
-    strcpy(fileName, "./test/data/audio_coding/testfile32kHz.pcm");
+    strcpy(fileName, "./data/audio_coding/testfile32kHz.pcm");
     printf("\n\nEnter input file at side B [%s]: ", fileName);
     PCMFile::ChooseFile(fileName, 499, &frequencyHz);
     _inFileB.Open(fileName, frequencyHz, "rb", true);
@@ -430,7 +430,7 @@ APITest::PullAudioRunA()
         {
             _outFileA.Write10MsData(audioFrame);
         }
-        _receiveVADActivityA[(int)audioFrame._vadActivity]++;
+        _receiveVADActivityA[(int)audioFrame.vad_activity_]++;
     }
     return true;
 }
@@ -459,7 +459,7 @@ APITest::PullAudioRunB()
         {
             _outFileB.Write10MsData(audioFrame);
         }
-        _receiveVADActivityB[(int)audioFrame._vadActivity]++;
+        _receiveVADActivityB[(int)audioFrame.vad_activity_]++;
     }     
     return true;
 }

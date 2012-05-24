@@ -117,7 +117,7 @@ RTPSender::~RTPSender() {
 
   WEBRTC_TRACE(kTraceMemory, kTraceRtpRtcp, _id, "%s deleted", __FUNCTION__);
 }
-
+/*
 WebRtc_Word32
 RTPSender::Init(const WebRtc_UWord32 remoteSSRC)
 {
@@ -173,31 +173,10 @@ RTPSender::Init(const WebRtc_UWord32 remoteSSRC)
     }
     return(0);
 }
+*/
 
-void
-RTPSender::ChangeUniqueId(const WebRtc_Word32 id)
-{
-    _id = id;
-    if(_audioConfigured)
-    {
-        _audio->ChangeUniqueId(id);
-    } else
-    {
-        _video->ChangeUniqueId(id);
-    }
-}
-
-WebRtc_Word32
-RTPSender::SetTargetSendBitrate(const WebRtc_UWord32 bits)
-{
-    _targetSendBitrate = (WebRtc_UWord16)(bits/1000);
-    return 0;
-}
-
-WebRtc_UWord16
-RTPSender::TargetSendBitrateKbit() const
-{
-    return _targetSendBitrate;
+void RTPSender::SetTargetSendBitrate(const WebRtc_UWord32 bits) {
+  _targetSendBitrate = static_cast<uint16_t>(bits / 1000);
 }
 
 WebRtc_UWord16
@@ -743,7 +722,7 @@ RTPSender::OnReceivedNACK(const WebRtc_UWord16 nackSequenceNumbersLength,
                  kTraceRtpRtcp,
                  _id,
                  "NACK bitrate reached. Skip sending NACK response. Target %d",
-                 TargetSendBitrateKbit());
+                 _targetSendBitrate);
     return;
   }
 
@@ -766,10 +745,10 @@ RTPSender::OnReceivedNACK(const WebRtc_UWord16 nackSequenceNumbersLength,
       break;
     }
     // delay bandwidth estimate (RTT * BW)
-    if (TargetSendBitrateKbit() != 0 && avgRTT) {
+    if (_targetSendBitrate != 0 && avgRTT) {
       // kbits/s * ms = bits => bits/8 = bytes
       WebRtc_UWord32 targetBytes =
-          (static_cast<WebRtc_UWord32>(TargetSendBitrateKbit()) * avgRTT) >> 3;
+          (static_cast<WebRtc_UWord32>(_targetSendBitrate) * avgRTT) >> 3;
       if (bytesReSent > targetBytes) {
         break; // ignore the rest of the packets in the list
       }

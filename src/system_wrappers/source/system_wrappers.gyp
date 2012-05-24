@@ -109,6 +109,9 @@
         },{
           'sources!': [ 'data_log.cc', ],
         },],
+        ['OS=="android"', {
+          'dependencies': [ 'cpu_features_android', ],
+        }],
         ['OS=="linux"', {
           'link_settings': {
             'libraries': [ '-lrt', ],
@@ -150,6 +153,25 @@
     },
   ], # targets
   'conditions': [
+    ['OS=="android"', {
+      'targets': [
+        {
+          'variables': {
+            # Treat this as third-party code.
+            'chromium_code': 0,
+          },
+          'target_name': 'cpu_features_android',
+          'type': '<(library)',
+          'sources': [
+            'android/cpu-features.c',
+            'android/cpu-features.h',
+            # TODO(leozwang): Ideally we want to audomatically exclude .c files
+            # as with .cc files, gyp currently only excludes .cc files.
+            'cpu_features_android.c',
+          ],
+        },
+      ],
+    }],
     ['build_with_chromium==0', {
       'targets': [
         {
@@ -171,6 +193,7 @@
             'data_log_helpers_unittest.cc',
             'data_log_c_helpers_unittest.c',
             'data_log_c_helpers_unittest.h',
+            'thread_unittest.cc',
             'trace_unittest.cc',
           ],
           'conditions': [

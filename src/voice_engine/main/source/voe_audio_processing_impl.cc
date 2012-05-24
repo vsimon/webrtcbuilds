@@ -41,9 +41,8 @@ VoEAudioProcessing* VoEAudioProcessing::GetInterface(VoiceEngine* voiceEngine) {
     return NULL;
   }
   VoiceEngineImpl* s = reinterpret_cast<VoiceEngineImpl*>(voiceEngine);
-  VoEAudioProcessingImpl* d = s;
-  (*d)++;
-  return (d);
+  s->AddRef();
+  return s;
 #endif
 }
 
@@ -57,21 +56,6 @@ VoEAudioProcessingImpl::VoEAudioProcessingImpl(voe::SharedData* shared)
 VoEAudioProcessingImpl::~VoEAudioProcessingImpl() {
   WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_shared->instance_id(), -1),
                "VoEAudioProcessingImpl::~VoEAudioProcessingImpl() - dtor");
-}
-
-int VoEAudioProcessingImpl::Release() {
-  WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
-               "VoEAudioProcessing::Release()");
-  (*this)--;
-  int refCount = GetCount();
-  if (refCount < 0) {
-    Reset();  // reset reference counter to zero => OK to delete VE
-    _shared->SetLastError(VE_INTERFACE_NOT_FOUND, kTraceWarning);
-    return (-1);
-  }
-  WEBRTC_TRACE(kTraceStateInfo, kTraceVoice, VoEId(_shared->instance_id(), -1),
-               "VoEAudioProcessing reference counter = %d", refCount);
-  return (refCount);
 }
 
 int VoEAudioProcessingImpl::SetNsStatus(bool enable, NsModes mode) {
@@ -1093,7 +1077,8 @@ int VoEAudioProcessingImpl::TimeSinceLastTyping(int &seconds) {
 int VoEAudioProcessingImpl::SetTypingDetectionParameters(int timeWindow,
                                                          int costPerTyping,
                                                          int reportingThreshold,
-                                                         int penaltyDecay) {
+                                                         int penaltyDecay,
+                                                         int typeEventDelay) {
   WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
                "SetTypingDetectionParameters()");
   ANDROID_NOT_SUPPORTED(_shared->statistics());
@@ -1105,7 +1090,7 @@ int VoEAudioProcessingImpl::SetTypingDetectionParameters(int timeWindow,
     return -1;
   }
   return (_shared->transmit_mixer()->SetTypingDetectionParameters(timeWindow,
-      costPerTyping, reportingThreshold, penaltyDecay));
+      costPerTyping, reportingThreshold, penaltyDecay, typeEventDelay));
 
 #else
   _shared->statistics().SetLastError(VE_FUNC_NOT_SUPPORTED, kTraceError,

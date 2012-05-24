@@ -2478,7 +2478,7 @@ WebRtc_Word32 UdpTransport::LocalHostAddressIPV6(char n_localIP[16])
                     {
                         continue;
                     }
-                    if(n_localIP[0] == 0xfe && 
+                    if(n_localIP[0] == 0xfe &&
                        n_localIP[1] == 0x80 && ptr->ai_next)
                     {
                         continue;
@@ -2505,11 +2505,11 @@ WebRtc_Word32 UdpTransport::LocalHostAddressIPV6(char n_localIP[16])
     {
         if(ptrIfAddrs->ifa_addr->sa_family == AF_INET6)
         {
-            const struct sockaddr_in6* sock_in6 = 
+            const struct sockaddr_in6* sock_in6 =
                 reinterpret_cast<struct sockaddr_in6*>(ptrIfAddrs->ifa_addr);
             const struct in6_addr* sin6_addr = &sock_in6->sin6_addr;
 
-            if (IN6_IS_ADDR_LOOPBACK(sin6_addr) || 
+            if (IN6_IS_ADDR_LOOPBACK(sin6_addr) ||
                 IN6_IS_ADDR_LINKLOCAL(sin6_addr)) {
                 ptrIfAddrs = ptrIfAddrs->ifa_next;
                 continue;
@@ -2733,6 +2733,7 @@ WebRtc_Word32 UdpTransport::LocalHostAddress(WebRtc_UWord32& localIP)
         ifc.ifc_len = IFRSIZE;
         if (ioctl(sockfd, SIOCGIFCONF, &ifc))
         {
+            free(ifc.ifc_req);
             close(sockfd);
             return -1;
         }
@@ -2759,9 +2760,11 @@ WebRtc_Word32 UdpTransport::LocalHostAddress(WebRtc_UWord32& localIP)
                 saddr);
             localIP = Htonl(socket_addess->_sockaddr_in.sin_addr);
             close(sockfd);
+            free(ifc.ifc_req);
             return 0;
         }
     }
+    free(ifc.ifc_req);
     close(sockfd);
     return -1;
 #endif

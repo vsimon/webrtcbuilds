@@ -11,6 +11,22 @@
 #include "after_streaming_fixture.h"
 #include "voe_standard_test.h"
 
+class RxCallback : public webrtc::VoERxVadCallback {
+ public:
+  RxCallback() :
+    vad_decision(-1) {
+  }
+
+  virtual void OnRxVad(int, int vadDecision) {
+    char msg[128];
+    sprintf(msg, "RX VAD detected decision %d \n", vadDecision);
+    TEST_LOG("%s", msg);
+    vad_decision = vadDecision;
+  }
+
+  int vad_decision;
+};
+
 class AudioProcessingTest : public AfterStreamingFixture {
  protected:
   // Note: Be careful with this one, it is used in the
@@ -188,7 +204,7 @@ TEST_F(AudioProcessingTest, ManualTestEcMetrics) {
 
 // TODO(phoglund): Reenable below test when it's no longer flaky.
 TEST_F(AudioProcessingTest, DISABLED_TestVoiceActivityDetectionWithObserver) {
-  voetest::RxCallback rx_callback;
+  RxCallback rx_callback;
   EXPECT_EQ(0, voe_apm_->RegisterRxVadObserver(channel_, rx_callback));
 
   // The extra sleeps are to allow decisions some time to propagate to the
@@ -196,12 +212,12 @@ TEST_F(AudioProcessingTest, DISABLED_TestVoiceActivityDetectionWithObserver) {
   TryDetectingSilence();
   Sleep(100);
 
-  EXPECT_EQ(0, rx_callback._vadDecision);
+  EXPECT_EQ(0, rx_callback.vad_decision);
 
   TryDetectingSpeechAfterSilence();
   Sleep(100);
 
-  EXPECT_EQ(1, rx_callback._vadDecision);
+  EXPECT_EQ(1, rx_callback.vad_decision);
 
   EXPECT_EQ(0, voe_apm_->DeRegisterRxVadObserver(channel_));
 }
@@ -331,6 +347,28 @@ TEST_F(AudioProcessingTest, CanSetDelayOffset) {
   EXPECT_EQ(50, voe_apm_->DelayOffsetMs());
   voe_apm_->SetDelayOffsetMs(-50);
   EXPECT_EQ(-50, voe_apm_->DelayOffsetMs());
+}
+
+TEST_F(AudioProcessingTest, HighPassFilterIsOnByDefault) {
+  EXPECT_TRUE(voe_apm_->IsHighPassFilterEnabled());
+}
+
+TEST_F(AudioProcessingTest, CanSetHighPassFilter) {
+  EXPECT_EQ(0, voe_apm_->EnableHighPassFilter(true));
+  EXPECT_TRUE(voe_apm_->IsHighPassFilterEnabled());
+  EXPECT_EQ(0, voe_apm_->EnableHighPassFilter(false));
+  EXPECT_FALSE(voe_apm_->IsHighPassFilterEnabled());
+}
+
+TEST_F(AudioProcessingTest, StereoChannelSwappingIsOffByDefault) {
+  EXPECT_FALSE(voe_apm_->IsStereoChannelSwappingEnabled());
+}
+
+TEST_F(AudioProcessingTest, CanSetStereoChannelSwapping) {
+  voe_apm_->EnableStereoChannelSwapping(true);
+  EXPECT_TRUE(voe_apm_->IsStereoChannelSwappingEnabled());
+  voe_apm_->EnableStereoChannelSwapping(false);
+  EXPECT_FALSE(voe_apm_->IsStereoChannelSwappingEnabled());
 }
 
 #if defined(MAC_IPHONE) || defined(WEBRTC_ANDROID)

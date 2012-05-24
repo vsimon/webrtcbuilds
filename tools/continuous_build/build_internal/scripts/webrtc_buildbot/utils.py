@@ -7,7 +7,7 @@
 #  in the file PATENTS.  All contributing project authors may
 #  be found in the AUTHORS file in the root of the source tree.
 
-__author__ = 'ivinnichenko@webrtc.org (Illya Vinnichenko)'
+__author__ = 'kjellander@webrtc.org (Henrik Kjellander)'
 
 import ntpath
 import os
@@ -29,13 +29,14 @@ SUPPORTED_PLATFORMS = ('Linux', 'Mac', 'Windows')
 
 WEBRTC_SOLUTION_NAME = 'trunk'
 WEBRTC_SVN_LOCATION = 'http://webrtc.googlecode.com/svn/trunk'
-WEBRTC_TRUNK_DIR = 'build/trunk/'
-WEBRTC_BUILD_DIR = 'build/'
+WEBRTC_TRUNK_DIR = 'build/trunk'
+WEBRTC_BUILD_DIR = 'build'
 
-VALGRIND_CMD = ['tools/valgrind-webrtc/webrtc_tests.sh', '-t', 'cmdline']
+MEMCHECK_CMD = ['tools/valgrind-webrtc/webrtc_tests.sh', '-t']
+TSAN_CMD = ['tools/valgrind-webrtc/webrtc_tests.sh', '--tool', 'tsan', '-t']
+ASAN_CMD = ['tools/valgrind-webrtc/webrtc_tests.sh', '--tool', 'asan',  '-t']
 
-DEFAULT_COVERAGE_DIR = '/var/www/coverage/'
-DEFAULT_BLOAT_DIR = '/var/www/bloat/'
+DEFAULT_COVERAGE_DIR = '/var/www/coverage'
 DEFAULT_MASTER_WORK_DIR = '.'
 GCLIENT_RETRIES = 3
 
@@ -43,8 +44,8 @@ GCLIENT_RETRIES = 3
 # but converted to a list since we set defines instead of using an environment
 # variable.
 #
-# On valgrind bots, override the optimizer settings so we don't inline too
-# much and make the stacks harder to figure out. Use the same settings
+# On memcheck and tsan bots, override the optimizer settings so we don't inline
+# too much and make the stacks harder to figure out. Use the same settings
 # on all buildbot masters to make it easier to move bots.
 MEMORY_TOOLS_GYP_DEFINES = [
     # GCC flags
@@ -73,9 +74,9 @@ MEMORY_TOOLS_GYP_DEFINES = [
 class WebRTCFactory(factory.BuildFactory):
   """Abstract superclass for all build factories.
 
-     A build factory defines a sequence of steps to take in a build process.
-     This class provides some helper methods and some abstract methods that
-     can be overridden to create customized build sequences.
+  A build factory defines a sequence of steps to take in a build process.
+  This class provides some helper methods and some abstract methods that
+  can be overridden to create customized build sequences.
   """
 
   def __init__(self, build_status_oracle, is_try_slave=False,
@@ -84,17 +85,17 @@ class WebRTCFactory(factory.BuildFactory):
                custom_deps_list=None, safesync_url=None):
     """Creates the abstract factory.
 
-       Args:
-         build_status_oracle: An instance of BuildStatusOracle which is used to
-             keep track of our build state.
-         is_try_slave: If this bot is a try slave. Needed since we're handling
-             some things differently between normal slaves and try slaves.
-         gclient_solution_name: The name of the solution used for gclient.
-         svn_url: The Subversion URL for gclient to sync agains.
-         custom_deps_list: Content to be put in the custom_deps entry of the
-             .gclient file. The parameter must be a list of tuples with two
-             strings in each: path and remote URL.
-         safesync_url: If a LKGR URL shall be used for the gclient sync command.
+    Args:
+      build_status_oracle: An instance of BuildStatusOracle which is used to
+        keep track of our build state.
+      is_try_slave: If this bot is a try slave. Needed since we're handling
+        some things differently between normal slaves and try slaves.
+      gclient_solution_name: The name of the solution used for gclient.
+      svn_url: The Subversion URL for gclient to sync agains.
+      custom_deps_list: Content to be put in the custom_deps entry of the
+        .gclient file. The parameter must be a list of tuples with two
+        strings in each: path and remote URL.
+      safesync_url: If a LKGR URL shall be used for the gclient sync command.
     """
     factory.BuildFactory.__init__(self)
 
@@ -113,51 +114,59 @@ class WebRTCFactory(factory.BuildFactory):
   def EnableBuild(self):
     """Adds steps for building WebRTC [must be overridden].
 
-       Implementations of this method must add clean and build steps so that
-       when all steps have been run, we have an up-to-date, complete and correct
-       build of WebRTC for the platform. It is up to the method how to do this.
+    Implementations of this method must add clean and build steps so that
+    when all steps have been run, we have an up-to-date, complete and correct
+    build of WebRTC for the platform. It is up to the method how to do this.
     """
     pass
 
   def EnableTests(self, tests):
     """Adds test run steps for all tests in the list.
 
-       This method must be run after enabling the build.
+    This method must be run after enabling the build.
 
-       Args:
-         tests: list of test to be run.
+    Args:
+      tests: list of test to be run.
     """
     for test in tests:
       self.EnableTest(test)
 
   def AddCommonStep(self, cmd, descriptor='', workdir=WEBRTC_TRUNK_DIR,
                     halt_build_on_failure=True, warn_on_failure=False,
-                    timeout=1200):
+                    timeout=1200, use_pty=True, env={}):
     """Adds a step which will run as a shell command on the slave.
 
-       NOTE: you are recommended to use this method to add new shell commands
-       instead of the base-class addStep method, since steps added here will
-       work with the smart-clean system (e.g. only do a full rebuild if the
-       previous build failed). Steps handled outside this method will not lead
-       to a full rebuild on the next build if they fail.
+    NOTE: you are recommended to use this method to add new shell commands
+    instead of the base-class addStep method, since steps added here will
+    work with the smart-clean system (e.g. only do a full rebuild if the
+    previous build failed). Steps handled outside this method will not lead
+    to a full rebuild on the next build if they fail.
 
-       Args:
-         cmd: The command to run. This command follows the contract for
-             ShellCommand, so see that documentation for more details.
-         descriptor: A string, or a list of strings, describing what the step
-             does. The descriptor gets printed in the waterfall display.
-         workdir: The working directory to run the command in, relative to
-             the bot's build name directory. The WebRTC root will generally be
-             in build/trunk/ relative to that directory. The caller is
-             responsible for making sure that the slashes are flipped the right
-             way depending on platform, which means you can't use the default
-             value if the step will run on a Windows machine.
-         halt_build_on_failure: Stops the build dead in its tracks if this step
-             fails. Use for critical steps. This option does not make sense with
-             warn_on_failure.
-         warn_on_failure: If true, this step isn't that important and will not
-             cause a failed build on failure.
-         timeout: The timeout for the command, in seconds.
+    Args:
+      cmd: The command to run. This command follows the contract for
+        ShellCommand, so see that documentation for more details.
+      descriptor: A string, or a list of strings, describing what the step
+        does. The descriptor gets printed in the waterfall display.
+      workdir: The working directory to run the command in, relative to
+        the bot's build name directory. The WebRTC root will generally be
+        in build/trunk/ relative to that directory. The caller is
+        responsible for making sure that the slashes are flipped the right
+        way depending on platform, which means you can't use the default
+        value if the step will run on a Windows machine.
+      halt_build_on_failure: Stops the build dead in its tracks if this step
+        fails. Use for critical steps. This option does not make sense with
+        warn_on_failure.
+      warn_on_failure: If true, this step isn't that important and will not
+        cause a failed build on failure.
+      timeout: The timeout for the command, in seconds.
+      use_pty: If Pseudo-terminal shall be enabled for the command. This is
+        needed if stdout and stderr output shall be collected
+        separately, which is useful to make it possible to color-code
+        stderr output with red in the web interface. Some shell
+        commands seem to fail when Pseudo-terminal is enabled on
+        Linux.
+      env: dict of string->string that describes the environment the command
+        shall be excuted with on the build slave.
     """
     flunk_on_failure = not warn_on_failure
 
@@ -177,13 +186,15 @@ class WebRTCFactory(factory.BuildFactory):
         flunkOnFailure=flunk_on_failure,
         haltOnFailure=halt_build_on_failure,
         name='_'.join(descriptor),
-        timeout=timeout))
+        timeout=timeout,
+        usePTY=use_pty,
+        env=env))
 
   def AddSmartCleanStep(self):
     """Adds a smart clean step.
 
-       Smart clean only cleans the whole repository if the build status oracle
-       thinks the last build failed. Otherwise it cleans just the build output.
+    Smart clean only cleans the whole repository if the build status oracle
+    thinks the last build failed. Otherwise it cleans just the build output.
     """
     self.addStep(SmartClean(self.build_status_oracle, self.is_try_slave,
                             self.path_joiner, workdir=WEBRTC_BUILD_DIR))
@@ -191,47 +202,51 @@ class WebRTCFactory(factory.BuildFactory):
   def AddCommonTestRunStep(self, test, descriptor='', cmd=None):
     """Adds a step for running a single test [must be overridden].
 
-       In general, failing tests should not halt the build and allow other tests
-       to execute. A failing test should fail, or 'flunk', the build though.
+    In general, failing tests should not halt the build and allow other tests
+    to execute. A failing test should fail, or 'flunk', the build though.
 
-       The working directory for this command will be the WebRTC root directory
-       (generally build/trunk).
+    The working directory for this command will be the WebRTC root directory
+    (generally build/trunk).
 
-       Implementations of this method must add new steps through AddCommonStep
-       and not by calling addStep.
+    Implementations of this method must add new steps through AddCommonStep
+    and not by calling addStep.
 
-       Args:
-         test: The test binary name. The step will attempt to execute this
-             binary in the binary output folder, except if the cmd argument is
-             defined (in that case, we will run cmd instead and just use the
-             test name in the descriptor).
-         descriptor: This should either be a string or a list of strings. The
-             descriptor or descriptors are appended to the test name and
-             displayed in the waterfall.
-         cmd: If necessary, you can specify this argument to override the
-             default behavior, which is to just run the binary specified in
-             test without arguments.
+    Args:
+      test: The test binary name. The step will attempt to execute this
+        binary in the binary output folder, except if the cmd argument is
+        defined (in that case, we will run cmd instead and just use the
+        test name in the descriptor).
+      descriptor: This should either be a string or a list of strings. The
+        descriptor or descriptors are appended to the test name and
+        displayed in the waterfall.
+      cmd: If necessary, you can specify this argument to override the
+        default behavior, which is to just run the binary specified in
+        test without arguments.
     """
     raise NotImplementedError('Must be overridden')
 
   def EnableTest(self, test):
     """Makes a test run in the build sequence. May be overridden.
 
-       Override to handle special cases for specific platforms, for instance if
-       a particular test binary requires command line arguments.
+    Override to handle special cases for specific platforms, for instance if
+    a particular test binary requires command line arguments.
 
-       Args:
-           test: The test name to enable.
+    Args:
+      test: The test name to enable.
     """
     self.AddCommonTestRunStep(test)
 
-  def AddGclientSyncStep(self, alwaysUseLatest=False):
+  def AddGclientSyncStep(self, workdir=WEBRTC_BUILD_DIR,
+                         always_use_latest=False):
     """Helper method for invoking gclient sync.
 
     Args:
-        alwaysUseLatest: Set to true to always use the latest build, otherwise
-                         the highest revision in the changeset will be used
-                         for sync.
+      workdir: The name of the directory to checkout the source into.
+        The default is 'build' which is the base working dir of
+        most build slaves.
+      always_use_latest: Set to true to always use the latest build,
+        otherwise the highest revision in the changeset will
+        be used for sync.
     """
     gclient_spec = self._ConfigureWhatToBuild()
     env = self._GetEnvironmentWithDisabledDepotToolsUpdate()
@@ -244,9 +259,9 @@ class WebRTCFactory(factory.BuildFactory):
     # Removal can take a long time. Allow 15 minutes.
     rm_timeout = 60 * 15
     self.addStep(chromium_step.GClient,
-                 alwaysUseLatest=alwaysUseLatest,
+                 alwaysUseLatest=always_use_latest,
                  gclient_spec=gclient_spec,
-                 workdir='build',
+                 workdir=workdir,
                  mode='update',
                  env=env,
                  retry=retry,
@@ -256,17 +271,17 @@ class WebRTCFactory(factory.BuildFactory):
   def AddCommonGYPStep(self, gyp_file, gyp_params=[], descriptor='gyp'):
     """Helper method for invoking GYP on WebRTC.
 
-       GYP will generate makefiles or its equivalent in a platform-specific
-       manner. A failed GYP step will halt the build.
+    GYP will generate makefiles or its equivalent in a platform-specific
+    manner. A failed GYP step will halt the build.
 
-       This command will run in the WebRTC root directory
-       (generally build/trunk).
+    This command will run in the WebRTC root directory
+    (generally build/trunk).
 
-       Args:
-         gyp_file: The root GYP file to use.
-         gyp_params: Custom GYP parameters (same semantics as the GYP_PARAMS
-             environment variable).
-         descriptor: The descriptor to use for the step.
+    Args:
+      gyp_file: The root GYP file to use.
+      gyp_params: Custom GYP parameters (same semantics as the GYP_PARAMS
+        environment variable).
+      descriptor: The descriptor to use for the step.
     """
     cmd = ['./build/gyp_chromium', '--depth=.', gyp_file]
     cmd += gyp_params + self.gyp_params
@@ -288,24 +303,23 @@ class WebRTCFactory(factory.BuildFactory):
   def _WrapLongLines(self, string_list, max_line_length=25, wrap_character='_'):
     """ Creates a list with wrapped strings for lines that are too long.
 
-       This is done by inserting spaces to long lines with the wrap character
-       in. It's a simple way to make long test targets wrap nicer in the
-       waterfall display.
+    This is done by inserting spaces to long lines with the wrap character
+    in. It's a simple way to make long test targets wrap nicer in the
+    waterfall display.
 
-       This method should only be used for lists that are displayed in the web
-       interface!
+    This method should only be used for lists that are displayed in the web
+    interface!
 
-       Args:
-           string_list: List of strings where each string represents one line.
-           max_line_length: Number of characters a line may have to avoid
-             getting wrapped.
-           wrap_character: The character we're looking for when inserting a
-             space if a string is larger than max_line_length. If no such
-             character is found, no space will be inserted.
-        Returns:
-            A new list of the same length as the input list, but with strings
-            that may contain extra spaces in them, if longer than the max
-            length.
+    Args:
+      string_list: List of strings where each string represents one line.
+      max_line_length: Number of characters a line may have to avoid
+        getting wrapped.
+      wrap_character: The character we're looking for when inserting a
+        space if a string is larger than max_line_length. If no such
+        character is found, no space will be inserted.
+     Returns:
+       A new list of the same length as the input list, but with strings
+       that may contain extra spaces in them, if longer than the max length.
     """
     result = []
     for line in string_list:
@@ -320,17 +334,17 @@ class WebRTCFactory(factory.BuildFactory):
 class BuildStatusOracle:
   """Keeps track of a particular build's state.
 
-     The oracle uses files in the default master work directory to keep track
-     of whether a build has failed. It only keeps track of the most recent build
-     until told to forget it.
+  The oracle uses files in the default master work directory to keep track
+  of whether a build has failed. It only keeps track of the most recent build
+  until told to forget it.
   """
 
   def __init__(self, builder_name):
     """Creates the oracle.
 
-       Args:
-         builder_name: The name of the associated builder. This name is used
-             in the filename on disk. This name should be unique.
+    Args:
+      builder_name: The name of the associated builder. This name is used
+        in the filename on disk. This name should be unique.
     """
     self.builder_name = builder_name
     self.master_work_dir = DEFAULT_MASTER_WORK_DIR
@@ -369,10 +383,10 @@ class SmartClean(ShellCommand):
 
   def __init__(self, build_status_oracle, is_try_slave, path_joiner, **kwargs):
     """Args:
-          build_status_oracle: class that knows if the previous build failed.
-          is_try_slave: if the current factory is a try slave.
-          path_joiner: function to create paths for the current platform, given
-                       a number of path elements in string form.
+         build_status_oracle: class that knows if the previous build failed.
+         is_try_slave: if the current factory is a try slave.
+         path_joiner: function to create paths for the current platform, given
+           a number of path elements in string form.
      """
     ShellCommand.__init__(self, **kwargs)
 
@@ -403,25 +417,25 @@ class SmartClean(ShellCommand):
 class GenerateCodeCoverage(ShellCommand):
   """This custom shell command generates coverage HTML using genhtml.
 
-     The command will dump the HTML output into coverage_dir, in a directory
-     whose name is generated from the build number and slave name. We will
-     expect that the coverage directory is somewhere under the web server root
-     (i.e. public html root) that corresponds to the web server URL. That is, if
-     we write Foo to the coverage directory we expect that directory to be
-     reachable from url/Foo.
+  The command will dump the HTML output into coverage_dir, in a directory
+  whose name is generated from the build number and slave name. We will
+  expect that the coverage directory is somewhere under the web server root
+  (i.e. public html root) that corresponds to the web server URL. That is, if
+  we write Foo to the coverage directory we expect that directory to be
+  reachable from url/Foo.
   """
 
   def __init__(self, build_status_oracle, coverage_url, coverage_dir,
                coverage_file, **kwargs):
     """Prepares the coverage command.
 
-       Args:
-         build_status_oracle: class that knows if the current build has failed.
-         coverage_url: The base URL for the serving web server we will use
-             when we generate the link to the coverage. This will generally
-             be the slave's URL (something like http://slave-hostname/).
-         coverage_dir: Where to write coverage HTML.
-         coverage_file: The LCOV file to generate the coverage from.
+    Args:
+      build_status_oracle: class that knows if the current build has failed.
+      coverage_url: The base URL for the serving web server we will use
+        when we generate the link to the coverage. This will generally
+        be the slave's URL (something like http://slave-hostname/).
+      coverage_dir: Where to write coverage HTML.
+      coverage_file: The LCOV file to generate the coverage from.
     """
     ShellCommand.__init__(self, **kwargs)
     self.addFactoryArguments(build_status_oracle=build_status_oracle,
@@ -459,8 +473,8 @@ class GenerateCodeCoverage(ShellCommand):
 class WebRTCAndroidFactory(WebRTCFactory):
   """Sets up the Android build."""
 
-  def __init__(self, build_status_oracle):
-    WebRTCFactory.__init__(self, build_status_oracle)
+  def __init__(self, build_status_oracle, is_try_slave=False):
+    WebRTCFactory.__init__(self, build_status_oracle, is_try_slave)
 
   def EnableBuild(self, product='toro'):
     prefix = 'rm -rf out/target/product/%s/obj/' % product
@@ -472,10 +486,11 @@ class WebRTCAndroidFactory(WebRTCFactory):
         ]
     cmd = ' ; '.join(cleanup_list)
     self.AddCommonStep(cmd, descriptor='cleanup')
-
-    cmd = 'svn checkout %s external/webrtc' % self.svn_url
-    self.AddCommonStep(cmd, descriptor='svn (checkout)')
-
+    self.AddGclientSyncStep(workdir='build/trunk/external/webrtc')
+    # Work around lack of support for checking out into another dir than the
+    # last dir of the Subversion URL.
+    self.AddCommonStep(cmd='mv external/webrtc/trunk/* external/webrtc',
+                       use_pty=False, descriptor='Prepare WebRTC source')
     cmd = ('source build/envsetup.sh && lunch full_%s-eng '
            '&& mmm external/webrtc showcommands' % product)
     self.AddCommonStep(cmd, descriptor='build')
@@ -484,15 +499,15 @@ class WebRTCAndroidFactory(WebRTCFactory):
 class WebRTCAndroidNDKFactory(WebRTCFactory):
   """Sets up the Android NDK build."""
 
-  def __init__(self, build_status_oracle):
-    WebRTCFactory.__init__(self, build_status_oracle)
+  def __init__(self, build_status_oracle, is_try_slave=False):
+    WebRTCFactory.__init__(self, build_status_oracle, is_try_slave)
 
   def EnableBuild(self):
     self.AddSmartCleanStep()
     self.AddGclientSyncStep()
     self._AddAndroidStep(cmd='gclient runhooks',
                          descriptor='gen_android_makefiles')
-    self._AddAndroidStep(cmd='make -j100', descriptor='make')
+    self._AddAndroidStep(cmd='make -j100', descriptor='build')
 
   def _AddAndroidStep(self, cmd, descriptor):
     full_cmd = ('source build/android/buildbot_functions.sh &&'
@@ -501,110 +516,36 @@ class WebRTCAndroidNDKFactory(WebRTCFactory):
                 '%s' % cmd)
     self.AddCommonStep(cmd=full_cmd, descriptor=descriptor)
 
-class WebRTCChromeFactory(WebRTCFactory):
-  """Sets up the Chrome Browser+WebRTC build."""
-
-  def __init__(self, build_status_oracle,
-               gclient_solution_name,
-               svn_url,
-               custom_deps_list=None,
-               safesync_url=None):
-    WebRTCFactory.__init__(self, build_status_oracle=build_status_oracle,
-                           gclient_solution_name=gclient_solution_name,
-                           svn_url=svn_url,
-                           custom_deps_list=custom_deps_list,
-                           safesync_url=safesync_url)
-    self.build_enabled = False
-
-  def EnableBuild(self, release=False, enable_profiling=False):
-    self.AddCommonStep(['rm', '-rf', 'src'], workdir=WEBRTC_BUILD_DIR,
-                       descriptor='Cleanup')
-    self.AddGclientSyncStep(alwaysUseLatest=True)
-    if enable_profiling:
-      self.AddCommonStep(['./build/gyp_chromium', '-Dprofiling=1'],
-                         descriptor="gyp_chromium",
-                         warn_on_failure=True, workdir='build/src')
-
-    chrome_targets = ['chrome', 'pyautolib']
-    if release:
-      self.AddCommonMakeStep(chrome_targets, 'BUILDTYPE=Release')
-    else:
-      self.AddCommonMakeStep(chrome_targets)
-
-    self.build_enabled = True
-    self.release = release
-    self.profiling = enable_profiling
-
-  def EnableBloatCalculation(self):
-    """Runs a bloat calculation, which will yield a size breakdown for Chrome.
-
-    If running in Release mode, you should also run with profiling to get the
-    symbols right. Running this on Debug mode will work but it will probably
-    take hours.
-    """
-    assert self.build_enabled is True
-    assert (self.release and self.profiling) or not self.release
-
-    bloat_path = PosixPathJoin(WEBRTC_BUILD_DIR, '..', '..', '..', '..', '..',
-                               '..', 'build_internal', 'symsrc',
-                               'calculate_bloat.py')
-    output_filename = PosixPathJoin(DEFAULT_BLOAT_DIR, 'bloat_latest.json')
-    build_directory = 'Release' if self.release else 'Debug'
-    chrome_binary = PosixPathJoin('out', build_directory, 'chrome')
-    self.AddCommonStep([bloat_path, '--binary', chrome_binary,
-                        '--source-path', '.', '--output-file', output_filename],
-                       descriptor='calculate_bloat.py',
-                       warn_on_failure=True, workdir='build/src',
-                       timeout=7200)
-
-  def AddCommonMakeStep(self, targets, make_extra=None):
-    descriptor = ['make'] + targets
-    cmd = ['make', '-j100'] + targets
-    if make_extra is not None:
-      cmd.append(make_extra)
-    self.AddCommonStep(cmd=cmd, descriptor=descriptor,
-                       warn_on_failure=True, workdir='build/src')
-
-  def AddCommonTestRunStep(self, test):
-    # We currently only support PyAuto tests on this bot.
-    self._AddPyAutoTestRunStep(test)
-
-  def _AddPyAutoTestRunStep(self, test):
-    assert self.build_enabled
-
-    # Set up the test under Xvfb since it will probably launch browser windows.
-    # Replace any slashes in the test's path with underscores for the name since
-    # the buildbot web pages will become confused otherwise.
-    descriptor = test.replace('/', '_')
-    pyauto_flags = ' --chrome-flags --enable-media-stream'
-    cmd = MakeCommandToRunTestInXvfb(test + pyauto_flags)
-    self.AddCommonStep(cmd=cmd, descriptor=descriptor, workdir='build/src')
 
 class WebRTCLinuxFactory(WebRTCFactory):
   """Sets up the Linux build.
 
-     This factory is quite configurable and can run a variety of builds.
+  This factory is quite configurable and can run a variety of builds.
   """
 
   def __init__(self, build_status_oracle, is_try_slave=False,
-               valgrind_enabled=False, custom_deps_list=None):
+               run_with_memcheck=False, run_with_tsan=False,
+               run_with_asan=False, custom_deps_list=None):
     WebRTCFactory.__init__(self, build_status_oracle=build_status_oracle,
                            is_try_slave=is_try_slave,
                            custom_deps_list=custom_deps_list)
     self.build_enabled = False
     self.coverage_enabled = False
-    self.valgrind_enabled = valgrind_enabled
+    self.run_with_memcheck = run_with_memcheck
+    self.run_with_tsan = run_with_tsan
+    self.run_with_asan = run_with_asan
+    self.compile_for_memory_tooling = False
 
   def EnableCoverage(self, coverage_url, coverage_dir=DEFAULT_COVERAGE_DIR):
     """Enables coverage measurements using LCOV/GCOV.
 
-       This method must be called before enabling build.
+    This method must be called before enabling build.
 
-       Args:
-         coverage_url: See the GenerateCodeCoverage command's contract for
-             this argument.
-         coverage_dir: See the GenerateCodeCoverage command's contract for
-             this argument.
+    Args:
+      coverage_url: See the GenerateCodeCoverage command's contract for
+        this argument.
+      coverage_dir: See the GenerateCodeCoverage command's contract for
+        this argument.
     """
     assert self.build_enabled is False
 
@@ -613,23 +554,32 @@ class WebRTCLinuxFactory(WebRTCFactory):
     self.coverage_dir = coverage_dir
 
   def EnableBuild(self, release=False, build32=False, chrome_os=False,
-                  clang=False):
+                  clang=False, compile_for_memory_tooling=False):
     if build32:
       self.gyp_params.append('-Dtarget_arch=ia32')
 
     self.build_enabled = True
+    self.compile_for_memory_tooling = compile_for_memory_tooling
     self.release = release
 
     self.AddSmartCleanStep()
-
-    # Valgrind bots need special GYP defines to enable memory profiling
-    # friendly compilation. They already has a custom .gclient configuration
-    # file created so they don't need one being generated like the other bots.
-    if self.valgrind_enabled:
-      for gyp_define in MEMORY_TOOLS_GYP_DEFINES:
-        self.gyp_params.append('-D' + gyp_define)
     self.AddGclientSyncStep()
 
+    # Valgrind bots need special GYP defines to enable memory profiling
+    # friendly compilation.
+    if self.compile_for_memory_tooling:
+      for gyp_define in MEMORY_TOOLS_GYP_DEFINES:
+        self.gyp_params.append('-D' + gyp_define)
+
+    if self.run_with_asan:
+      # ASAN requires Clang compilation and we enforce Release mode since
+      # that's what Chromium recommends.
+      assert clang
+      assert release
+      self.gyp_params.append('-Dasan=1')
+      self.gyp_params.append('-Dlinux_use_tcmalloc=0')
+      self.gyp_params.append('-Drelease_extra_cflags="-g -O1 '
+                             '-fno-inline-functions -fno-inline"')
     if chrome_os:
       self.gyp_params.append('-Dchromeos=1')
 
@@ -655,13 +605,17 @@ class WebRTCLinuxFactory(WebRTCFactory):
     if cmd is None:
       test_folder = 'Release' if self.release else 'Debug'
       cmd = ['out/%s/%s' % (test_folder, test)]
-    if self.valgrind_enabled:
-      cmd = VALGRIND_CMD + cmd
+    if self.run_with_memcheck:
+      cmd = MEMCHECK_CMD + cmd
+    if self.run_with_tsan:
+      cmd = TSAN_CMD + cmd
+    if self.run_with_asan:
+      cmd = ASAN_CMD + cmd
     self.AddCommonStep(cmd, descriptor=descriptor, halt_build_on_failure=False)
 
   def AddXvfbTestRunStep(self, test_name, test_binary, test_arguments=''):
     """ Adds a test to be run inside a XVFB window manager."""
-    cmd = MakeCommandToRunTestInXvfb("%s %s" % (test_binary, test_arguments))
+    cmd = MakeCommandToRunTestInXvfb('%s %s' % (test_binary, test_arguments))
     self.AddCommonTestRunStep(test=test_name, cmd=cmd)
 
   def AddCommonMakeStep(self, target, extra_text=None, make_extra=None):
@@ -670,7 +624,18 @@ class WebRTCLinuxFactory(WebRTCFactory):
     cmd = ['make', target, '-j100']
     if make_extra:
       cmd.append(make_extra)
-    self.AddCommonStep(cmd=cmd, descriptor=descriptor)
+
+    env = {}
+    if self.run_with_asan:
+      # Override the Clang compiler with the prebuilt ASAN executables.
+      # It seems like CC and CXX must contain full paths and since there's no
+      # way to evaluate subcommands on the slaves, this hardcoding is the only
+      # way for now.
+      asan_bin = ('/b/build/slave/linux-asan/build/trunk/third_party/asan/'
+                  'asan_clang_Linux/bin')
+      env = {'CC': '%s/clang' % asan_bin,
+             'CXX': '%s/clang++ ' % asan_bin}
+    self.AddCommonStep(cmd=cmd, descriptor=descriptor, env=env)
 
   def AddStepsToEstablishCoverageBaseline(self):
     self.AddCommonStep(['lcov', '--directory', '.', '--capture', '-b',
@@ -746,12 +711,12 @@ class WebRTCLinuxFactory(WebRTCFactory):
   def EnableTest(self, test):
     """Adds a step for running a test on Linux.
 
-       In general, this method will interpret the name as the name of a binary
-       in the default build output directory, except for a few special cases
-       which require custom command lines.
+    In general, this method will interpret the name as the name of a binary
+    in the default build output directory, except for a few special cases
+    which require custom command lines.
 
-       Args:
-         test: the test name as a string.
+    Args:
+      test: the test name as a string.
     """
     if test == 'audioproc_unittest':
       self.AddCommonTestRunStep(test)
@@ -763,12 +728,25 @@ class WebRTCLinuxFactory(WebRTCFactory):
       # TODO(phoglund): Enable the full stack test once it is completed and
       # nonflaky.
       binary = 'out/Debug/vie_auto_test'
+      filter = '-ViEVideoVerificationTest.RunsFullStack*:ViERtpFuzzTest*'
       args = (
-          '--automated --gtest_filter="'
-          '-ViEVideoVerificationTest.RunsFullStackWithoutErrors" '
-          '--capture_test_ensure_resolution_alignment_in_capture_device=false')
+        '--automated --gtest_filter="%s" '
+        '--capture_test_ensure_resolution_alignment_in_capture_device=false')
+      args = args % filter
       self.AddXvfbTestRunStep(test_name=test, test_binary=binary,
                               test_arguments=args)
+
+      # Set up the fuzz tests as a separate step under memcheck.
+      # If this test is run we require that we have compiled for memory tools.
+      # We need to use some special black magic here: -- is replaced with ++
+      # when calling the webrtc_tests.sh script since we want those parameters
+      # to not be caught by webrtc_tests.sh's options parser, but be passed on
+      # to vie_auto_test. This is a part of webrtc_tests.sh's contract.
+      assert self.compile_for_memory_tooling
+      fuzz_binary = (' '.join(MEMCHECK_CMD) + ' ' + binary +
+                     ' ++automated ++gtest_filter=ViERtpFuzzTest*')
+      self.AddXvfbTestRunStep(test_name=test + ' (fuzz tests)',
+                              test_binary=fuzz_binary)
     elif test == 'video_render_module_test':
       self.AddXvfbTestRunStep(test_name=test,
                               test_binary='out/Debug/video_render_module_test')
@@ -802,6 +780,41 @@ class WebRTCMacFactory(WebRTCFactory):
       self.AddCommonGYPStep('webrtc.gyp', gyp_params=['-f', 'make'],
                             descriptor='EnableMake')
     self.AddCommonMakeStep('all')
+
+  def EnableTest(self, test):
+    """Adds a step for running a test on Mac.
+
+       In general, this method will interpret the name as the name of a binary
+       in the default build output directory, except for a few special cases
+       which require custom command lines.
+
+       Args:
+         test: the test name as a string.
+    """
+    if test == 'vie_auto_test':
+      # Start ManyCam before the test starts:
+      self.AddCommonStep(cmd=['open', '/Applications/ManyCam/ManyCam.app'],
+                         descriptor=['Starting ManyCam'])
+      # TODO(phoglund): Enable the full stack test once it is completed and
+      # nonflaky.
+      cmd = (
+          'out/Debug/vie_auto_test --automated --gtest_filter="'
+          'ViEStandardIntegrationTest.*:'
+          'ViEVideoVerificationTest.*:'
+          '-ViEVideoVerificationTest.RunsFullStackWithoutErrors:'
+          'ViEVideoVerificationTest.RunsFileTestWithoutErrors:' # bug 524
+          'ViEStandardIntegrationTest.RunsRtpRtcpTestWithoutErrors" ' # bug 477
+          '--capture_test_ensure_resolution_alignment_in_capture_device=false')
+      self.AddCommonTestRunStep(test=test, cmd=cmd)
+      self.AddCommonStep(cmd=['killall', 'ManyCam'],
+                         descriptor=['Stopping ManyCam'])
+    elif test == 'voe_auto_test':
+      cmd = ('out/Debug/voe_auto_test --automated '
+             # Disabled test until bug 527 is resolved.
+             '--gtest_filter=-VolumeTest.SetVolumeBeforePlayoutWorks')
+      self.AddCommonTestRunStep(test=test, cmd=cmd)
+    else:
+      self.AddCommonTestRunStep(test)
 
   def AddCommonTestRunStep(self, test, extra_text=None, cmd=None):
     descriptor = [test, extra_text] if extra_text else [test]
@@ -837,12 +850,13 @@ class WebRTCMacFactory(WebRTCFactory):
 class WebRTCWinFactory(WebRTCFactory):
   """Sets up the Windows build.
 
-     Allows building with Debug, Release or both in sequence.
+  Allows building with Debug, Release or both in sequence.
   """
 
   # Must provide full path to the command since we cannot add custom paths to
   # the PATH environment variable when using Chromium buildbot startup scripts.
   BUILD_CMD = r'C:\Windows\Microsoft.NET\Framework\v3.5\msbuild.exe'
+  VCAM_PATH = r'C:\Program Files (x86)\e2eSoft\VCam\VCamManager.exe'
 
   def __init__(self, build_status_oracle, is_try_slave=False):
     WebRTCFactory.__init__(self, build_status_oracle, is_try_slave)
@@ -876,8 +890,7 @@ class WebRTCWinFactory(WebRTCFactory):
     # Since Windows is very picky about locking files, make sure to kill
     # any interfering processes. Feel free to add more process kill steps if
     # necessary.
-    cmd = '%WINDIR%\\system32\\taskkill /f /im svn.exe || set ERRORLEVEL=0'
-    self.AddCommonStep(cmd, 'svnkill')
+    self.KillProcesses('svn.exe')
 
     # TODO(kjellander): Enable for normal slaves too when all are moved over to
     # the new slave architecture.
@@ -914,6 +927,51 @@ class WebRTCWinFactory(WebRTCFactory):
              '/p:Configuration=Release;Platform=%s' % (self.platform)]
       self.AddCommonStep(cmd, descriptor='Build(Release)')
 
+  def KillProcesses(self, process_name, descriptor=None):
+    """Kills all running processes with the specified name.
+
+    Make sure the name contains .exe at the end. If no processes are found, this
+    method will execute silently doing nothing.
+    """
+    # Setting ERRORLEVEL is to make sure the command always exits with exit code
+    # 0, since we want the step to succeed even when there's nothing to kill.
+    cmd = ('%WINDIR%\\system32\\taskkill.exe /f /im ' + process_name +
+           ' || set ERRORLEVEL=0')
+    if not descriptor:
+      descriptor = 'kill %s' % process_name
+    self.AddCommonStep(cmd, descriptor)
+
+  def EnableTest(self, test):
+    """Adds a step for running a test on Windows.
+
+       In general, this method will interpret the name as the name of a binary
+       in the default build output directory, except for a few special cases
+       which require custom command lines.
+
+       Args:
+         test: the test name as a string.
+    """
+    if test == 'vie_auto_test':
+      # Start VCam before the test starts:
+      self.AddCommonStep(cmd=['cmd', '-c', WebRTCWinFactory.VCAM_PATH],
+                         descriptor=['Starting VCam'])
+      # TODO(phoglund): Enable the full stack test once it is completed and
+      # nonflaky.
+      cmd = (
+          'build\\Debug\\vie_auto_test.exe --automated --gtest_filter="'
+          'ViEStandardIntegrationTest.*:'
+          'ViEVideoVerificationTest.*:'
+          '-ViEVideoVerificationTest.RunsFullStackWithoutErrors:'
+          'ViEStandardIntegrationTest.RunsRtpRtcpTestWithoutErrors" ' # bug 477
+          '--capture_test_ensure_resolution_alignment_in_capture_device=false')
+      self.AddCommonTestRunStep(test=test, cmd=cmd)
+      self.KillProcesses('VCamManager.exe', 'Stop VCam')
+    elif test == 'voe_auto_test':
+      cmd = 'build\\Debug\\voe_auto_test.exe --automated'
+      self.AddCommonTestRunStep(test=test, cmd=cmd)
+    else:
+      self.AddCommonTestRunStep(test)
+
   def AddCommonTestRunStep(self, test, cmd=None):
     descriptor = [test]
     if self.configuration == 'Debug' or self.configuration == 'both':
@@ -948,18 +1006,18 @@ class UnsupportedConfigurationError(Exception):
 def GetEnabledTests(test_dict, platform):
   """Returns a list of enabled test names for the provided platform.
 
-     Args:
-       test_dict: Dictionary mapping test names to tuples representing if the
-           test shall be enabled on each platform. Each tuple contains one
-           boolean for each platform. The platforms are in the order specified
-           by SUPPORTED_PLATFORMS.
-       platform: The platform we're looking to get the tests for.
+  Args:
+    test_dict: Dictionary mapping test names to tuples representing if the
+      test shall be enabled on each platform. Each tuple contains one
+      boolean for each platform. The platforms are in the order specified
+      by SUPPORTED_PLATFORMS.
+    platform: The platform we're looking to get the tests for.
 
-     Returns:
-       A list of test names, sorted alphabetically.
+  Returns:
+    A list of test names, sorted alphabetically.
 
-     Raises:
-       UnsupportedConfigurationError: if the platform supplied is not supported.
+  Raises:
+    UnsupportedConfigurationError: if the platform supplied is not supported.
   """
   if platform not in SUPPORTED_PLATFORMS:
     raise UnsupportedConfigurationError('Platform %s is not supported.'

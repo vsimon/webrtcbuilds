@@ -34,7 +34,6 @@
     'enable_video%': 1,
 
     # Selects fixed-point code where possible.
-    # TODO(andrew): we'd like to set this based on the target OS/architecture.
     'prefer_fixed_point%': 0,
 
     # Enable data logging. Produces text files with data logged within engines
@@ -46,6 +45,10 @@
     'build_libyuv%': 1,
 
     'conditions': [
+      ['OS=="android"', {
+        # On Android, we always prefer fixed_point to reduce CPU usage.
+        'prefer_fixed_point%': 1,
+      }],
       ['build_with_chromium==1', {
         # Exclude pulse audio on Chromium since its prerequisites don't require
         # pulse audio.
@@ -79,15 +82,10 @@
 
         'webrtc_root%': '<(DEPTH)/src',
 
-        'conditions': [
-          ['OS=="mac"', {
-            # TODO(andrew): clang is the default on Mac. For now, disable the
-            # Chrome plugins, which causes a flood of chromium-style warnings.
-            # Investigate enabling the plugins:
-            # http://code.google.com/p/webrtc/issues/detail?id=163
-            'clang_use_chrome_plugins%': 0,
-          }],
-        ],
+        # TODO(andrew): For now, disable the Chrome plugins, which causes a
+        # flood of chromium-style warnings. Investigate enabling them:
+        # http://code.google.com/p/webrtc/issues/detail?id=163
+        'clang_use_chrome_plugins%': 0,
       }],
     ], # conditions
   },
@@ -96,9 +94,16 @@
       '..','../..', # common_types.h, typedefs.h
     ],
     'defines': [
-      # TODO(leozwang): Most of team use git-svn, need to add
-      # git-svn support as well.
-      'WEBRTC_SVNREVISION="<!(svnversion -n)"',
+      # TODO(leozwang): Temporally disable it because we cannot assume svn
+      # is installed by default, it will break Chromium build. The problem
+      # could happen on Gentoo which download and build tar ball directly,
+      # it also could happen when developer downloads Chromium tar ball and
+      # build inside source tree without svn installed. The solution is to
+      # have a script to deal with these cases and support git-svn.
+      # Two similar issues have been filed at
+      # WebRTC http://code.google.com/p/webrtc/issues/detail?id=496
+      # Chromium http://code.google.com/p/chromium/issues/detail?id=126452
+      'WEBRTC_SVNREVISION="n/a"',
     ],
     'conditions': [
       ['build_with_chromium==1', {
@@ -151,22 +156,25 @@
         # http://code.google.com/p/webrtc/issues/detail?id=261 is solved.
         'msvs_disabled_warnings': [4389, 4373],
 
-	# Re-enable some warnings that Chromium disables.
-	'msvs_disabled_warnings!': [4189,],
+        # Re-enable some warnings that Chromium disables.
+        'msvs_disabled_warnings!': [4189,],
       }],
       ['OS=="android"', {
+        # On android, we always perfer fixed_point to reduce cpu usage
+        'prefer_fixed_point%': 1,
+
         'defines': [
           'WEBRTC_LINUX',
           'WEBRTC_ANDROID',
           # TODO(leozwang): move WEBRTC_ARCH_ARM to typedefs.h.
           'WEBRTC_ARCH_ARM',
+          'WEBRTC_DETECT_ARM_NEON',
           # TODO(leozwang): Investigate CLOCK_REALTIME and CLOCK_MONOTONIC
           # support on Android. Keep WEBRTC_CLOCK_TYPE_REALTIME for now,
           # remove it after I verify that CLOCK_MONOTONIC is fully functional
           # with condition and event functions in system_wrappers.
           'WEBRTC_CLOCK_TYPE_REALTIME',
           'WEBRTC_THREAD_RR',
-          'WEBRTC_ARM_INLINE_CALLS',
           'WEBRTC_ANDROID_OPENSLES',
          ],
       }],
