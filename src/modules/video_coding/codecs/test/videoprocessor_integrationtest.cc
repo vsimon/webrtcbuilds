@@ -70,6 +70,7 @@ class VideoProcessorIntegrationTest: public testing::Test {
     config_.codec_settings->startBitrate = kBitRateKbps;
     config_.codec_settings->width = kCIFWidth;
     config_.codec_settings->height = kCIFHeight;
+    config_.codec_settings->codecSpecific.VP8.errorConcealmentOn = true;
 
     frame_reader_ =
         new webrtc::test::FrameReaderImpl(config_.input_filename,
@@ -129,6 +130,7 @@ class VideoProcessorIntegrationTest: public testing::Test {
     printf("PSNR avg: %f, min: %f    SSIM avg: %f, min: %f\n",
            psnr_result.average, psnr_result.min,
            ssim_result.average, ssim_result.min);
+    stats_.PrintSummary();
     EXPECT_GT(psnr_result.average, minimum_avg_psnr);
     EXPECT_GT(psnr_result.min, minimum_min_psnr);
     EXPECT_GT(ssim_result.average, minimum_avg_ssim);
