@@ -431,9 +431,16 @@ WebRtc_Word32 AudioCodingModuleImpl::Process() {
     CriticalSectionScoped lock(*_callbackCritSect);
 #ifdef ACM_QA_TEST
     if(_outgoingPL != NULL) {
-      fwrite(&rtp_timestamp, sizeof(WebRtc_UWord32), 1, _outgoingPL);
-      fwrite(&current_payload_type, sizeof(WebRtc_UWord8), 1, _outgoingPL);
-      fwrite(&length_bytes, sizeof(WebRtc_Word16), 1, _outgoingPL);
+      if (fwrite(&rtp_timestamp, sizeof(WebRtc_UWord32), 1, _outgoingPL) != 1) {
+        return -1;
+      }
+      if (fwrite(&current_payload_type, sizeof(WebRtc_UWord8),
+                 1, _outgoingPL) != 1) {
+        return -1;
+      }
+      if (fwrite(&length_bytes, sizeof(WebRtc_Word16), 1, _outgoingPL) != 1) {
+        return -1;
+      }
     }
 #endif
 
@@ -978,14 +985,14 @@ WebRtc_Word32 AudioCodingModuleImpl::Add10MsData(
   // either mono-to-stereo or stereo-to-mono conversion.
   WebRtc_Word16 audio[WEBRTC_10MS_PCM_AUDIO];
   int audio_channels = _sendCodecInst.channels;
-  if (audio_frame.num_channels_ != _sendCodecInst.channels) {
-    if (_sendCodecInst.channels == 2) {
+  if (audio_frame.num_channels_ != audio_channels) {
+    if (audio_channels == 2) {
       // Do mono-to-stereo conversion by copying each sample.
       for (int k = 0; k < audio_frame.samples_per_channel_; k++) {
         audio[k * 2] = audio_frame.data_[k];
         audio[(k * 2) + 1] = audio_frame.data_[k];
       }
-    } else if (_sendCodecInst.channels == 1) {
+    } else if (audio_channels == 1) {
       // Do stereo-to-mono conversion by creating the average of the stereo
       // samples.
       for (int k = 0; k < audio_frame.samples_per_channel_; k++) {
@@ -1489,11 +1496,18 @@ WebRtc_Word32 AudioCodingModuleImpl::IncomingPacket(
     CriticalSectionScoped lock(*_acmCritSect);
 #ifdef ACM_QA_TEST
     if(_incomingPL != NULL) {
-      fwrite(&rtp_info.header.timestamp, sizeof(WebRtc_UWord32), 1,
-             _incomingPL);
-      fwrite(&rtp_info.header.payloadType, sizeof(WebRtc_UWord8), 1,
-             _incomingPL);
-      fwrite(&payload_length, sizeof(WebRtc_Word16), 1, _incomingPL);
+      if (fwrite(&rtp_info.header.timestamp, sizeof(WebRtc_UWord32),
+                 1, _incomingPL) != 1) {
+        return -1;
+      }
+      if (fwrite(&rtp_info.header.payloadType, sizeof(WebRtc_UWord8),
+                 1, _incomingPL) != 1) {
+        return -1;
+      }
+      if (fwrite(&payload_length, sizeof(WebRtc_Word16),
+                 1, _incomingPL) != 1) {
+        return -1;
+      }
     }
 #endif
 

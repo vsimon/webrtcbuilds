@@ -654,7 +654,7 @@ Channel::OnInitializeDecoder(
     receiveCodec.rate = rate;
     strncpy(receiveCodec.plname, payloadName, RTP_PAYLOAD_NAME_SIZE - 1);
     
-    _audioCodingModule.Codec(payloadName, dummyCodec, frequency);
+    _audioCodingModule.Codec(payloadName, dummyCodec, frequency, channels);
     receiveCodec.pacsize = dummyCodec.pacsize;
 
     // Register the new codec to the ACM
@@ -1423,7 +1423,7 @@ Channel::Init()
         }
 
         // Ensure that PCMU is used as default codec on the sending side
-        if (!STR_CASE_CMP(codec.plname, "PCMU"))
+        if (!STR_CASE_CMP(codec.plname, "PCMU") && (codec.channels == 1))
         {
             SetSendCodec(codec);
         }
@@ -1601,6 +1601,10 @@ Channel::StartPlayout()
     }
 
     _playing = true;
+
+    if (RegisterFilePlayingToMixer() != 0)
+        return -1;
+
     return 0;
 }
 
@@ -2472,12 +2476,13 @@ Channel::SetSendCNPayloadType(int type, PayloadFrequencies frequency)
 
     CodecInst codec;
     WebRtc_Word32 samplingFreqHz(-1);
+    const int kMono = 1;
     if (frequency == kFreq32000Hz)
         samplingFreqHz = 32000;
     else if (frequency == kFreq16000Hz)
         samplingFreqHz = 16000;
 
-    if (_audioCodingModule.Codec("CN", codec, samplingFreqHz) == -1)
+    if (_audioCodingModule.Codec("CN", codec, samplingFreqHz, kMono) == -1)
     {
         _engineStatisticsPtr->SetLastError(
             VE_AUDIO_CODING_MODULE_ERROR, kTraceError,
@@ -3408,22 +3413,9 @@ int Channel::StartPlayingFileLocally(const char* fileName,
         _outputFilePlayerPtr->RegisterModuleFileCallback(this);
         _outputFilePlaying = true;
     }
-    // _fileCritSect cannot be taken while calling
-    // SetAnonymousMixabilityStatus() since as soon as the participant is added
-    // frames can be pulled by the mixer. Since the frames are generated from
-    // the file, _fileCritSect will be taken. This would result in a deadlock.
-    if (_outputMixerPtr->SetAnonymousMixabilityStatus(*this, true) != 0)
-    {
-        CriticalSectionScoped cs(&_fileCritSect);
-        _outputFilePlaying = false;
-        _engineStatisticsPtr->SetLastError(
-            VE_AUDIO_CONF_MIX_MODULE_ERROR, kTraceError,
-            "StartPlayingFile() failed to add participant as file to mixer");
-        _outputFilePlayerPtr->StopPlayingFile();
-        FilePlayer::DestroyFilePlayer(_outputFilePlayerPtr);
-        _outputFilePlayerPtr = NULL;
+
+    if (RegisterFilePlayingToMixer() != 0)
         return -1;
-    }
 
     return 0;
 }
@@ -3499,21 +3491,9 @@ int Channel::StartPlayingFileLocally(InStream* stream,
       _outputFilePlayerPtr->RegisterModuleFileCallback(this);
       _outputFilePlaying = true;
     }
-    // _fileCritSect cannot be taken while calling
-    // SetAnonymousMixibilityStatus. Refer to comments in
-    // StartPlayingFileLocally(const char* ...) for more details.
-    if (_outputMixerPtr->SetAnonymousMixabilityStatus(*this, true) != 0)
-    {
-        CriticalSectionScoped cs(&_fileCritSect);
-        _outputFilePlaying = false;
-        _engineStatisticsPtr->SetLastError(
-            VE_AUDIO_CONF_MIX_MODULE_ERROR, kTraceError,
-            "StartPlayingFile() failed to add participant as file to mixer");
-        _outputFilePlayerPtr->StopPlayingFile();
-        FilePlayer::DestroyFilePlayer(_outputFilePlayerPtr);
-        _outputFilePlayerPtr = NULL;
+
+    if (RegisterFilePlayingToMixer() != 0)
         return -1;
-    }
 
     return 0;
 }
@@ -3567,6 +3547,36 @@ int Channel::IsPlayingFileLocally() const
                  "Channel::IsPlayingFileLocally()");
 
     return (WebRtc_Word32)_outputFilePlaying;
+}
+
+int Channel::RegisterFilePlayingToMixer()
+{
+    // Return success for not registering for file playing to mixer if:
+    // 1. playing file before playout is started on that channel.
+    // 2. starting playout without file playing on that channel.
+    if (!_playing || !_outputFilePlaying)
+    {
+        return 0;
+    }
+
+    // |_fileCritSect| cannot be taken while calling
+    // SetAnonymousMixabilityStatus() since as soon as the participant is added
+    // frames can be pulled by the mixer. Since the frames are generated from
+    // the file, _fileCritSect will be taken. This would result in a deadlock.
+    if (_outputMixerPtr->SetAnonymousMixabilityStatus(*this, true) != 0)
+    {
+        CriticalSectionScoped cs(&_fileCritSect);
+        _outputFilePlaying = false;
+        _engineStatisticsPtr->SetLastError(
+            VE_AUDIO_CONF_MIX_MODULE_ERROR, kTraceError,
+            "StartPlayingFile() failed to add participant as file to mixer");
+        _outputFilePlayerPtr->StopPlayingFile();
+        FilePlayer::DestroyFilePlayer(_outputFilePlayerPtr);
+        _outputFilePlayerPtr = NULL;
+        return -1;
+    }
+
+    return 0;
 }
 
 int Channel::ScaleLocalFilePlayout(const float scale)
