@@ -31,23 +31,31 @@
         'send_side_bandwidth_estimation.h',
       ],
     },
-    {
-      'target_name': 'bitrate_controller_unittests',
-      'type': 'executable',
-      'dependencies': [
-        'bitrate_controller',
-        '<(webrtc_root)/../test/test.gyp:test_support_main',
-        '<(webrtc_root)/../testing/gtest.gyp:gtest',
-      ],
-      'sources': [
-        'bitrate_controller_unittest.cc',
-      ],
-    },
-  ],
+  ], # targets
+
+  'conditions': [
+    ['include_tests==1', {
+      'targets' : [
+        {
+          'target_name': 'bitrate_controller_unittests',
+          'type': 'executable',
+          'dependencies': [
+            'bitrate_controller',
+            '<(webrtc_root)/../test/test.gyp:test_support_main',
+            '<(webrtc_root)/../testing/gtest.gyp:gtest',
+          ],
+          'sources': [
+            'bitrate_controller_unittest.cc',
+           ],
+         },
+       ], # targets
+    }], # include_tests
+  ], # conditions
+
 }
 
 # Local Variables:
 # tab-width:2
 # indent-tabs-mode:nil
 # End:
-# vim: set expandtab tabstop=2 shiftwidth=2:
+# vim: set expandtab tabstop=2 shiftwidth=2
