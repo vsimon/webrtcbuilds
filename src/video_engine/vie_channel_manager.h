@@ -78,7 +78,7 @@ class ViEChannelManager: private ViEManagerBase {
   // protected.
   bool CreateChannelObject(int channel_id, ViEEncoder* vie_encoder,
                            RtcpBandwidthObserver* bandwidth_observer,
-                           RtpRemoteBitrateObserver* bitrate_observer);
+                           RemoteBitrateEstimator* remote_bitrate_estimator);
 
   // Used by ViEChannelScoped, forcing a manager user to use scoped.
   // Returns a pointer to the channel with id 'channelId'.
@@ -109,7 +109,6 @@ class ViEChannelManager: private ViEManagerBase {
   CriticalSectionWrapper* channel_id_critsect_;
   int engine_id_;
   int number_of_cores_;
-  ViEPerformanceMonitor& vie_performance_monitor_;
 
   // TODO(mflodman) Make part of channel group.
   ChannelMap channel_map_;

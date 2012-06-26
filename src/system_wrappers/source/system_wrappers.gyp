@@ -42,6 +42,7 @@
         '../interface/rw_lock_wrapper.h',
         '../interface/scoped_ptr.h',
         '../interface/scoped_refptr.h',
+        '../interface/sleep.h',
         '../interface/sort.h',
         '../interface/static_instance.h',
         '../interface/thread_wrapper.h',
@@ -88,6 +89,7 @@
         'rw_lock_posix.h',
         'rw_lock_win.cc',
         'rw_lock_win.h',
+        'sleep.cc',
         'sort.cc',
         'thread.cc',
         'thread_posix.cc',
@@ -183,9 +185,11 @@
             '<(webrtc_root)/../test/test.gyp:test_support_main',
           ],
           'sources': [
+            'condition_variable_unittest.cc',
             'cpu_wrapper_unittest.cc',
             'cpu_measurement_harness.h',
             'cpu_measurement_harness.cc',
+            'critical_section_unittest.cc',
             'list_unittest.cc',
             'map_unittest.cc',
             'data_log_unittest.cc',
@@ -195,6 +199,7 @@
             'data_log_c_helpers_unittest.h',
             'thread_unittest.cc',
             'trace_unittest.cc',
+            'unittest_utilities_unittest.cc',
           ],
           'conditions': [
             ['enable_data_logging==1', {

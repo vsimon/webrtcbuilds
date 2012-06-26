@@ -104,7 +104,6 @@ ViERenderer::ViERenderer(const WebRtc_Word32 render_id,
                          VideoRender& render_module,
                          ViERenderManager& render_manager)
     : render_id_(render_id),
-      engine_id_(engine_id),
       render_module_(render_module),
       render_manager_(render_manager),
       render_callback_(NULL),
@@ -127,17 +126,17 @@ WebRtc_Word32 ViERenderer::Init(const WebRtc_UWord32 z_order,
 }
 
 void ViERenderer::DeliverFrame(int id,
-                               VideoFrame& video_frame,
+                               VideoFrame* video_frame,
                                int num_csrcs,
                                const WebRtc_UWord32 CSRC[kRtpCsrcSize]) {
-  render_callback_->RenderFrame(render_id_, video_frame);
+  render_callback_->RenderFrame(render_id_, *video_frame);
 }
 
 void ViERenderer::DelayChanged(int id, int frame_delay) {}
 
-int ViERenderer::GetPreferedFrameSettings(int& width,
-                                          int& height,
-                                          int& frame_rate) {
+int ViERenderer::GetPreferedFrameSettings(int* width,
+                                          int* height,
+                                          int* frame_rate) {
     return -1;
 }
 
