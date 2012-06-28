@@ -8,13 +8,12 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "video_engine/vie_sender.h"
-
 #include <cassert>
 
-#include "modules/utility/interface/rtp_dump.h"
-#include "system_wrappers/interface/critical_section_wrapper.h"
-#include "system_wrappers/interface/trace.h"
+#include "critical_section_wrapper.h"
+#include "rtp_dump.h"
+#include "vie_sender.h"
+#include "trace.h"
 
 namespace webrtc {
 

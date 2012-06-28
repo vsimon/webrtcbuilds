@@ -25,12 +25,13 @@ enum RateControlRegion;
 
 class OverUseDetector {
  public:
-  explicit OverUseDetector(const OverUseDetectorOptions& options);
+  OverUseDetector();
   ~OverUseDetector();
-  void Update(const WebRtc_UWord16 packet_size,
-              const uint32_t timestamp,
-              const int64_t now_ms);
+  void Update(const WebRtc_UWord16 packetSize,
+              const WebRtc_UWord32 timestamp,
+              const WebRtc_Word64 nowMS);
   BandwidthUsage State() const;
+  void Reset();
   double NoiseVar() const;
   void SetRateControlRegion(RateControlRegion region);
 
@@ -38,59 +39,52 @@ class OverUseDetector {
   struct FrameSample {
     FrameSample() : size_(0), completeTimeMs_(-1), timestamp_(-1) {}
 
-    uint32_t size_;
-    int64_t  completeTimeMs_;
-    int64_t  timestamp_;
+    WebRtc_UWord32 size_;
+    WebRtc_Word64  completeTimeMs_;
+    WebRtc_Word64  timestamp_;
   };
 
-  struct DebugPlots {
-#ifdef WEBRTC_BWE_MATLAB
-    DebugPlots() : plot1(NULL), plot2(NULL), plot3(NULL), plot4(NULL) {}
-    MatlabPlot* plot1;
-    MatlabPlot* plot2;
-    MatlabPlot* plot3;
-    MatlabPlot* plot4;
-#endif
-  };
-
-  static bool OldTimestamp(uint32_t new_timestamp,
-                           uint32_t existing_timestamp,
+  static bool OldTimestamp(uint32_t newTimestamp,
+                           uint32_t existingTimestamp,
                            bool* wrapped);
 
-  void CompensatedTimeDelta(const FrameSample& current_frame,
-                            const FrameSample& prev_frame,
-                            int64_t& t_delta,
-                            double& ts_delta,
+  void CompensatedTimeDelta(const FrameSample& currentFrame,
+                            const FrameSample& prevFrame,
+                            WebRtc_Word64& tDelta,
+                            double& tsDelta,
                             bool wrapped);
-  void UpdateKalman(int64_t t_delta,
-                    double ts_elta,
-                    uint32_t frame_size,
-                    uint32_t prev_frame_size);
-  double UpdateMinFramePeriod(double ts_delta);
-  void UpdateNoiseEstimate(double residual, double ts_delta, bool stable_state);
-  BandwidthUsage Detect(double ts_delta);
+  void UpdateKalman(WebRtc_Word64 tDelta,
+                    double tsDelta,
+                    WebRtc_UWord32 frameSize,
+                    WebRtc_UWord32 prevFrameSize);
+  double UpdateMinFramePeriod(double tsDelta);
+  void UpdateNoiseEstimate(double residual, double tsDelta, bool stableState);
+  BandwidthUsage Detect(double tsDelta);
   double CurrentDrift();
 
-  OverUseDetectorOptions options_;  // Must be first member
-                                    // variable. Cannot be const
-                                    // because we need to be copyable.
-  bool first_packet_;
-  FrameSample current_frame_;
-  FrameSample prev_frame_;
-  uint16_t num_of_deltas_;
+  bool firstPacket_;
+  FrameSample currentFrame_;
+  FrameSample prevFrame_;
+  WebRtc_UWord16 numOfDeltas_;
   double slope_;
   double offset_;
   double E_[2][2];
-  double process_noise_[2];
-  double avg_noise_;
-  double var_noise_;
+  double processNoise_[2];
+  double avgNoise_;
+  double varNoise_;
   double threshold_;
-  std::list<double> ts_delta_hist_;
-  double prev_offset_;
-  double time_over_using_;
-  uint16_t over_use_counter_;
+  std::list<double> tsDeltaHist_;
+  double prevOffset_;
+  double timeOverUsing_;
+  WebRtc_UWord16 overUseCounter_;
   BandwidthUsage hypothesis_;
-  DebugPlots plots_;
+
+#ifdef WEBRTC_BWE_MATLAB
+  MatlabPlot* plot1_;
+  MatlabPlot* plot2_;
+  MatlabPlot* plot3_;
+  MatlabPlot* plot4_;
+#endif
 };
 }  // namespace webrtc
 

@@ -642,17 +642,9 @@ WebRtc_Word32 AudioCodingModuleImpl::RegisterSendCodec(
     return -1;
   }
 
-  // Set Stereo, and make sure VAD and DTX is turned off.
+  // Set Stereo.
   if (send_codec.channels == 2) {
     _stereoSend = true;
-    if (_vadEnabled || _dtxEnabled) {
-      WEBRTC_TRACE(webrtc::kTraceWarning, webrtc::kTraceAudioCoding, _id,
-                   "VAD/DTX is turned off, not supported when sending stereo.");
-    }
-    _vadEnabled = false;
-    _dtxEnabled = false;
-  } else {
-    _stereoSend = false;
   }
 
   // Check if the codec is already registered as send codec.
@@ -993,8 +985,6 @@ WebRtc_Word32 AudioCodingModuleImpl::Add10MsData(
   // either mono-to-stereo or stereo-to-mono conversion.
   WebRtc_Word16 audio[WEBRTC_10MS_PCM_AUDIO];
   int audio_channels = _sendCodecInst.channels;
-  // TODO(andrew): reuse RemixAndResample here? The upmixing should be done
-  // after resampling. (Would require moving it somewhere common).
   if (audio_frame.num_channels_ != audio_channels) {
     if (audio_channels == 2) {
       // Do mono-to-stereo conversion by copying each sample.
@@ -1122,14 +1112,6 @@ WebRtc_Word32 AudioCodingModuleImpl::SetVAD(const bool enable_dtx,
     WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _id,
                  "Invalid VAD Mode %d, no change is made to VAD/DTX status",
                  (int) mode);
-    return -1;
-  }
-
-  // Check that the send codec is mono. We don't support VAD/DTX for stereo
-  // sending.
-  if ((enable_dtx || enable_vad) && _stereoSend) {
-    WEBRTC_TRACE(webrtc::kTraceError, webrtc::kTraceAudioCoding, _id,
-                 "VAD/DTX not supported for stereo sending");
     return -1;
   }
 
@@ -1564,21 +1546,15 @@ WebRtc_Word32 AudioCodingModuleImpl::IncomingPacket(
   // Split the payload for stereo packets, so that first half of payload
   // vector holds left channel, and second half holds right channel.
   if (_expected_channels == 2) {
-    if (!rtp_info.type.Audio.isCNG) {
-      // Create a new vector for the payload, maximum payload size.
-      WebRtc_Word32 length = payload_length;
-      WebRtc_UWord8 payload[kMaxPacketSize];
-      assert(payload_length <= kMaxPacketSize);
-      memcpy(payload, incoming_payload, payload_length);
-      _codecs[_current_receive_codec_idx]->SplitStereoPacket(payload, &length);
-      rtp_header.type.Audio.channel = 2;
-      // Insert packet into NetEQ.
-      return _netEq.RecIn(payload, length, rtp_header);
-    } else {
-      // If we receive a CNG packet while expecting stereo, we ignore the packet
-      // and continue. CNG is not supported for stereo.
-      return 0;
-    }
+    // Create a new vector for the payload, maximum payload size.
+    WebRtc_Word32 length = payload_length;
+    WebRtc_UWord8 payload[kMaxPacketSize];
+    assert(payload_length <= kMaxPacketSize);
+    memcpy(payload, incoming_payload, payload_length);
+    _codecs[_current_receive_codec_idx]->SplitStereoPacket(payload, &length);
+    rtp_header.type.Audio.channel = 2;
+    // Insert packet into NetEQ.
+    return _netEq.RecIn(payload, length, rtp_header);
   } else {
     return _netEq.RecIn(incoming_payload, payload_length, rtp_header);
   }

@@ -19,7 +19,7 @@
 #include "module_common_types.h"
 #include "scoped_ptr.h"
 #include "signal_processing_library.h"
-#include "test/testsupport/fileutils.h"
+#include "testsupport/fileutils.h"
 #include "thread_wrapper.h"
 #include "trace.h"
 #ifdef WEBRTC_ANDROID_PLATFORM_BUILD

@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -8,8 +8,8 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef WEBRTC_VOICE_ENGINE_OUTPUT_MIXER_H_
-#define WEBRTC_VOICE_ENGINE_OUTPUT_MIXER_H_
+#ifndef WEBRTC_VOICE_ENGINE_OUTPUT_MIXER_H
+#define WEBRTC_VOICE_ENGINE_OUTPUT_MIXER_H
 
 #include "audio_conference_mixer.h"
 #include "audio_conference_mixer_defines.h"
@@ -72,8 +72,9 @@ public:
     WebRtc_Word32 SetAnonymousMixabilityStatus(MixerParticipant& participant,
                                                const bool mixable);
 
-    int GetMixedAudio(int sample_rate_hz, int num_channels,
-                      AudioFrame* audioFrame);
+    WebRtc_Word32 GetMixedAudio(const WebRtc_Word32 desiredFreqHz,
+                                const WebRtc_UWord8 channels,
+                                AudioFrame& audioFrame);
 
     // VoEVolumeControl
     int GetSpeechOutputLevel(WebRtc_UWord32& level);
@@ -94,14 +95,14 @@ public:
 
     virtual ~OutputMixer();
 
-    // from AudioMixerOutputReceiver
+public:	// from AudioMixerOutputReceiver
     virtual void NewMixedAudio(
         const WebRtc_Word32 id,
         const AudioFrame& generalAudioFrame,
         const AudioFrame** uniqueAudioFrames,
         const WebRtc_UWord32 size);
 
-    // from AudioMixerStatusReceiver
+public:  // from AudioMixerStatusReceiver
     virtual void MixedParticipants(
         const WebRtc_Word32 id,
         const ParticipantStatistics* participantStatistics,
@@ -115,7 +116,7 @@ public:
     virtual void MixedAudioLevel(const WebRtc_Word32  id,
                                  const WebRtc_UWord32 level);
 
-    // For file recording
+public: // For file recording
     void PlayNotification(const WebRtc_Word32 id,
                           const WebRtc_UWord32 durationMs);
 
@@ -127,14 +128,14 @@ public:
 
 private:
     OutputMixer(const WebRtc_UWord32 instanceId);
-    void APMAnalyzeReverseStream();
+    int APMAnalyzeReverseStream();
     int InsertInbandDtmfTone();
 
-    // uses
+private:  // uses
     Statistics* _engineStatisticsPtr;
     AudioProcessing* _audioProcessingModulePtr;
 
-    // owns
+private:  // owns
     CriticalSectionWrapper& _callbackCritSect;
     // protect the _outputFileRecorderPtr and _outputFileRecording
     CriticalSectionWrapper& _fileCritSect;
@@ -158,4 +159,4 @@ private:
 
 }  //  namespace werbtc
 
-#endif  // VOICE_ENGINE_OUTPUT_MIXER_H_
+#endif // VOICE_ENGINE_OUTPUT_MIXER_H

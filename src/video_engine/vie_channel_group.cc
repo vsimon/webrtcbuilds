@@ -19,12 +19,10 @@
 
 namespace webrtc {
 
-ChannelGroup::ChannelGroup(ProcessThread* process_thread,
-                           const OverUseDetectorOptions& options)
+ChannelGroup::ChannelGroup(ProcessThread* process_thread)
     : remb_(new VieRemb(process_thread)),
       bitrate_controller_(BitrateController::CreateBitrateController()),
-      remote_bitrate_estimator_(new RemoteBitrateEstimator(remb_.get(),
-                                                           options)) {
+      remote_bitrate_estimator_(new RemoteBitrateEstimator(remb_.get())) {
 }
 
 ChannelGroup::~ChannelGroup() {
