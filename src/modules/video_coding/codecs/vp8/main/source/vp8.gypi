@@ -12,6 +12,7 @@
       'target_name': 'webrtc_vp8',
       'type': '<(library)',
       'dependencies': [
+        '<(DEPTH)/third_party/libvpx/libvpx.gyp:libvpx',
         '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
         '<(webrtc_root)/common_video/common_video.gyp:webrtc_libyuv',
       ],
@@ -23,16 +24,10 @@
       ],
       'conditions': [
         ['build_with_chromium==1', {
-          'dependencies': [
-            '<(third_party_root)/libvpx/libvpx.gyp:libvpx',
-          ],
           'defines': [
             'WEBRTC_LIBVPX_VERSION=960' # Bali
           ],
         },{
-          'dependencies': [
-            '<(third_party_root)/third_party/libvpx/libvpx.gyp:libvpx',
-          ],
           'defines': [
             'WEBRTC_LIBVPX_VERSION=971' # Cayuga
           ],
@@ -69,9 +64,9 @@
             'webrtc_vp8',
             '<(webrtc_root)/common_video/common_video.gyp:webrtc_libyuv',
             '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
-            '<(third_party_root)/test/test.gyp:test_support',
-            '<(third_party_root)/test/test.gyp:test_support_main',
-            '<(third_party_root)/testing/gtest.gyp:gtest',
+            '<(webrtc_root)/test/test.gyp:test_support',
+            '<(webrtc_root)/test/test.gyp:test_support_main',
+            '<(DEPTH)/testing/gtest.gyp:gtest',
           ],
          'sources': [
             # header files
@@ -96,13 +91,13 @@
           'target_name': 'vp8_unittests',
           'type': 'executable',
           'dependencies': [
-            '<(third_party_root)/test/test.gyp:test_support_main',
-            '<(third_party_root)/testing/gtest.gyp:gtest',
-            '<(third_party_root)/third_party/libvpx/libvpx.gyp:libvpx',
+            '<(webrtc_root)/test/test.gyp:test_support_main',
+            '<(DEPTH)/testing/gtest.gyp:gtest',
+            '<(DEPTH)/third_party/libvpx/libvpx.gyp:libvpx',
             'webrtc_vp8',
           ],
           'include_dirs': [
-            '<(third_party_root)/third_party/libvpx/source/libvpx',
+            '<(DEPTH)/third_party/libvpx/source/libvpx',
           ],
           'sources': [
             'reference_picture_selection_unittest.cc',

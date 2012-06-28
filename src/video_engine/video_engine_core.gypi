@@ -62,6 +62,7 @@
         'include/vie_rtp_rtcp.h',
 
         # headers
+        'stream_synchronization.h',
         'vie_base_impl.h',
         'vie_capture_impl.h',
         'vie_codec_impl.h',
@@ -96,6 +97,7 @@
         'vie_sync_module.h',
 
         # ViE
+        'stream_synchronization.cc',
         'vie_base_impl.cc',
         'vie_capture_impl.cc',
         'vie_codec_impl.cc',
@@ -138,9 +140,9 @@
           'type': 'executable',
           'dependencies': [
             'video_engine_core',
-            '<(third_party_root)/testing/gtest.gyp:gtest',
-            '<(third_party_root)/testing/gmock.gyp:gmock',
-            '<(third_party_root)/test/test.gyp:test_support_main',
+            '<(DEPTH)/testing/gtest.gyp:gtest',
+            '<(DEPTH)/testing/gmock.gyp:gmock',
+            '<(webrtc_root)/test/test.gyp:test_support_main',
           ],
           'include_dirs': [
             '..',
@@ -148,6 +150,7 @@
             '../modules/rtp_rtcp/interface',
           ],
           'sources': [
+            'stream_synchronization_unittest.cc',
             'vie_remb_unittest.cc',
           ],
         },
