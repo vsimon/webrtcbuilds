@@ -481,9 +481,9 @@ private:
     WebRtc_Word32             _id;
     const bool                _audio;
     bool                      _collisionDetected;
-    WebRtc_Word64             _lastProcessTime;
-    WebRtc_Word64             _lastBitrateProcessTime;
-    WebRtc_Word64             _lastPacketTimeoutProcessTime;
+    WebRtc_UWord32            _lastProcessTime;
+    WebRtc_UWord32            _lastBitrateProcessTime;
+    WebRtc_UWord32            _lastPacketTimeoutProcessTime;
     WebRtc_UWord16            _packetOverHead;
 
     scoped_ptr<CriticalSectionWrapper> _criticalSectionModulePtrs;
@@ -494,7 +494,7 @@ private:
     // Dead or alive
     bool                  _deadOrAliveActive;
     WebRtc_UWord32        _deadOrAliveTimeoutMS;
-    WebRtc_Word64        _deadOrAliveLastTimer;
+    WebRtc_UWord32        _deadOrAliveLastTimer;
     // send side
     NACKMethod            _nackMethod;
     WebRtc_UWord32        _nackLastTimeSent;

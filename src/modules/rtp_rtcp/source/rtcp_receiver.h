@@ -36,7 +36,7 @@ public:
     RTCPMethod Status() const;
     WebRtc_Word32 SetRTCPStatus(const RTCPMethod method);
 
-    WebRtc_Word64 LastReceived();
+    WebRtc_UWord32 LastReceived();
 
     void SetSSRC( const WebRtc_UWord32 ssrc);
     void SetRelaySSRC( const WebRtc_UWord32 ssrc);
@@ -189,7 +189,7 @@ protected:
   WebRtc_Word32           _id;
   RtpRtcpClock&           _clock;
   RTCPMethod              _method;
-  WebRtc_Word64           _lastReceived;
+  WebRtc_UWord32          _lastReceived;
   ModuleRtpRtcpImpl&      _rtpRtcp;
 
   CriticalSectionWrapper* _criticalSectionFeedbacks;
