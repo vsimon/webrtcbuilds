@@ -176,6 +176,7 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
         const FrameType frameType,
         const WebRtc_Word8 payloadType,
         const WebRtc_UWord32 timeStamp,
+        int64_t capture_time_ms,
         const WebRtc_UWord8* payloadData,
         const WebRtc_UWord32 payloadSize,
         const RTPFragmentationHeader* fragmentation = NULL,
@@ -481,9 +482,9 @@ private:
     WebRtc_Word32             _id;
     const bool                _audio;
     bool                      _collisionDetected;
-    WebRtc_UWord32            _lastProcessTime;
-    WebRtc_UWord32            _lastBitrateProcessTime;
-    WebRtc_UWord32            _lastPacketTimeoutProcessTime;
+    WebRtc_Word64             _lastProcessTime;
+    WebRtc_Word64             _lastBitrateProcessTime;
+    WebRtc_Word64             _lastPacketTimeoutProcessTime;
     WebRtc_UWord16            _packetOverHead;
 
     scoped_ptr<CriticalSectionWrapper> _criticalSectionModulePtrs;
@@ -494,7 +495,7 @@ private:
     // Dead or alive
     bool                  _deadOrAliveActive;
     WebRtc_UWord32        _deadOrAliveTimeoutMS;
-    WebRtc_UWord32        _deadOrAliveLastTimer;
+    WebRtc_Word64        _deadOrAliveLastTimer;
     // send side
     NACKMethod            _nackMethod;
     WebRtc_UWord32        _nackLastTimeSent;

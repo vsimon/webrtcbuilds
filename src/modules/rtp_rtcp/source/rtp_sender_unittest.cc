@@ -39,7 +39,7 @@ class FakeClockTest : public RtpRtcpClock {
   }
   // Return a timestamp in milliseconds relative to some arbitrary
   // source; the source is fixed for this clock.
-  virtual WebRtc_UWord32 GetTimeInMS() {
+  virtual WebRtc_Word64 GetTimeInMS() {
     return time_in_ms_;
   }
   // Retrieve an NTP absolute timestamp.
@@ -51,7 +51,7 @@ class FakeClockTest : public RtpRtcpClock {
     time_in_ms_ += time_increment_ms;
   }
  private:
-  WebRtc_UWord32 time_in_ms_;
+  WebRtc_Word64 time_in_ms_;
 };
 
 class LoopbackTransportTest : public webrtc::Transport {
@@ -207,7 +207,10 @@ TEST_F(RtpSenderTest, NoTrafficSmoothing) {
                                                          kTimestamp);
 
   // Packet should be sent immediately.
-  EXPECT_EQ(0, rtp_sender_->SendToNetwork(packet_, 0, rtp_length,
+  EXPECT_EQ(0, rtp_sender_->SendToNetwork(packet_,
+                                          0,
+                                          rtp_length,
+                                          kTimestamp / 90,
                                           kAllowRetransmission));
   EXPECT_EQ(1, transport_.packets_sent_);
   EXPECT_EQ(rtp_length, transport_.last_sent_packet_len_);
@@ -225,7 +228,10 @@ TEST_F(RtpSenderTest, TrafficSmoothing) {
                                                          kTimestamp);
 
   // Packet should be stored in a send bucket.
-  EXPECT_EQ(0, rtp_sender_->SendToNetwork(packet_, 0, rtp_length,
+  EXPECT_EQ(0, rtp_sender_->SendToNetwork(packet_,
+                                          0,
+                                          rtp_length,
+                                          fake_clock_.GetTimeInMS(),
                                           kAllowRetransmission));
   EXPECT_EQ(0, transport_.packets_sent_);
 

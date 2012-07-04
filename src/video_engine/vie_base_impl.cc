@@ -113,7 +113,7 @@ int ViEBaseImpl::CreateChannel(int& video_channel) {  // NOLINT
     return -1;
   }
 
-  if (shared_data_.channel_manager()->CreateChannel(video_channel) == -1) {
+  if (shared_data_.channel_manager()->CreateChannel(&video_channel) == -1) {
     WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(shared_data_.instance_id()),
                  "%s: Could not create channel", __FUNCTION__);
     video_channel = -1;
@@ -397,7 +397,7 @@ int ViEBaseImpl::GetVersion(char version[1024]) {
 
   // Add WebRTC Version.
   std::stringstream version_stream;
-  version_stream << "VideoEngine 3.8.0" << std::endl;
+  version_stream << "VideoEngine 3.8.1" << std::endl;
 
   // Add build info.
   version_stream << "Build: svn:" << WEBRTC_SVNREVISION << " " << BUILDINFO
@@ -439,7 +439,7 @@ int ViEBaseImpl::CreateChannel(int& video_channel,  // NOLINT
     return -1;
   }
 
-  if (shared_data_.channel_manager()->CreateChannel(video_channel,
+  if (shared_data_.channel_manager()->CreateChannel(&video_channel,
                                                     original_channel,
                                                     sender) == -1) {
     WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(shared_data_.instance_id()),
