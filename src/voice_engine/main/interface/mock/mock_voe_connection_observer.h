@@ -11,7 +11,7 @@
 #ifndef MOCK_VOE_CONNECTION_OBSERVER_H_
 #define MOCK_VOE_CONNECTION_OBSERVER_H_
 
-#include "voe_network.h"
+#include "voice_engine/main/interface/voe_network.h"
 
 namespace webrtc {
 
