@@ -60,10 +60,8 @@ class ProducerFec {
 
   bool FecAvailable() const;
 
-  RedPacket* GetFecPacket(int red_pl_type,
-                          int fec_pl_type,
-                          uint16_t seq_num,
-                          int rtp_header_length);
+  RedPacket* GetFecPacket(int red_pl_type, int fec_pl_type,
+                          uint16_t seq_num);
 
  private:
   void DeletePackets();

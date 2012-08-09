@@ -145,10 +145,9 @@ ACMGenericCodec::Add10MsDataSafe(
     if(_lastTimestamp == timestamp)
     {
         // Same timestamp as the last time, overwrite.
-        if((_inAudioIxWrite >= lengthSmpl * audioChannel) &&
-           (_inTimestampIxWrite > 0))
+        if((_inAudioIxWrite >= lengthSmpl) && (_inTimestampIxWrite > 0))
         {
-            _inAudioIxWrite -= lengthSmpl * audioChannel;
+            _inAudioIxWrite -= lengthSmpl;
             _inTimestampIxWrite--;
             WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceAudioCoding, _uniqueID,
                 "Adding 10ms with previous timestamp, \
@@ -370,9 +369,6 @@ ACMGenericCodec::EncodeSafe(
                         break;
                     }
 
-                    // TODO(andrew): This should be multiplied by the number of
-                    //               channels, right?
-                    // http://code.google.com/p/webrtc/issues/detail?id=714
                     done = _inAudioIxRead >= _frameLenSmpl;
                 }
             }

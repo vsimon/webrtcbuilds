@@ -9,14 +9,14 @@
 {
   'includes': [
     '../build/common.gypi',
-    'voice_engine_core.gypi',
+    'main/source/voice_engine_core.gypi',
   ],
 
   # Test targets, excluded when building with Chromium.
   'conditions': [
     ['include_tests==1', {
       'includes': [
-        'test/voice_engine_tests.gypi',
+        'main/test/voice_engine_tests.gypi',
       ],
     }],
   ],

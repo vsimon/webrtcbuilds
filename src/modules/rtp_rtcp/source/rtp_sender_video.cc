@@ -150,8 +150,7 @@ RTPSenderVideo::SendVideoPacket(WebRtc_UWord8* data_buffer,
       red_packet = producer_fec_.GetFecPacket(
           _payloadTypeRED,
           _payloadTypeFEC,
-          _rtpSender.IncrementSequenceNumber(),
-          rtp_header_length);
+          _rtpSender.IncrementSequenceNumber());
       StorageType storage = kDontRetransmit;
       if (_retransmissionSettings & kRetransmitFECPackets) {
         storage = kAllowRetransmission;
