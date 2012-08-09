@@ -64,6 +64,8 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../../../../../.. \
     $(LOCAL_PATH)/../../../../../../common_audio/signal_processing/include
 
+LOCAL_STATIC_LIBRARIES += libwebrtc_system_wrappers
+
 LOCAL_SHARED_LIBRARIES := \
     libcutils \
     libdl \
@@ -86,7 +88,8 @@ LOCAL_MODULE := libwebrtc_isacfix_neon
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := \
     filters_neon.c \
-    lattice_neon.S
+    lattice_neon.S \
+    lpc_masking_model_neon.S
 
 # Flags passed to both C and C++ files.
 LOCAL_CFLAGS := \
@@ -126,7 +129,8 @@ LOCAL_C_INCLUDES := \
 
 LOCAL_STATIC_LIBRARIES := \
     libwebrtc_isacfix \
-    libwebrtc_spl
+    libwebrtc_spl \
+    libwebrtc_system_wrappers
 
 ifeq ($(WEBRTC_BUILD_NEON_LIBS),true)
 LOCAL_STATIC_LIBRARIES += \

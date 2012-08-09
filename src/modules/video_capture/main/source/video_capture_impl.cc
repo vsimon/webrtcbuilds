@@ -10,7 +10,7 @@
 
 #include "video_capture_impl.h"
 
-#include "common_video/libyuv/include/libyuv.h"
+#include "common_video/libyuv/include/webrtc_libyuv.h"
 #include "critical_section_wrapper.h"
 #include "module_common_types.h"
 #include "ref_count.h"
@@ -48,6 +48,7 @@ WebRtc_Word32 VideoCaptureImpl::ChangeUniqueId(const WebRtc_Word32 id)
 // returns the number of milliseconds until the module want a worker thread to call Process
 WebRtc_Word32 VideoCaptureImpl::TimeUntilNextProcess()
 {
+    CriticalSectionScoped cs(&_callBackCs);
     TickTime timeNow = TickTime::Now();
 
     WebRtc_Word32 timeToNormalProcess = kProcessInterval

@@ -55,6 +55,7 @@
     'build_libyuv%': 1,
 
     'webrtc_vp8_dir%': '<(webrtc_root)/modules/video_coding/codecs/vp8',
+    'libyuv_dir%': '<(DEPTH)/third_party/libyuv',
 
     'conditions': [
       ['OS=="android"', {
@@ -112,7 +113,7 @@
     'defines': [
       # TODO(leozwang): Run this as a gclient hook rather than at build-time:
       # http://code.google.com/p/webrtc/issues/detail?id=687
-      'WEBRTC_SVNREVISION="Unavailable (issue687)"',
+      'WEBRTC_SVNREVISION="Unavailable(issue687)"',
       #'WEBRTC_SVNREVISION="<!(python <(webrtc_root)/build/version.py)"',
     ],
     'conditions': [
