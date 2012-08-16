@@ -608,7 +608,6 @@ void RTPHeaderParser::ParseOneByteExtensionHeader(
     const WebRtc_UWord8* ptrRTPDataExtensionEnd,
     const WebRtc_UWord8* ptr) const {
   if (!ptrExtensionMap) {
-    WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, -1, "No extension map.");
     return;
   }
 
@@ -676,7 +675,7 @@ void RTPHeaderParser::ParseOneByteExtensionHeader(
         break;
       }
       default: {
-        WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, -1,
+        WEBRTC_TRACE(kTraceStream, kTraceRtpRtcp, -1,
                      "Extension type not implemented.");
         return;
       }

@@ -516,6 +516,10 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         ReadSettings();
     }
 
+    private String GetRemoteIPString() {
+        return etRemoteIp.getText().toString();
+    }
+
     private void StartCall() {
         int ret = 0;
 
@@ -531,10 +535,10 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
 
             channel = ViEAndroidAPI.CreateChannel(voiceChannel);
             ret = ViEAndroidAPI.SetLocalReceiver(channel,
-                    receivePortVideo);
+                                                 receivePortVideo);
             ret = ViEAndroidAPI.SetSendDestination(channel,
-                    destinationPortVideo,
-                    remoteIp.getBytes());
+                                                   destinationPortVideo,
+                                                   GetRemoteIPString());
 
             if (enableVideoReceive) {
                 if(useOpenGLRender) {
@@ -576,6 +580,9 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
                 ret = ViEAndroidAPI.StartSend(channel);
             }
 
+            // TODO(leozwang): Add more options besides PLI, currently use pli
+            // as the default. Also check return value.
+            ret = ViEAndroidAPI.EnablePLI(channel, true);
             ret = ViEAndroidAPI.SetCallback(channel, this);
 
             if (enableVideoSend) {
@@ -676,8 +683,8 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
         }
 
         if (0 != ViEAndroidAPI.VoE_SetSendDestination(voiceChannel,
-                        destinationPortVoice,
-                        remoteIp)) {
+                                                      destinationPortVoice,
+                                                      GetRemoteIPString())) {
             Log.d(TAG, "VoE set send  destination failed");
         }
 
