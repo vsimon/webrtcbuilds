@@ -144,6 +144,8 @@ TestStereo::~TestStereo() {
 }
 
 void TestStereo::Perform() {
+  char file_name_stereo[500];
+  char file_name_mono[500];
   WebRtc_UWord16 frequency_hz;
   int audio_channels;
   int codec_channels;
@@ -158,10 +160,9 @@ void TestStereo::Perform() {
   }
 
   // Open both mono and stereo test files in 32 kHz.
-  const std::string file_name_stereo =
-      webrtc::test::ResourcePath("audio_coding/teststereo32kHz", "pcm");
-  const std::string file_name_mono =
-      webrtc::test::ResourcePath("audio_coding/testfile32kHz", "pcm");
+  strcpy(file_name_stereo, "./data/audio_coding/teststereo32kHz.pcm");
+  strcpy(file_name_mono, "./data/audio_coding/testfile32kHz.pcm");
+
   frequency_hz = 32000;
   in_file_stereo_ = new PCMFile();
   in_file_mono_ = new PCMFile();
@@ -654,7 +655,7 @@ void TestStereo::RegisterSendCodec(char side, char* codec_name,
                                    int payload_type) {
   if (test_mode_ != 0) {
     // Print out codec and settings
-    printf("Codec: %s Freq: %d Rate: %d PackSize: %d\n", codec_name,
+    printf("Codec: %s Freq: %d Rate: %d PackSize: %d", codec_name,
            sampling_freq_hz, rate, pack_size);
   }
 
@@ -775,11 +776,9 @@ void TestStereo::Run(TestPackStereo* channel, int in_channels, int out_channels,
 }
 
 void TestStereo::OpenOutFile(WebRtc_Word16 test_number) {
-  std::string file_name;
-  std::stringstream file_stream;
-  file_stream << webrtc::test::OutputPath() << "teststereo_out_"
-      << test_number << ".pcm";
-  file_name = file_stream.str();
+  char file_name[500];
+  sprintf(file_name, "%s/teststereo_out_%02d.pcm",
+          webrtc::test::OutputPath().c_str(), test_number);
   out_file_.Open(file_name, 32000, "wb");
 }
 

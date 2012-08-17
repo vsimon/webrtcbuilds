@@ -13,7 +13,6 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <string>
 
 #include "module_common_types.h"
 #include "typedefs.h"
@@ -29,9 +28,8 @@ class PCMFile {
       fclose(pcm_file_);
     }
   }
-
-  void Open(const std::string& filename, WebRtc_UWord16 frequency,
-                  const char* mode, bool auto_rewind = false);
+  void Open(const char *filename, WebRtc_UWord16 frequency, const char *mode,
+            bool auto_rewind = false);
 
   WebRtc_Word32 Read10MsData(AudioFrame& audio_frame);
 
@@ -46,11 +44,9 @@ class PCMFile {
     return end_of_file_;
   }
   void Rewind();
-  static WebRtc_Word16 ChooseFile(std::string* file_name,
-                                  WebRtc_Word16 max_len,
+  static WebRtc_Word16 ChooseFile(char* filename, WebRtc_Word16 max_len,
                                   WebRtc_UWord16* frequency_hz);
-  static WebRtc_Word16 ChooseFile(std::string* file_name,
-                                  WebRtc_Word16 max_len);
+  static WebRtc_Word16 ChooseFile(char* filename, WebRtc_Word16 max_len);
   bool Rewinded();
   void SaveStereo(bool is_stereo = true);
   void ReadStereo(bool is_stereo = true);
