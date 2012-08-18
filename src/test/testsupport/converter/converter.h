@@ -23,10 +23,9 @@ class Converter {
  public:
   Converter(int width, int height);
 
-  // Converts RGBA to YUV video. If the delete_frames argument is true, the
-  // method will delete the input frames after conversion.
+  // Converts RGBA to YUV video.
   bool ConvertRGBAToI420Video(std::string frames_dir,
-                              std::string output_file_name, bool delete_frames);
+                              std::string output_file_name);
 
  private:
   int width_;  // Width of the video (respectively of the RGBA frames).

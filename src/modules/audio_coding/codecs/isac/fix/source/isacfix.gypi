@@ -97,9 +97,8 @@
             '<(webrtc_root)/common_audio/common_audio.gyp:signal_processing',
           ],
           'sources': [
-            'filters_neon.c',
             'lattice_neon.S',
-            'lpc_masking_model_neon.S',
+            'filters_neon.c',
           ],
         },
       ],

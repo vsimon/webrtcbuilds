@@ -53,45 +53,62 @@ SpatialAudio::Setup()
     // Register the receiver ACM in channel
     _channel->RegisterReceiverACM(_acmReceiver);
 
+    char audioFileName[MAX_FILE_NAME_LENGTH_BYTE];
     WebRtc_UWord16 sampFreqHz = 32000;
 
-    const std::string file_name =
-        webrtc::test::ResourcePath("audio_coding/testfile32kHz", "pcm");
-    _inFile.Open(file_name, sampFreqHz, "rb", false);
-
-    std::string output_file = webrtc::test::OutputPath() +
-        "out_spatial_autotest.pcm";
+    strncpy(audioFileName, "./data/audio_coding/testfile32kHz.pcm",
+            MAX_FILE_NAME_LENGTH_BYTE - 1);
     if(_testMode == 1)
     {
-        output_file = webrtc::test::OutputPath() + "testspatial_out.pcm";
+        printf("Enter the input file [%s]: ", audioFileName);
+        PCMFile::ChooseFile(audioFileName, MAX_FILE_NAME_LENGTH_BYTE, &sampFreqHz);
+    }
+    _inFile.Open(audioFileName, sampFreqHz, "rb", false);
+
+    if(_testMode == 0)
+    {
+        std::string outputFile = webrtc::test::OutputPath() +
+            "out_spatial_autotest.pcm";
+        strncpy(audioFileName, outputFile.c_str(),
+                MAX_FILE_NAME_LENGTH_BYTE - 1);
+    }
+    else if(_testMode == 1)
+    {
         printf("\n");
-        printf("Enter the output file [%s]: ", output_file.c_str());
-        PCMFile::ChooseFile(&output_file, MAX_FILE_NAME_LENGTH_BYTE,
-                            &sampFreqHz);
+        std::string outputFile = webrtc::test::OutputPath() +
+            "testspatial_out.pcm";
+        strncpy(audioFileName, outputFile.c_str(),
+                MAX_FILE_NAME_LENGTH_BYTE - 1);
+        printf("Enter the output file [%s]: ", audioFileName);
+        PCMFile::ChooseFile(audioFileName, MAX_FILE_NAME_LENGTH_BYTE, &sampFreqHz);
     }
     else
     {
-        output_file = webrtc::test::OutputPath() + "testspatial_out.pcm";
+        std::string outputFile = webrtc::test::OutputPath() +
+            "testspatial_out.pcm";
+        strncpy(audioFileName, outputFile.c_str(),
+                MAX_FILE_NAME_LENGTH_BYTE - 1);
     }
-    _outFile.Open(output_file, sampFreqHz, "wb", false);
+    _outFile.Open(audioFileName, sampFreqHz, "wb", false);
     _outFile.SaveStereo(true);
 
-    // Register all available codes as receiving codecs.
+
+    // Register couple of codecs as receive codec    
     CodecInst codecInst;
-    int status;
-    WebRtc_UWord8 num_encoders = _acmReceiver->NumberOfCodecs();
-    // Register all available codes as receiving codecs once more.
-    for (WebRtc_UWord8 n = 0; n < num_encoders; n++) {
-      status = _acmReceiver->Codec(n, codecInst);
-      if (status < 0) {
-        printf("Error in Codec(), no matching codec found");
-      }
-      status = _acmReceiver->RegisterReceiveCodec(codecInst);
-      if (status < 0) {
-        printf("Error in RegisterReceiveCodec() for payload type %d",
-               codecInst.pltype);
-      }
-    }
+
+    _acmLeft->Codec((WebRtc_UWord8)0, codecInst);    
+    codecInst.channels = 2;
+    CHECK_ERROR(_acmReceiver->RegisterReceiveCodec(codecInst));
+
+    _acmLeft->Codec((WebRtc_UWord8)3, codecInst);    
+    codecInst.channels = 2;
+    CHECK_ERROR(_acmReceiver->RegisterReceiveCodec(codecInst));
+ 
+    _acmLeft->Codec((WebRtc_UWord8)1, codecInst);
+    CHECK_ERROR(_acmReceiver->RegisterReceiveCodec(codecInst));
+    
+    _acmLeft->Codec((WebRtc_UWord8)4, codecInst);
+    CHECK_ERROR(_acmReceiver->RegisterReceiveCodec(codecInst));
 
     return 0;
 }
@@ -102,8 +119,7 @@ SpatialAudio::Perform()
     if(_testMode == 0)
     {
         printf("Running SpatialAudio Test");
-        WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceAudioCoding, -1,
-                     "---------- SpatialAudio ----------");
+        WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceAudioCoding, -1, "---------- SpatialAudio ----------");
     }
 
     Setup();

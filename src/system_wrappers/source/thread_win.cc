@@ -18,6 +18,11 @@
 #include "set_thread_name_win.h"
 #include "trace.h"
 
+#if defined(_WIN32)
+// VS 2005: Disable warnings for default initialized arrays.
+#pragma warning(disable:4351)
+#endif
+
 namespace webrtc {
 ThreadWindows::ThreadWindows(ThreadRunFunction func, ThreadObj obj,
                              ThreadPriority prio, const char* threadName)

@@ -10,7 +10,6 @@
 
 #include "EncodeDecodeTest.h"
 
-#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,17 +59,20 @@ void Sender::Setup(AudioCodingModule *acm, RTPStream *rtpStream) {
   int noOfCodecs = acm->NumberOfCodecs();
   int codecNo;
 
-  // Open input file
-  const std::string file_name =
-      webrtc::test::ResourcePath("audio_coding/testfile32kHz", "pcm");
-  _pcmFile.Open(file_name, 32000, "rb");
-
-  // Set the codec for the current test.
-  if ((testMode == 0) || (testMode == 1)) {
-    // Set the codec id.
+  if (testMode == 1) {
+    // Set the codec, input file, and parameters for the current test.
     codecNo = codeId;
+    // Use same input file for now.
+    char fileName[] = "./data/audio_coding/testfile32kHz.pcm";
+    _pcmFile.Open(fileName, 32000, "rb");
+  } else if (testMode == 0) {
+    // Set the codec, input file, and parameters for the current test.
+    codecNo = codeId;
+    acm->Codec(codecNo, sendCodec);
+    // Use same input file for now.
+    char fileName[] = "./data/audio_coding/testfile32kHz.pcm";
+    _pcmFile.Open(fileName, 32000, "rb");
   } else {
-    // Choose codec on command line.
     printf("List of supported codec.\n");
     for (int n = 0; n < noOfCodecs; n++) {
       acm->Codec(n, sendCodec);
@@ -78,6 +80,8 @@ void Sender::Setup(AudioCodingModule *acm, RTPStream *rtpStream) {
     }
     printf("Choose your codec:");
     ASSERT_GT(scanf("%d", &codecNo), 0);
+    char fileName[] = "./data/audio_coding/testfile32kHz.pcm";
+    _pcmFile.Open(fileName, 32000, "rb");
   }
 
   acm->Codec(codecNo, sendCodec);
@@ -91,8 +95,8 @@ void Sender::Setup(AudioCodingModule *acm, RTPStream *rtpStream) {
            codeId);
   }
 
-  _acm = acm;
-}
+    _acm = acm;
+  }
 
 void Sender::Teardown() {
   _pcmFile.Close();
@@ -151,28 +155,30 @@ void Receiver::Setup(AudioCodingModule *acm, RTPStream *rtpStream) {
     }
   }
 
-  int playSampFreq;
-  std::string file_name;
-  std::stringstream file_stream;
-  file_stream << webrtc::test::OutputPath() << "encodeDecode_out" <<
-      static_cast<int>(codeId) << ".pcm";
-  file_name = file_stream.str();
+  char filename[256];
   _rtpStream = rtpStream;
+  int playSampFreq;
 
   if (testMode == 1) {
     playSampFreq=recvCodec.plfreq;
-    _pcmFile.Open(file_name, recvCodec.plfreq, "wb+");
+    //output file for current run
+    sprintf(filename,"%s/out%dFile.pcm", webrtc::test::OutputPath().c_str(),
+            codeId);
+    _pcmFile.Open(filename, recvCodec.plfreq, "wb+");
   } else if (testMode == 0) {
     playSampFreq=32000;
-    _pcmFile.Open(file_name, 32000, "wb+");
+    //output file for current run
+    sprintf(filename,  "%s/encodeDecode_out%d.pcm",
+            webrtc::test::OutputPath().c_str(), codeId);
+    _pcmFile.Open(filename, 32000/*recvCodec.plfreq*/, "wb+");
   } else {
     printf("\nValid output frequencies:\n");
     printf("8000\n16000\n32000\n-1,");
-    printf("which means output frequency equal to received signal frequency");
+    printf("which means output freq equal to received signal freq");
     printf("\n\nChoose output sampling frequency: ");
     ASSERT_GT(scanf("%d", &playSampFreq), 0);
-    file_name =  webrtc::test::OutputPath() + "encodeDecode_out.pcm";
-    _pcmFile.Open(file_name, playSampFreq, "wb+");
+    sprintf(filename,  "%s/outFile.pcm", webrtc::test::OutputPath().c_str());
+    _pcmFile.Open(filename, 32000, "wb+");
   }
 
   _realPayloadSizeBytes = 0;
