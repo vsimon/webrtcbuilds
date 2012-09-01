@@ -20,6 +20,7 @@
 #include "../source/audio_device_config.h"
 #include "../source/audio_device_impl.h"
 #include "../source/audio_device_utility.h"
+#include "system_wrappers/interface/sleep.h"
 
 // Helper functions
 #if defined(ANDROID)
@@ -531,7 +532,7 @@ TEST_F(AudioDeviceAPITest, InitPlayout) {
     EXPECT_EQ(0, audio_device_->InitPlayout());
     // Sleep is needed for e.g. iPhone since we after stopping then starting may
     // have a hangover time of a couple of ms before initialized.
-    AudioDeviceUtility::Sleep(50);
+    SleepMs(50);
     EXPECT_TRUE(audio_device_->PlayoutIsInitialized());
   }
 
@@ -580,7 +581,7 @@ TEST_F(AudioDeviceAPITest, InitRecording) {
   EXPECT_EQ(0, audio_device_->RecordingIsAvailable(&available));
   if (available) {
     EXPECT_EQ(0, audio_device_->InitRecording());
-    AudioDeviceUtility::Sleep(50);
+    SleepMs(50);
     EXPECT_TRUE(audio_device_->RecordingIsInitialized());
   }
 
@@ -939,6 +940,8 @@ TEST_F(AudioDeviceAPITest, SpeakerVolumeIsAvailable) {
 // SpeakerVolume
 // MaxSpeakerVolume
 // MinSpeakerVolume
+// NOTE: Disabled on mac due to issue 257.
+#ifndef WEBRTC_MAC
 TEST_F(AudioDeviceAPITest, SpeakerVolumeTests) {
   WebRtc_UWord32 vol(0);
   WebRtc_UWord32 volume(0);
@@ -1034,6 +1037,7 @@ TEST_F(AudioDeviceAPITest, SpeakerVolumeTests) {
         maxVolume/3 : maxVolume/10) == 0);
   }
 }
+#endif  // !WEBRTC_MAC
 
 TEST_F(AudioDeviceAPITest, AGC) {
   // NOTE: The AGC API only enables/disables the AGC. To ensure that it will
@@ -1080,6 +1084,8 @@ TEST_F(AudioDeviceAPITest, MicrophoneVolumeIsAvailable) {
 // MicrophoneVolume
 // MaxMicrophoneVolume
 // MinMicrophoneVolume
+// NOTE: Disabled on mac due to issue 257.
+#ifndef WEBRTC_MAC
 TEST_F(AudioDeviceAPITest, MicrophoneVolumeTests) {
   WebRtc_UWord32 vol(0);
   WebRtc_UWord32 volume(0);
@@ -1173,6 +1179,7 @@ TEST_F(AudioDeviceAPITest, MicrophoneVolumeTests) {
     EXPECT_EQ(0, audio_device_->SetMicrophoneVolume(maxVolume/10));
   }
 }
+#endif  // !WEBRTC_MAC
 
 TEST_F(AudioDeviceAPITest, SpeakerMuteIsAvailable) {
   bool available;
@@ -1704,7 +1711,7 @@ TEST_F(AudioDeviceAPITest, StartAndStopRawOutputFileRecording) {
 
   EXPECT_EQ(0, audio_device_->StartRawOutputFileRecording(
       GetFilename("raw_output_playing.pcm")));
-  AudioDeviceUtility::Sleep(100);
+  SleepMs(100);
   EXPECT_EQ(0, audio_device_->StopRawOutputFileRecording());
   EXPECT_EQ(0, audio_device_->StopPlayout());
   EXPECT_EQ(0, audio_device_->StartRawOutputFileRecording(
@@ -1717,6 +1724,8 @@ TEST_F(AudioDeviceAPITest, StartAndStopRawOutputFileRecording) {
   // - size of raw_output_playing.pcm shall be > 0
 }
 
+// TODO(phoglund): The following test is flaky on Linux.
+#if !defined(WEBRTC_LINUX)
 TEST_F(AudioDeviceAPITest, StartAndStopRawInputFileRecording) {
   // NOTE: this API is better tested in a functional test
   CheckInitialRecordingStates();
@@ -1738,7 +1747,7 @@ TEST_F(AudioDeviceAPITest, StartAndStopRawInputFileRecording) {
 #endif
   EXPECT_EQ(0, audio_device_->StartRawInputFileRecording(
       GetFilename("raw_input_recording.pcm")));
-  AudioDeviceUtility::Sleep(100);
+  SleepMs(100);
   EXPECT_EQ(0, audio_device_->StopRawInputFileRecording());
   EXPECT_EQ(0, audio_device_->StopRecording());
   EXPECT_EQ(0, audio_device_->StartRawInputFileRecording(
@@ -1750,7 +1759,8 @@ TEST_F(AudioDeviceAPITest, StartAndStopRawInputFileRecording) {
   // - size of raw_input_not_recording.pcm shall be 0
   // - size of raw_input_not_recording.pcm shall be > 0
 }
-#endif
+#endif  // !WEBRTC_LINUX
+#endif  // !WIN32
 
 TEST_F(AudioDeviceAPITest, RecordingSampleRate) {
   WebRtc_UWord32 sampleRate(0);
@@ -1806,7 +1816,7 @@ TEST_F(AudioDeviceAPITest, ResetAudioDevice) {
   {
     TEST_LOG("Resetting sound device several time with pause %d ms\n", l);
     EXPECT_EQ(0, audio_device_->ResetAudioDevice());
-    AudioDeviceUtility::Sleep(l);
+    SleepMs(l);
   }
 #else
   // Fail tests

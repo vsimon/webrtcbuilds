@@ -10,7 +10,7 @@ vars = {
   # If you do not know, use the full path while defining your new deps entry.
   "googlecode_url": "http://%s.googlecode.com/svn",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
-  "chromium_revision": "143348",
+  "chromium_revision": "152335",
 
   # External resources like video and audio files used for testing purposes.
   # Downloaded on demand when needed.
@@ -51,7 +51,7 @@ deps = {
     "http://git.chromium.org/webm/libvpx.git@c522217d",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@255",
+    (Var("googlecode_url") % "libyuv") + "/trunk@338",
 
   "third_party/protobuf":
     Var("chromium_trunk") + "/src/third_party/protobuf@" + Var("chromium_revision"),
@@ -83,7 +83,7 @@ deps_os = {
   "win": {
     # Use our own, stripped down, version of Cygwin (required by GYP).
     "third_party/cygwin":
-      (Var("googlecode_url") % "webrtc") + "/deps/third_party/cygwin",
+      (Var("googlecode_url") % "webrtc") + "/deps/third_party/cygwin@2672",
 
     # Used by libjpeg-turbo.
     "third_party/yasm/binaries":

@@ -15,6 +15,7 @@
 #include "audio_device_config.h"
 
 #include "event_wrapper.h"
+#include "system_wrappers/interface/sleep.h"
 #include "trace.h"
 #include "thread_wrapper.h"
 
@@ -93,7 +94,6 @@ AudioDeviceLinuxALSA::AudioDeviceLinuxALSA(const WebRtc_Word32 id) :
     _playoutBuffer(NULL),
     _recordingFramesLeft(0),
     _playoutFramesLeft(0),
-    _playbackBufferSize(0),
     _playBufType(AudioDeviceModule::kFixedBufferSize),
     _initialized(false),
     _recording(false),
@@ -103,7 +103,6 @@ AudioDeviceLinuxALSA::AudioDeviceLinuxALSA(const WebRtc_Word32 id) :
     _AGC(false),
     _recordingDelay(0),
     _playoutDelay(0),
-    _writeErrors(0),
     _playWarning(0),
     _playError(0),
     _recWarning(0),
@@ -1141,7 +1140,7 @@ WebRtc_Word32 AudioDeviceLinuxALSA::InitPlayout()
     {
         for (int i=0; i < 5; i++)
         {
-            sleep(1);
+            SleepMs(1000);
             errVal = LATE(snd_pcm_open)
                          (&_handlePlayout,
                           deviceName,
@@ -1298,7 +1297,7 @@ WebRtc_Word32 AudioDeviceLinuxALSA::InitRecording()
     {
         for (int i=0; i < 5; i++)
         {
-            sleep(1);
+            SleepMs(1000);
             errVal = LATE(snd_pcm_open)
                          (&_handleRecord,
                           deviceName,
