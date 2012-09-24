@@ -21,8 +21,7 @@
       'dependencies': [
 
         # common_video
-       '<(webrtc_root)/common_video/common_video.gyp:webrtc_libyuv',
-       '<(webrtc_root)/common_video/common_video.gyp:webrtc_jpeg',
+       '<(webrtc_root)/common_video/common_video.gyp:common_video',
 
         # ModulesShared
         '<(webrtc_root)/modules/modules.gyp:media_file',
@@ -69,6 +68,7 @@
         'include/vie_rtp_rtcp.h',
 
         # headers
+        'encoder_state_feedback.h',
         'stream_synchronization.h',
         'vie_base_impl.h',
         'vie_capture_impl.h',
@@ -104,6 +104,7 @@
         'vie_sync_module.h',
 
         # ViE
+        'encoder_state_feedback.cc',
         'stream_synchronization.cc',
         'vie_base_impl.cc',
         'vie_capture_impl.cc',
@@ -157,6 +158,7 @@
             '../modules/rtp_rtcp/interface',
           ],
           'sources': [
+            'encoder_state_feedback_unittest.cc',
             'stream_synchronization_unittest.cc',
             'vie_remb_unittest.cc',
           ],

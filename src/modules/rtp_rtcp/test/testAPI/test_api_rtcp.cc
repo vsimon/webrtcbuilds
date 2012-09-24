@@ -19,7 +19,7 @@
 #include "rtp_rtcp_defines.h"
 
 using namespace webrtc;
- 
+
 const uint64_t kTestPictureId = 12345678;
 
 class RtcpCallback : public RtcpFeedback, public RtcpIntraFrameObserver {
@@ -51,21 +51,24 @@ class RtcpCallback : public RtcpFeedback, public RtcpIntraFrameObserver {
     EXPECT_STRCASEEQ("test", print_name);
   };
   virtual void OnSendReportReceived(const WebRtc_Word32 id,
-                                    const WebRtc_UWord32 senderSSRC) {
+                                    const WebRtc_UWord32 senderSSRC,
+                                    uint32_t ntp_secs,
+                                    uint32_t ntp_frac,
+                                    uint32_t timestamp) {
     RTCPSenderInfo senderInfo;
     EXPECT_EQ(0, _rtpRtcpModule->RemoteRTCPStat(&senderInfo));
   };
   virtual void OnReceiveReportReceived(const WebRtc_Word32 id,
                                        const WebRtc_UWord32 senderSSRC) {
   };
-  virtual void OnReceivedIntraFrameRequest(const uint32_t ssrc) {
+  virtual void OnReceivedIntraFrameRequest(uint32_t ssrc) {
   };
-  virtual void OnReceivedSLI(const uint32_t ssrc,
-                             const uint8_t pictureId) {
+  virtual void OnReceivedSLI(uint32_t ssrc,
+                             uint8_t pictureId) {
     EXPECT_EQ(28, pictureId);
   };
-  virtual void OnReceivedRPSI(const uint32_t ssrc,
-                              const uint64_t pictureId) {
+  virtual void OnReceivedRPSI(uint32_t ssrc,
+                              uint64_t pictureId) {
     EXPECT_EQ(kTestPictureId, pictureId);
   };
  private:
@@ -251,8 +254,11 @@ TEST_F(RtpRtcpRtcpTest, RTCP) {
   WebRtc_UWord32 receivedNTPfrac = 0;
   WebRtc_UWord32 RTCPArrivalTimeSecs = 0;
   WebRtc_UWord32 RTCPArrivalTimeFrac = 0;
-  EXPECT_EQ(0, module2->RemoteNTP(&receivedNTPsecs, &receivedNTPfrac,
-                                  &RTCPArrivalTimeSecs, &RTCPArrivalTimeFrac));
+  EXPECT_EQ(0, module2->RemoteNTP(&receivedNTPsecs,
+                                  &receivedNTPfrac,
+                                  &RTCPArrivalTimeSecs,
+                                  &RTCPArrivalTimeFrac,
+                                  NULL));
 
 
   // get all report blocks

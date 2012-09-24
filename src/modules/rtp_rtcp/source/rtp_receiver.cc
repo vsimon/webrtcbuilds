@@ -32,10 +32,9 @@ using ModuleRTPUtility::VideoPayload;
 RTPReceiver::RTPReceiver(const WebRtc_Word32 id,
                          const bool audio,
                          RtpRtcpClock* clock,
-                         RemoteBitrateEstimator* remote_bitrate,
                          ModuleRtpRtcpImpl* owner) :
     RTPReceiverAudio(id),
-    RTPReceiverVideo(id, remote_bitrate, owner),
+    RTPReceiverVideo(id, owner),
     Bitrate(clock),
     _id(id),
     _audio(audio),
@@ -71,6 +70,7 @@ RTPReceiver::RTPReceiver(const WebRtc_Word32 id,
     _cumulativeLoss(0),
     _jitterQ4TransmissionTimeOffset(0),
     _localTimeLastReceivedTimestamp(0),
+    _lastReceivedFrameTimeMs(0),
     _lastReceivedTimestamp(0),
     _lastReceivedSequenceNumber(0),
     _lastReceivedTransmissionTimeOffset(0),
@@ -784,6 +784,7 @@ WebRtc_Word32 RTPReceiver::IncomingRTPPacket(
   if (!old_packet) {
     if (_lastReceivedTimestamp != rtp_header->header.timestamp) {
       _lastReceivedTimestamp = rtp_header->header.timestamp;
+      _lastReceivedFrameTimeMs = _clock.GetTimeInMS();
     }
     _lastReceivedSequenceNumber = rtp_header->header.sequenceNumber;
     _lastReceivedTransmissionTimeOffset =
@@ -995,6 +996,12 @@ RTPReceiver::TimeStamp() const
     return _lastReceivedTimestamp;
 }
 
+int32_t RTPReceiver::LastReceivedTimeMs() const
+{
+    CriticalSectionScoped lock(_criticalSectionRTPReceiver);
+    return _lastReceivedFrameTimeMs;
+}
+
 WebRtc_UWord32 RTPReceiver::PayloadTypeToPayload(
     const WebRtc_UWord8 payloadType,
     Payload*& payload) const {
@@ -1087,6 +1094,7 @@ void RTPReceiver::CheckSSRCChanged(const WebRtcRTPHeader* rtpHeader) {
       _lastReceivedTimestamp      = 0;
       _lastReceivedSequenceNumber = 0;
       _lastReceivedTransmissionTimeOffset = 0;
+      _lastReceivedFrameTimeMs = 0;
 
       if (_SSRC) {  // do we have a SSRC? then the stream is restarted
         //  if we have the same codec? reinit decoder

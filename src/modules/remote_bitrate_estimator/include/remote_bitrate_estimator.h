@@ -8,8 +8,7 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-// RemoteBitrateEstimator
-// This class estimates the incoming bitrate capacity.
+// This class estimates the incoming available bandwidth.
 
 #ifndef WEBRTC_MODULES_REMOTE_BITRATE_ESTIMATOR_INCLUDE_REMOTE_BITRATE_ESTIMATOR_H_
 #define WEBRTC_MODULES_REMOTE_BITRATE_ESTIMATOR_INCLUDE_REMOTE_BITRATE_ESTIMATOR_H_
@@ -19,18 +18,21 @@
 #include "modules/remote_bitrate_estimator/bitrate_estimator.h"
 #include "modules/remote_bitrate_estimator/overuse_detector.h"
 #include "modules/remote_bitrate_estimator/remote_rate_control.h"
+#include "system_wrappers/interface/constructor_magic.h"
 #include "system_wrappers/interface/critical_section_wrapper.h"
 #include "system_wrappers/interface/scoped_ptr.h"
 #include "typedefs.h"
+#include "video_engine/stream_synchronization.h"
 
 namespace webrtc {
 
 // RemoteBitrateObserver is used to signal changes in bitrate estimates for
-// the incoming stream.
+// the incoming streams.
 class RemoteBitrateObserver {
  public:
   // Called when a receive channel has a new bitrate estimate for the incoming
   // stream.
+  // TODO(holmer): Remove |ssrc| argument and remove SSRC map from VieRemb.
   virtual void OnReceiveBitrateChanged(unsigned int ssrc,
                                        unsigned int bitrate) = 0;
 
@@ -39,54 +41,45 @@ class RemoteBitrateObserver {
 
 class RemoteBitrateEstimator {
  public:
-  RemoteBitrateEstimator(RemoteBitrateObserver* observer,
-                         const OverUseDetectorOptions& options);
-
-  // Called for each incoming packet. If this is a new SSRC, a new
-  // BitrateControl will be created.
-  void IncomingPacket(unsigned int ssrc,
-                      int packet_size,
-                      int64_t arrival_time,
-                      uint32_t rtp_timestamp,
-                      int64_t packet_send_time);
-
-  // Triggers a new estimate calculation for the stream identified by |ssrc|.
-  void UpdateEstimate(unsigned int ssrc, int64_t time_now);
-
-  // Set the current round-trip time experienced by the stream identified by
-  // |ssrc|.
-  void SetRtt(unsigned int ssrc);
-
-  // Removes all data for |ssrc|.
-  void RemoveStream(unsigned int ssrc);
-
-  // Returns true if a valid estimate exists for a stream identified by |ssrc|
-  // and sets |bitrate_bps| to the estimated bitrate in bits per second.
-  bool LatestEstimate(unsigned int ssrc, unsigned int* bitrate_bps) const;
-
- private:
-  struct BitrateControls {
-    explicit BitrateControls(const OverUseDetectorOptions& options)
-        : remote_rate(),
-          overuse_detector(options),
-          incoming_bitrate() {
-    }
-    BitrateControls(const BitrateControls& other)
-        : remote_rate(other.remote_rate),
-          overuse_detector(other.overuse_detector),
-          incoming_bitrate(other.incoming_bitrate) {
-    }
-    RemoteRateControl remote_rate;
-    OverUseDetector overuse_detector;
-    BitRateStats incoming_bitrate;
+  enum EstimationMode {
+    kMultiStreamEstimation,
+    kSingleStreamEstimation
   };
 
-  typedef std::map<unsigned int, BitrateControls> SsrcBitrateControlsMap;
+  virtual ~RemoteBitrateEstimator() {}
 
-  const OverUseDetectorOptions& options_;
-  SsrcBitrateControlsMap bitrate_controls_;
-  RemoteBitrateObserver* observer_;
-  scoped_ptr<CriticalSectionWrapper> crit_sect_;
+  static RemoteBitrateEstimator* Create(RemoteBitrateObserver* observer,
+                                        const OverUseDetectorOptions& options,
+                                        EstimationMode mode);
+
+  // Stores an RTCP SR (NTP, RTP timestamp) tuple for a specific SSRC to be used
+  // in future RTP timestamp to NTP time conversions. As soon as any SSRC has
+  // two tuples the RemoteBitrateEstimator will switch to multi-stream mode.
+  virtual void IncomingRtcp(unsigned int ssrc, uint32_t ntp_secs,
+                            uint32_t ntp_frac, uint32_t rtp_timestamp) = 0;
+
+  // Called for each incoming packet. The first SSRC will immediately be used
+  // for overuse detection. Subsequent SSRCs will only be used when at least
+  // two RTCP SR reports with the same SSRC have been received.
+  virtual void IncomingPacket(unsigned int ssrc,
+                              int packet_size,
+                              int64_t arrival_time,
+                              uint32_t rtp_timestamp) = 0;
+
+  // Triggers a new estimate calculation.
+  virtual void UpdateEstimate(unsigned int ssrc, int64_t time_now) = 0;
+
+  // Set the current round-trip time experienced by the streams going into this
+  // estimator.
+  virtual void SetRtt(unsigned int rtt) = 0;
+
+  // Removes all data for |ssrc|.
+  virtual void RemoveStream(unsigned int ssrc) = 0;
+
+  // Returns true if a valid estimate exists and sets |bitrate_bps| to the
+  // estimated bitrate in bits per second.
+  virtual bool LatestEstimate(unsigned int ssrc,
+                              unsigned int* bitrate_bps) const = 0;
 };
 
 }  // namespace webrtc

@@ -104,7 +104,8 @@ void ViEAutoTest::ViERtpRtcpStandardTest()
     tbCapture.ConnectTo(tbChannel.videoChannel);
 
     ViETest::Log("\n");
-    TbExternalTransport myTransport(*(ViE.network));
+    TbExternalTransport myTransport(*(ViE.network), tbChannel.videoChannel,
+                                    NULL);
 
     EXPECT_EQ(0, ViE.network->RegisterSendTransport(
         tbChannel.videoChannel, myTransport));
@@ -375,7 +376,8 @@ void ViEAutoTest::ViERtpRtcpExtendedTest()
 
     //tbChannel.StartReceive(rtpPort);
     //tbChannel.StartSend(rtpPort);
-    TbExternalTransport myTransport(*(ViE.network));
+    TbExternalTransport myTransport(*(ViE.network), tbChannel.videoChannel,
+                                    NULL);
 
     EXPECT_EQ(0, ViE.network->RegisterSendTransport(
         tbChannel.videoChannel, myTransport));
@@ -429,8 +431,22 @@ void ViEAutoTest::ViERtpRtcpAPITest()
     //***************************************************************
     // Create VIE
     TbInterfaces ViE("ViERtpRtcpAPITest");
+
+    // Verify that we can set the bandwidth estimation mode, as that API only
+    // is valid to call before creating channels.
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetBandwidthEstimationMode(
+        webrtc::kViESingleStreamEstimation));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetBandwidthEstimationMode(
+        webrtc::kViEMultiStreamEstimation));
+
     // Create a video channel
     TbVideoChannel tbChannel(ViE, webrtc::kVideoCodecVP8);
+
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetBandwidthEstimationMode(
+        webrtc::kViESingleStreamEstimation));
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetBandwidthEstimationMode(
+        webrtc::kViEMultiStreamEstimation));
+
     // Create a capture device
     TbCaptureDevice tbCapture(ViE);
     tbCapture.ConnectTo(tbChannel.videoChannel);
@@ -646,7 +662,18 @@ void ViEAutoTest::ViERtpRtcpAPITest()
     EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiveTimestampOffsetStatus(
             tbChannel.videoChannel, false, 3));
 
-
+    // Transmission smoothening.
+    const int invalid_channel_id = 17;
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetTransmissionSmoothingStatus(
+        invalid_channel_id, true));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetTransmissionSmoothingStatus(
+        tbChannel.videoChannel, true));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetTransmissionSmoothingStatus(
+        tbChannel.videoChannel, true));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetTransmissionSmoothingStatus(
+        tbChannel.videoChannel, false));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetTransmissionSmoothingStatus(
+        tbChannel.videoChannel, false));
 
     //***************************************************************
     //  Testing finished. Tear down Video Engine

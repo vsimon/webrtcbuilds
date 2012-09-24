@@ -60,6 +60,7 @@
     # Disable these to not build components which can be externally provided.
     'build_libjpeg%': 1,
     'build_libyuv%': 1,
+    'build_libvpx%': 1,
 
     'libyuv_dir%': '<(DEPTH)/third_party/libyuv',
 
@@ -97,6 +98,21 @@
         # flood of chromium-style warnings. Investigate enabling them:
         # http://code.google.com/p/webrtc/issues/detail?id=163
         'clang_use_chrome_plugins%': 0,
+
+        # Switch between Android audio device OpenSL ES implementation
+        # and Java Implementation
+        'enable_android_opensl%': 1,
+      }],
+      ['OS=="ios"', {
+        'enable_video%': 0,
+        'enable_protobuf%': 0,
+        'build_libjpeg%': 0,
+        'build_libyuv%': 0,
+        'build_libvpx%': 0,
+        'include_tests%': 0,
+      }],
+      ['target_arch=="arm"', {
+        'prefer_fixed_point%': 1,
       }],
     ], # conditions
   },
@@ -135,25 +151,28 @@
         ],
       }],
       ['target_arch=="arm"', {
-        'prefer_fixed_point%': 1,
         'defines': [
           'WEBRTC_ARCH_ARM',
         ],
         'conditions': [
           ['armv7==1', {
-            'defines': [
-              'WEBRTC_ARCH_ARM_V7',
-              'WEBRTC_DETECT_ARM_NEON',
+            'defines': ['WEBRTC_ARCH_ARM_V7',],
+            'conditions': [
+              ['arm_neon==1', {
+                'defines': ['WEBRTC_ARCH_ARM_NEON',],
+              }, {
+                'defines': ['WEBRTC_DETECT_ARM_NEON',],
+              }],
             ],
           }],
-          ['arm_neon==1', {
-            'defines': [
-              'WEBRTC_ARCH_ARM_NEON',
-            ],
-            'defines!': [
-              'WEBRTC_DETECT_ARM_NEON',
-            ],
-          }],
+        ],
+      }],
+      ['OS=="ios"', {
+        'defines': [
+          'WEBRTC_MAC',
+          'WEBRTC_IOS',
+          'WEBRTC_THREAD_RR',
+          'WEBRTC_CLOCK_TYPE_REALTIME',
         ],
       }],
       ['OS=="linux"', {
@@ -168,7 +187,6 @@
       ['OS=="mac"', {
         'defines': [
           'WEBRTC_MAC',
-          'WEBRTC_MAC_INTEL',  # TODO(andrew): remove this.
           'WEBRTC_THREAD_RR',
           'WEBRTC_CLOCK_TYPE_REALTIME',
         ],
@@ -188,8 +206,6 @@
         'msvs_disabled_warnings!': [4189,],
       }],
       ['OS=="android"', {
-        # TODO(kma): Remove prefer_fixed_point for Android.
-        'prefer_fixed_point%': 1,
         'defines': [
           'WEBRTC_LINUX',
           'WEBRTC_ANDROID',
@@ -199,7 +215,13 @@
           # with condition and event functions in system_wrappers.
           'WEBRTC_CLOCK_TYPE_REALTIME',
           'WEBRTC_THREAD_RR',
-          'WEBRTC_ANDROID_OPENSLES',
+         ],
+         'conditions': [
+           ['enable_android_opensl==1', {
+             'defines': [
+               'WEBRTC_ANDROID_OPENSLES',
+             ],
+           }],
          ],
       }],
     ], # conditions

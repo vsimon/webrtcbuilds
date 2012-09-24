@@ -23,8 +23,6 @@
 
 #if defined(_WIN32)
 #include <qos.h>
-#elif defined(WEBRTC_MAC_INTEL)
-
 #endif
 
 class ViEAutoTestNetworkObserver: public webrtc::ViENetworkObserver
@@ -63,7 +61,8 @@ void ViEAutoTest::ViENetworkStandardTest()
         //
         // Transport
         //
-        TbExternalTransport testTransport(*ViE.network);
+        TbExternalTransport testTransport(*ViE.network, tbChannel.videoChannel,
+                                          NULL);
         EXPECT_EQ(0, ViE.network->RegisterSendTransport(
             tbChannel.videoChannel, testTransport));
         EXPECT_EQ(0, ViE.base->StartReceive(tbChannel.videoChannel));
@@ -227,7 +226,8 @@ void ViEAutoTest::ViENetworkAPITest()
         //
         // External transport
         //
-        TbExternalTransport testTransport(*ViE.network);
+        TbExternalTransport testTransport(*ViE.network, tbChannel.videoChannel,
+                                          NULL);
         EXPECT_EQ(0, ViE.network->RegisterSendTransport(
             tbChannel.videoChannel, testTransport));
         EXPECT_NE(0, ViE.network->RegisterSendTransport(

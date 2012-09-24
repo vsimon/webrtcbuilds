@@ -21,8 +21,11 @@ import org.webrtc.videoengine.ViERenderer;
 import android.app.TabActivity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.res.Configuration;
 import android.content.pm.ActivityInfo;
 import android.graphics.Canvas;
@@ -184,6 +187,8 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
 
     private StatsView statsView = null;
 
+    private BroadcastReceiver receiver;
+
     public int GetCameraOrientation(int cameraOrientation) {
         Display display = this.getWindowManager().getDefaultDisplay();
         int displatyRotation = display.getRotation();
@@ -230,6 +235,24 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
             PowerManager.SCREEN_DIM_WAKE_LOCK, TAG);
 
         setContentView(R.layout.tabhost);
+
+        IntentFilter receiverFilter = new IntentFilter(Intent.ACTION_HEADSET_PLUG);
+
+        receiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    AudioManager am = (AudioManager)getSystemService(AUDIO_SERVICE);
+                    if (am.isWiredHeadsetOn()) {
+                        enableSpeaker = false;
+                    }
+                    else {
+                        enableSpeaker = true;
+                    }
+                    RouteAudio(enableSpeaker);
+                }
+            };
+        registerReceiver(receiver, receiverFilter );
+
         mTabHost = getTabHost();
 
         // Main tab
@@ -457,9 +480,9 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
                         R.layout.row,
                         mVoiceCodecsStrings));
         spVoiceCodecType.setSelection(0);
-        // Find PCMU and use it
-        for (int i=0; i<mVoiceCodecsStrings.length; ++i) {
-            if (mVoiceCodecsStrings[i].contains("PCMU")) {
+        // Find ISAC and use it
+        for (int i = 0; i < mVoiceCodecsStrings.length; ++i) {
+            if (mVoiceCodecsStrings[i].contains("ISAC")) {
                 spVoiceCodecType.setSelection(i);
                 break;
             }
@@ -597,10 +620,10 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
 
             if (enableVideoSend) {
                 currentCameraOrientation =
-                        ViEAndroidAPI.GetCameraOrientation(usingFrontCamera?1:0);
+                        ViEAndroidAPI.GetCameraOrientation(usingFrontCamera ? 1 : 0);
                 ret = ViEAndroidAPI.SetSendCodec(channel, codecType, INIT_BITRATE,
                         codecSizeWidth, codecSizeHeight, SEND_CODEC_FRAMERATE);
-                int camId = ViEAndroidAPI.StartCamera(channel, usingFrontCamera?1:0);
+                int camId = ViEAndroidAPI.StartCamera(channel, usingFrontCamera ? 1 : 0);
 
                 if(camId > 0) {
                     cameraId = camId;
@@ -671,7 +694,7 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
     private int SetupVoE() {
         // Create VoiceEngine
         // Error logging is done in native API wrapper
-        ViEAndroidAPI.VoE_Create();
+        ViEAndroidAPI.VoE_Create(getApplicationContext());
 
         // Initialize
         if (0 != ViEAndroidAPI.VoE_Init(enableTrace)) {
@@ -746,16 +769,8 @@ public class WebRTCDemo extends TabActivity implements IViEAndroidCallback,
     }
 
     private void RouteAudio(boolean enableSpeaker) {
-        int sdkVersion = Integer.parseInt(android.os.Build.VERSION.SDK);
-        if (sdkVersion >= 5) {
-            AudioManager am =
-                    (AudioManager) this.getSystemService(Context.AUDIO_SERVICE);
-            am.setSpeakerphoneOn(enableSpeaker);
-        }
-        else {
-            if (0 != ViEAndroidAPI.VoE_SetLoudspeakerStatus(enableSpeaker)) {
-                Log.d(TAG, "VoE set louspeaker status failed");
-            }
+        if (0 != ViEAndroidAPI.VoE_SetLoudspeakerStatus(enableSpeaker)) {
+            Log.d(TAG, "VoE set louspeaker status failed");
         }
     }
 

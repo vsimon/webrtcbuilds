@@ -68,12 +68,14 @@ class ViERTP_RTCPImpl
                                        const ViEKeyFrameRequestMethod method);
   virtual int SetTMMBRStatus(const int video_channel, const bool enable);
   virtual int SetRembStatus(int video_channel, bool sender, bool receiver);
+  virtual int SetBandwidthEstimationMode(BandwidthEstimationMode mode);
   virtual int SetSendTimestampOffsetStatus(int video_channel,
                                            bool enable,
                                            int id);
   virtual int SetReceiveTimestampOffsetStatus(int video_channel,
                                               bool enable,
                                               int id);
+  virtual int SetTransmissionSmoothingStatus(int video_channel, bool enable);
   virtual int GetReceivedRTCPStatistics(const int video_channel,
                                         uint16_t& fraction_lost,
                                         unsigned int& cumulative_lost,

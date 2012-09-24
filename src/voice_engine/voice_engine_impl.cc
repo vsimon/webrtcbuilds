@@ -8,16 +8,12 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#if defined(WEBRTC_ANDROID) && !defined(WEBRTC_ANDROID_OPENSLES)
+#include "modules/audio_device/main/source/android/audio_device_android_jni.h"
+#endif
+
 #include "voice_engine_impl.h"
 #include "trace.h"
-
-#ifdef WEBRTC_ANDROID
-extern "C"
-{
-extern WebRtc_Word32 SetAndroidAudioDeviceObjects(
-    void* javaVM, void* env, void* context);
-} // extern "C"
-#endif
 
 namespace webrtc
 {
@@ -148,12 +144,15 @@ bool VoiceEngine::Delete(VoiceEngine*& voiceEngine)
 
 int VoiceEngine::SetAndroidObjects(void* javaVM, void* env, void* context)
 {
-#if defined(WEBRTC_ANDROID) && !defined(WEBRTC_ANDROID_OPENSLES)
-    // modules/audio_device/main/source/android/audio_device_android_jni.cc
-    // contains the actual implementation.
-    return SetAndroidAudioDeviceObjects(javaVM, env, context);
+#ifdef WEBRTC_ANDROID
+#ifdef WEBRTC_ANDROID_OPENSLES
+  return 0;
 #else
-    return -1;
+  return AudioDeviceAndroidJni::SetAndroidAudioDeviceObjects(
+      javaVM, env, context);
+#endif
+#else
+  return -1;
 #endif
 }
 

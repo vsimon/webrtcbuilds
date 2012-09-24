@@ -13,7 +13,7 @@
       'type': '<(library)',
       'dependencies': [
         'webrtc_utility',
-        '<(webrtc_root)/common_video/common_video.gyp:webrtc_libyuv',
+        '<(webrtc_root)/common_video/common_video.gyp:common_video',
         '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
       ],
       'include_dirs': [
@@ -56,7 +56,6 @@
         # Windows
         'windows/i_video_render_win.h',
         'windows/video_render_direct3d9.h',
-        'windows/video_render_directdraw.h',
         'windows/video_render_windows_impl.h',
         # External
         'external/video_render_external_impl.h',
@@ -84,7 +83,6 @@
         'mac/cocoa_full_screen_window.mm',
         # Windows
         'windows/video_render_direct3d9.cc',
-        'windows/video_render_directdraw.cc',
         'windows/video_render_windows_impl.cc',
         # External
         'external/video_render_external_impl.cc',
@@ -147,10 +145,8 @@
           'sources!': [
             'windows/i_video_render_win.h',
             'windows/video_render_direct3d9.h',
-            'windows/video_render_directdraw.h',
             'windows/video_render_windows_impl.h',
             'windows/video_render_direct3d9.cc',
-            'windows/video_render_directdraw.cc',
             'windows/video_render_windows_impl.cc',
           ],
         }],
@@ -174,7 +170,7 @@
             'video_render_module',
             'webrtc_utility',
             '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
-            '<(webrtc_root)/common_video/common_video.gyp:webrtc_libyuv',
+            '<(webrtc_root)/common_video/common_video.gyp:common_video',
           ],
           'sources': [
             '../test/testAPI/testAPI.cc',

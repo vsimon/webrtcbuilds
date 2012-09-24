@@ -56,9 +56,9 @@ ViEChannel::ViEChannel(WebRtc_Word32 channel_id,
           ViEModuleId(engine_id, channel_id), num_socket_threads_)),
 #endif
       vcm_(*VideoCodingModule::Create(ViEModuleId(engine_id, channel_id))),
-      vie_receiver_(channel_id, &vcm_),
+      vie_receiver_(channel_id, &vcm_, remote_bitrate_estimator),
       vie_sender_(channel_id),
-      vie_sync_(channel_id, &vcm_),
+      vie_sync_(&vcm_, this),
       module_process_thread_(module_process_thread),
       codec_observer_(NULL),
       do_key_frame_callbackRequest_(false),
@@ -230,6 +230,12 @@ WebRtc_Word32 ViEChannel::SetSendCodec(const VideoCodec& video_codec,
     rtp_rtcp_->SetSendingStatus(false);
   }
   NACKMethod nack_method = rtp_rtcp_->NACK();
+  bool transmission_smoothening = rtp_rtcp_->TransmissionSmoothingStatus();
+
+  bool fec_enabled = false;
+  WebRtc_UWord8 payload_type_red;
+  WebRtc_UWord8 payload_type_fec;
+  rtp_rtcp_->GenericFECStatus(fec_enabled, payload_type_red, payload_type_fec);
 
   CriticalSectionScoped cs(rtp_rtcp_cs_.get());
 
@@ -259,6 +265,10 @@ WebRtc_Word32 ViEChannel::SetSendCodec(const VideoCodec& video_codec,
       if (nack_method != kNackOff) {
         rtp_rtcp->SetStorePacketsStatus(true, kNackHistorySize);
         rtp_rtcp->SetNACKStatus(nack_method);
+      }
+      if (fec_enabled) {
+        rtp_rtcp->SetGenericFECStatus(fec_enabled, payload_type_red,
+            payload_type_fec);
       }
       rtp_rtcp->SetSendingMediaStatus(rtp_rtcp_->SendingMedia());
       simulcast_rtp_rtcp_.push_back(rtp_rtcp);
@@ -290,6 +300,7 @@ WebRtc_Word32 ViEChannel::SetSendCodec(const VideoCodec& video_codec,
       if (mtu_ != 0) {
         rtp_rtcp->SetMaxTransferUnit(mtu_);
       }
+      rtp_rtcp->SetTransmissionSmoothingStatus(transmission_smoothening);
       if (restart_rtp) {
         rtp_rtcp->SetSendingStatus(true);
       }
@@ -685,6 +696,7 @@ bool ViEChannel::EnableRemb(bool enable) {
 }
 
 int ViEChannel::SetSendTimestampOffsetStatus(bool enable, int id) {
+  CriticalSectionScoped cs(rtp_rtcp_cs_.get());
   int error = 0;
   if (enable) {
     // Enable the extension, but disable possible old id to avoid errors.
@@ -721,6 +733,15 @@ int ViEChannel::SetReceiveTimestampOffsetStatus(bool enable, int id) {
   } else {
     return rtp_rtcp_->DeregisterReceiveRtpHeaderExtension(
         kRtpExtensionTransmissionTimeOffset);
+  }
+}
+
+void ViEChannel::SetTransmissionSmoothingStatus(bool enable) {
+  CriticalSectionScoped cs(rtp_rtcp_cs_.get());
+  rtp_rtcp_->SetTransmissionSmoothingStatus(enable);
+  for (std::list<RtpRtcp*>::iterator it = simulcast_rtp_rtcp_.begin();
+       it != simulcast_rtp_rtcp_.end(); ++it) {
+    (*it)->SetTransmissionSmoothingStatus(enable);
   }
 }
 
@@ -2323,6 +2344,15 @@ void ViEChannel::OnApplicationDataReceived(const WebRtc_Word32 id,
           length);
     }
   }
+}
+
+void ViEChannel::OnSendReportReceived(const WebRtc_Word32 id,
+                                      const WebRtc_UWord32 senderSSRC,
+                                      uint32_t ntp_secs,
+                                      uint32_t ntp_frac,
+                                      uint32_t timestamp) {
+  vie_receiver_.OnSendReportReceived(id, senderSSRC, ntp_secs, ntp_frac,
+                                     timestamp);
 }
 
 WebRtc_Word32 ViEChannel::OnInitializeDecoder(

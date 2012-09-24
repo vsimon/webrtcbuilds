@@ -613,6 +613,15 @@ int ViERTP_RTCPImpl::SetRembStatus(int video_channel, bool sender,
   return 0;
 }
 
+int ViERTP_RTCPImpl::SetBandwidthEstimationMode(BandwidthEstimationMode mode) {
+  WEBRTC_TRACE(kTraceApiCall, kTraceVideo, shared_data_->instance_id(),
+               "ViERTP_RTCPImpl::SetBandwidthEstimationMode(%d)", mode);
+  if (!shared_data_->channel_manager()->SetBandwidthEstimationMode(mode)) {
+    return -1;
+  }
+  return 0;
+}
+
 int ViERTP_RTCPImpl::SetSendTimestampOffsetStatus(int video_channel,
                                                   bool enable,
                                                   int id) {
@@ -657,6 +666,25 @@ int ViERTP_RTCPImpl::SetReceiveTimestampOffsetStatus(int video_channel,
     shared_data_->SetLastError(kViERtpRtcpUnknownError);
     return -1;
   }
+  return 0;
+}
+
+int ViERTP_RTCPImpl::SetTransmissionSmoothingStatus(int video_channel,
+                                                    bool enable) {
+  WEBRTC_TRACE(kTraceApiCall, kTraceVideo,
+               ViEId(shared_data_->instance_id(), video_channel),
+               "%s(channel: %d, enble: %d)", __FUNCTION__, video_channel,
+               enable);
+  ViEChannelManagerScoped cs(*(shared_data_->channel_manager()));
+  ViEChannel* vie_channel = cs.Channel(video_channel);
+  if (!vie_channel) {
+    WEBRTC_TRACE(kTraceError, kTraceVideo,
+                 ViEId(shared_data_->instance_id(), video_channel),
+                 "%s: Channel %d doesn't exist", __FUNCTION__, video_channel);
+    shared_data_->SetLastError(kViERtpRtcpInvalidChannelId);
+    return -1;
+  }
+  vie_channel->SetTransmissionSmoothingStatus(enable);
   return 0;
 }
 

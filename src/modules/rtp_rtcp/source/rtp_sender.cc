@@ -51,7 +51,7 @@ RTPSender::RTPSender(const WebRtc_Word32 id,
     _nackBitrate(clock),
 
     _packetHistory(new RTPPacketHistory(clock)),
-    _sendBucket(),
+    _sendBucket(clock),
     _timeLastSendToNetworkUpdate(clock->GetTimeInMS()),
     _transmissionSmoothing(false),
 
@@ -424,38 +424,11 @@ WebRtc_Word32 RTPSender::CheckPayloadType(const WebRtc_Word8 payloadType,
   _payloadType = payloadType;
   ModuleRTPUtility::Payload* payload = it->second;
   assert(payload);
-  if (payload->audio) {
-    if (_audioConfigured) {
-      // Extract payload frequency
-      int payloadFreqHz;
-      if (ModuleRTPUtility::StringCompare(payload->name,"g722",4)&&
-          (payload->name[4] == 0)) {
-        //Check that strings end there, g722.1...
-        // Special case for G.722, bug in spec
-        payloadFreqHz=8000;
-      } else {
-        payloadFreqHz=payload->typeSpecific.Audio.frequency;
-      }
-
-      //we don't do anything if it's CN
-      if ((_audio->AudioFrequency() != payloadFreqHz)&&
-          (!ModuleRTPUtility::StringCompare(payload->name,"cn",2))) {
-        _audio->SetAudioFrequency(payloadFreqHz);
-        // We need to correct the timestamp again,
-        // since this might happen after we've set it
-        WebRtc_UWord32 RTPtime =
-            ModuleRTPUtility::GetCurrentRTP(&_clock, payloadFreqHz);
-        SetStartTimestamp(RTPtime);
-        // will be ignored if it's already configured via API
-      }
-    }
-  } else {
-    if(!_audioConfigured) {
-      _video->SetVideoCodecType(payload->typeSpecific.Video.videoCodecType);
-      videoType = payload->typeSpecific.Video.videoCodecType;
-      _video->SetMaxConfiguredBitrateVideo(
-          payload->typeSpecific.Video.maxRate);
-    }
+  if (!payload->audio && !_audioConfigured) {
+    _video->SetVideoCodecType(payload->typeSpecific.Video.videoCodecType);
+    videoType = payload->typeSpecific.Video.videoCodecType;
+    _video->SetMaxConfiguredBitrateVideo(
+        payload->typeSpecific.Video.maxRate);
   }
   return 0;
 }
@@ -909,7 +882,9 @@ RTPSender::SendToNetwork(WebRtc_UWord8* buffer,
 
   if (_transmissionSmoothing) {
     const WebRtc_UWord16 sequenceNumber = (buffer[2] << 8) + buffer[3];
-    _sendBucket.Fill(sequenceNumber, rtpLength + length);
+    const WebRtc_UWord32 timestamp = (buffer[4] << 24) + (buffer[5] << 16) +
+                                     (buffer[6] << 8) + buffer[7];
+    _sendBucket.Fill(sequenceNumber, timestamp, rtpLength + length);
     // Packet will be sent at a later time.
     return 0;
   }

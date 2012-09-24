@@ -151,8 +151,14 @@ public:
 
     virtual void OnRTCPPacketTimeout(const WebRtc_Word32 /*id*/)  {};
 
+    // |ntp_secs|, |ntp_frac| and |timestamp| are the NTP time and RTP timestamp
+    // parsed from the RTCP sender report from the sender with ssrc
+    // |senderSSRC|.
     virtual void OnSendReportReceived(const WebRtc_Word32 id,
-                                      const WebRtc_UWord32 senderSSRC)  {};
+                                      const WebRtc_UWord32 senderSSRC,
+                                      uint32_t ntp_secs,
+                                      uint32_t ntp_frac,
+                                      uint32_t timestamp)  {};
 
     virtual void OnReceiveReportReceived(const WebRtc_Word32 id,
                                          const WebRtc_UWord32 senderSSRC)  {};
@@ -211,13 +217,13 @@ class RtpAudioFeedback {
 
 class RtcpIntraFrameObserver {
  public:
-  virtual void OnReceivedIntraFrameRequest(const uint32_t ssrc) = 0;
+  virtual void OnReceivedIntraFrameRequest(uint32_t ssrc) = 0;
 
-  virtual void OnReceivedSLI(const uint32_t ssrc,
-                             const uint8_t picture_id) = 0;
+  virtual void OnReceivedSLI(uint32_t ssrc,
+                             uint8_t picture_id) = 0;
 
-  virtual void OnReceivedRPSI(const uint32_t ssrc,
-                              const uint64_t picture_id) = 0;
+  virtual void OnReceivedRPSI(uint32_t ssrc,
+                              uint64_t picture_id) = 0;
 
   virtual ~RtcpIntraFrameObserver() {}
 };

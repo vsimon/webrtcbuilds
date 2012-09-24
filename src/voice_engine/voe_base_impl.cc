@@ -11,11 +11,11 @@
 #include "voe_base_impl.h"
 
 #include "audio_coding_module.h"
-#include "audio_device_impl.h"
 #include "audio_processing.h"
 #include "channel.h"
 #include "critical_section_wrapper.h"
 #include "file_wrapper.h"
+#include "modules/audio_device/audio_device_impl.h"
 #include "output_mixer.h"
 #include "signal_processing_library.h"
 #include "trace.h"
@@ -335,6 +335,8 @@ int VoEBaseImpl::Init(AudioDeviceModule* external_adm)
     WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
         "Init(external_adm=0x%p)", external_adm);
     CriticalSectionScoped cs(_shared->crit_sec());
+
+    WebRtcSpl_Init();
 
     if (_shared->statistics().Initialized())
     {

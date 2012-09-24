@@ -225,7 +225,7 @@ public:
 };
 
 // JNI_OnLoad
-jint JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
+jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   webrtcGlobalVM = vm;
   if (!webrtcGlobalVM)
   {
@@ -1099,13 +1099,15 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_StopInco
 /*
  * Class:     org_webrtc_videoengineapp_ViEAndroidJavaAPI
  * Method:    VoE_Create
- * Signature: ()Z
+ * Signature: (Landroid/content/Context)Z
  */
 JNIEXPORT jboolean JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1Create(
     JNIEnv *env,
-    jobject)
-{
-  __android_log_write(ANDROID_LOG_DEBUG, WEBRTC_LOG_TAG, "Create");
+    jobject context,
+    jobject ctx) {
+  __android_log_write(ANDROID_LOG_DEBUG, WEBRTC_LOG_TAG, "Create VoiceEngine");
+
+  VoiceEngine::SetAndroidObjects(webrtcGlobalVM, env, ctx);
 
   // Check if already created
   if (voeData.ve) {
@@ -1400,14 +1402,13 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1Set
 JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1SetLoudspeakerStatus(
     JNIEnv *,
     jobject,
-    jboolean enable)
-{
+    jboolean enable) {
   VALIDATE_HARDWARE_POINTER;
-
   if (voeData.hardware->SetLoudspeakerStatus(enable) != 0) {
+    __android_log_print(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
+                        "SetLoudspeakerStatus(%d) failed", enable);
     return -1;
   }
-
   return 0;
 }
 
@@ -1594,8 +1595,16 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1Set
     jobject,
     jboolean enable) {
   VALIDATE_APM_POINTER;
-  if (voeData.apm->SetEcStatus(enable, kEcAecm) < 0)
+  if (voeData.apm->SetEcStatus(enable, kEcAecm) < 0) {
+    __android_log_print(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
+                        "Failed SetECStatus(%d,%d)", enable, kEcAecm);
     return -1;
+  }
+  if (voeData.apm->SetAecmMode(kAecmSpeakerphone, false) != 0) {
+    __android_log_print(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
+                        "Failed SetAecmMode(%d,%d)", kAecmSpeakerphone, 0);
+    return -1;
+  }
   return 0;
 }
 
@@ -1609,8 +1618,24 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1Set
     jobject,
     jboolean enable) {
   VALIDATE_APM_POINTER;
-  if (voeData.apm->SetAgcStatus(enable, kAgcFixedDigital) < 0)
+  if (voeData.apm->SetAgcStatus(enable, kAgcFixedDigital) < 0) {
+    __android_log_print(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
+                        "Failed SetAgcStatus(%d,%d)", enable, kAgcFixedDigital);
     return -1;
+  }
+  webrtc::AgcConfig config;
+  // The following settings are by default, explicitly set here.
+  config.targetLeveldBOv = 3;
+  config.digitalCompressionGaindB = 9;
+  config.limiterEnable = true;
+  if (voeData.apm->SetAgcConfig(config) != 0) {
+    __android_log_print(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
+                        "Failed SetAgcConfig(%d,%d,%d)",
+                        config.targetLeveldBOv,
+                        config.digitalCompressionGaindB,
+                        config.limiterEnable);
+    return -1;
+  }
   return 0;
 }
 
@@ -1624,7 +1649,10 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1Set
     jobject,
     jboolean enable) {
   VALIDATE_APM_POINTER;
-  if (voeData.apm->SetNsStatus(enable) < 0) {
+  if (voeData.apm->SetNsStatus(enable, kNsModerateSuppression) < 0) {
+    __android_log_print(ANDROID_LOG_ERROR, WEBRTC_LOG_TAG,
+                        "Failed SetNsStatus(%d,%d)",
+                        enable, kNsModerateSuppression);
     return -1;
   }
   return 0;
@@ -1699,10 +1727,10 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1Sta
 
 /*
  * Class:     org_webrtc_videoengineapp_ViEAndroidJavaAPI
- * Method:    VoE_StopRTPDump
+ * Method:    VoE_StopIncomingRTPDump
  * Signature: (I)I
  */
-JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1StopRTPDump(
+JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1StopIncomingRTPDump(
     JNIEnv *,
     jobject,
     jint channel) {

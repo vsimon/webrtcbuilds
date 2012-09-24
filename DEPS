@@ -10,7 +10,7 @@ vars = {
   # If you do not know, use the full path while defining your new deps entry.
   "googlecode_url": "http://%s.googlecode.com/svn",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
-  "chromium_revision": "152335",
+  "chromium_revision": "157509",
 
   # External resources like video and audio files used for testing purposes.
   # Downloaded on demand when needed.
@@ -25,6 +25,10 @@ deps = {
 
   "build":
     Var("chromium_trunk") + "/src/build@" + Var("chromium_revision"),
+
+  # Needed by common.gypi.
+  "google_apis/build":
+    Var("chromium_trunk") + "/src/google_apis/build@" + Var("chromium_revision"),
 
   "testing":
     Var("chromium_trunk") + "/src/testing@" + Var("chromium_revision"),
@@ -48,10 +52,10 @@ deps = {
     From("chromium_deps", "src/third_party/libjpeg_turbo"),
 
   "third_party/libvpx/source/libvpx":
-    "http://git.chromium.org/webm/libvpx.git@c6fd0a5d",
+    "http://git.chromium.org/webm/libvpx.git@08cf9faed",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@338",
+    (Var("googlecode_url") % "libyuv") + "/trunk@364",
 
   "third_party/protobuf":
     Var("chromium_trunk") + "/src/third_party/protobuf@" + Var("chromium_revision"),
