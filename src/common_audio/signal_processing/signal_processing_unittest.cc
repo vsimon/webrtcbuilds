@@ -138,8 +138,20 @@ TEST_F(SplTest, InlineTest) {
     char bVersion[8];
 
     EXPECT_EQ(17, WebRtcSpl_GetSizeInBits(a32));
+
+    EXPECT_EQ(0, WebRtcSpl_NormW32(0));
+    EXPECT_EQ(31, WebRtcSpl_NormW32(-1));
+    EXPECT_EQ(0, WebRtcSpl_NormW32(WEBRTC_SPL_WORD32_MIN));
     EXPECT_EQ(14, WebRtcSpl_NormW32(a32));
+
+    EXPECT_EQ(0, WebRtcSpl_NormW16(0));
+    EXPECT_EQ(15, WebRtcSpl_NormW16(-1));
+    EXPECT_EQ(0, WebRtcSpl_NormW16(WEBRTC_SPL_WORD16_MIN));
     EXPECT_EQ(4, WebRtcSpl_NormW16(b32));
+
+    EXPECT_EQ(0, WebRtcSpl_NormU32(0));
+    EXPECT_EQ(0, WebRtcSpl_NormU32(-1));
+    EXPECT_EQ(0, WebRtcSpl_NormU32(WEBRTC_SPL_WORD32_MIN));
     EXPECT_EQ(15, WebRtcSpl_NormU32(a32));
 
     EXPECT_EQ(104, WebRtcSpl_AddSatW16(a16, b16));
@@ -147,6 +159,7 @@ TEST_F(SplTest, InlineTest) {
 
     EXPECT_EQ(109410, WebRtcSpl_AddSatW32(a32, b32));
     EXPECT_EQ(112832, WebRtcSpl_SubSatW32(a32, b32));
+
     a32 = 0x80000000;
     b32 = 0x80000000;
     // Cast to signed int to avoid compiler complaint on gtest.h.
@@ -505,14 +518,23 @@ TEST_F(SplTest, CrossCorrelationTest) {
   const int kStep = 1;
   const int kSeqDimension = 6;
 
-  const int16_t vector16_b[kVector16Size] = {1, 4323, 1963,
+  const int16_t kVector16[kVector16Size] = {1, 4323, 1963,
     WEBRTC_SPL_WORD16_MAX, WEBRTC_SPL_WORD16_MIN + 5, -3333, -876, 8483, 142};
-  const int32_t expected[3] = {-266947903, -15579555, -171282001};
   int32_t vector32[kCrossCorrelationDimension] = {0};
 
-  WebRtcSpl_CrossCorrelation(vector32, vector16, vector16_b, kSeqDimension,
+  WebRtcSpl_CrossCorrelation(vector32, vector16, kVector16, kSeqDimension,
                              kCrossCorrelationDimension, kShift, kStep);
 
+  // WebRtcSpl_CrossCorrelationC() and WebRtcSpl_CrossCorrelationNeon()
+  // are not bit-exact.
+  const int32_t kExpected[kCrossCorrelationDimension] =
+      {-266947903, -15579555, -171282001};
+  const int32_t kExpectedNeon[kCrossCorrelationDimension] =
+      {-266947901, -15579553, -171281999};
+  const int32_t* expected = kExpected;
+  if (WebRtcSpl_CrossCorrelation != WebRtcSpl_CrossCorrelationC) {
+    expected = kExpectedNeon;
+  }
   for (int i = 0; i < kCrossCorrelationDimension; ++i) {
     EXPECT_EQ(expected[i], vector32[i]);
   }
