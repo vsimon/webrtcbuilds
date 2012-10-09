@@ -45,6 +45,8 @@ class MockVieEncoder : public ViEEncoder {
                void(uint32_t ssrc, uint8_t picture_id));
   MOCK_METHOD2(OnReceivedRPSI,
                void(uint32_t ssrc, uint64_t picture_id));
+  MOCK_METHOD2(OnLocalSsrcChanged,
+               void(uint32_t old_ssrc, uint32_t new_ssrc));
 };
 
 class VieKeyRequestTest : public ::testing::Test {
@@ -79,7 +81,7 @@ TEST_F(VieKeyRequestTest, CreateAndTriggerRequests) {
   encoder_state_feedback_->GetRtcpIntraFrameObserver()->OnReceivedRPSI(
       ssrc, rpsi_picture_id);
 
-  encoder_state_feedback_->RemoveEncoder(ssrc);
+  encoder_state_feedback_->RemoveEncoder(&encoder);
 }
 
 // Register multiple encoders and make sure the request is relayed to correct
@@ -123,12 +125,12 @@ TEST_F(VieKeyRequestTest, MultipleEncoders) {
   encoder_state_feedback_->GetRtcpIntraFrameObserver()->OnReceivedRPSI(
       ssrc_2, rpsi_pid_2);
 
-  encoder_state_feedback_->RemoveEncoder(ssrc_1);
+  encoder_state_feedback_->RemoveEncoder(&encoder_1);
   EXPECT_CALL(encoder_2, OnReceivedIntraFrameRequest(ssrc_2))
       .Times(1);
   encoder_state_feedback_->GetRtcpIntraFrameObserver()->
       OnReceivedIntraFrameRequest(ssrc_2);
-  encoder_state_feedback_->RemoveEncoder(ssrc_2);
+  encoder_state_feedback_->RemoveEncoder(&encoder_2);
 }
 
 TEST_F(VieKeyRequestTest, AddTwiceError) {
@@ -136,7 +138,7 @@ TEST_F(VieKeyRequestTest, AddTwiceError) {
   MockVieEncoder encoder(process_thread_.get());
   EXPECT_TRUE(encoder_state_feedback_->AddEncoder(ssrc, &encoder));
   EXPECT_FALSE(encoder_state_feedback_->AddEncoder(ssrc, &encoder));
-  encoder_state_feedback_->RemoveEncoder(ssrc);
+  encoder_state_feedback_->RemoveEncoder(&encoder);
 }
 
 }  // namespace webrtc

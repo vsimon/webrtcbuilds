@@ -37,6 +37,10 @@ class EncoderStateFeedbackObserver : public  RtcpIntraFrameObserver {
     owner_->OnReceivedRPSI(ssrc, picture_id);
   }
 
+  virtual void OnLocalSsrcChanged(uint32_t old_ssrc, uint32_t new_ssrc) {
+    owner_->OnLocalSsrcChanged(old_ssrc, new_ssrc);
+  }
+
  private:
   EncoderStateFeedback* owner_;
 };
@@ -51,20 +55,25 @@ EncoderStateFeedback::~EncoderStateFeedback() {
 
 bool EncoderStateFeedback::AddEncoder(uint32_t ssrc, ViEEncoder* encoder)  {
   CriticalSectionScoped lock(crit_.get());
-  if (encoders_.find(ssrc) != encoders_.end())
+  if (encoders_.find(ssrc) != encoders_.end()) {
+    // Two encoders must not have the same ssrc.
     return false;
+  }
 
   encoders_[ssrc] = encoder;
   return true;
 }
 
-void EncoderStateFeedback::RemoveEncoder(uint32_t ssrc)  {
+void EncoderStateFeedback::RemoveEncoder(const ViEEncoder* encoder)  {
   CriticalSectionScoped lock(crit_.get());
-  SsrcEncoderMap::iterator it = encoders_.find(ssrc);
-  if (it == encoders_.end())
-    return;
-
-  encoders_.erase(it);
+  SsrcEncoderMap::iterator it = encoders_.begin();
+  while (it != encoders_.end()) {
+    if (it->second == encoder) {
+      encoders_.erase(it++);
+    } else {
+      ++it;
+    }
+  }
 }
 
 RtcpIntraFrameObserver* EncoderStateFeedback::GetRtcpIntraFrameObserver() {
@@ -96,6 +105,20 @@ void EncoderStateFeedback::OnReceivedRPSI(uint32_t ssrc, uint64_t picture_id) {
     return;
 
   it->second->OnReceivedRPSI(ssrc, picture_id);
+}
+
+void EncoderStateFeedback::OnLocalSsrcChanged(uint32_t old_ssrc,
+                                              uint32_t new_ssrc) {
+  CriticalSectionScoped lock(crit_.get());
+  SsrcEncoderMap::iterator it = encoders_.find(old_ssrc);
+  if (it == encoders_.end() || encoders_.find(new_ssrc) != encoders_.end()) {
+    return;
+  }
+
+  ViEEncoder* encoder = it->second;
+  encoders_.erase(it);
+  encoders_[new_ssrc] = encoder;
+  encoder->OnLocalSsrcChanged(old_ssrc, new_ssrc);
 }
 
 }  // namespace webrtc
