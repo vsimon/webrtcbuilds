@@ -1422,17 +1422,18 @@ TEST_F(ApmTest, Process) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-
   for (int i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--write_ref_data") == 0) {
       write_ref_data = true;
     }
   }
 
-  int err = RUN_ALL_TESTS();
-
+  // We don't use TestSuite here because it would require the Android platform
+  // build to depend on Gmock.
+  webrtc::test::SetExecutablePath(argv[0]);
+  testing::InitGoogleTest(&argc, argv);
+  int result = RUN_ALL_TESTS();
   // Optional, but removes memory leak noise from Valgrind.
   google::protobuf::ShutdownProtobufLibrary();
-  return err;
+  return result;
 }

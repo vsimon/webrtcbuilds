@@ -24,6 +24,7 @@
 #endif
 
 #include <cstdio>
+#include <cstring>
 
 #include "typedefs.h"  // For architecture defines
 
@@ -35,52 +36,82 @@ static const char* kPathDelimiter = "\\";
 #else
 static const char* kPathDelimiter = "/";
 #endif
+
+#ifdef WEBRTC_ANDROID
+static const char* kRootDirName = "/sdcard/";
+static const char* kResourcesDirName = "resources";
+#else
 // The file we're looking for to identify the project root dir.
 static const char* kProjectRootFileName = "DEPS";
 static const char* kOutputDirName = "out";
 static const char* kFallbackPath = "./";
-#ifdef WEBRTC_ANDROID
-static const char* kResourcesDirName = "/sdcard/";
-#else
 static const char* kResourcesDirName = "resources";
 #endif
 const char* kCannotFindProjectRootDir = "ERROR_CANNOT_FIND_PROJECT_ROOT_DIR";
 
-std::string ProjectRootPath() {
+namespace {
+char relative_dir_path[FILENAME_MAX];
+bool relative_dir_path_set = false;
+}
+
+void SetExecutablePath(const std::string& path) {
   std::string working_dir = WorkingDir();
-  if (working_dir == kFallbackPath) {
+  std::string temp_path = path;
+
+  // Handle absolute paths; convert them to relative paths to the working dir.
+  if (path.find(working_dir) != std::string::npos) {
+    temp_path = path.substr(working_dir.length() + 1);
+  }
+  // Trim away the executable name; only store the relative dir path.
+  temp_path = temp_path.substr(0, temp_path.find_last_of(kPathDelimiter));
+  strncpy(relative_dir_path, temp_path.c_str(), FILENAME_MAX);
+  relative_dir_path_set = true;
+}
+
+bool FileExists(std::string& file_name) {
+  struct stat file_info = {0};
+  return stat(file_name.c_str(), &file_info) == 0;
+}
+
+#ifdef WEBRTC_ANDROID
+
+std::string ProjectRootPath() {
+  return kRootDirName;
+}
+
+std::string OutputPath() {
+  return kRootDirName;
+}
+
+std::string WorkingDir() {
+  return kRootDirName;
+}
+
+#else // WEBRTC_ANDROID
+
+std::string ProjectRootPath() {
+  std::string path = WorkingDir();
+  if (path == kFallbackPath) {
     return kCannotFindProjectRootDir;
   }
+  if (relative_dir_path_set) {
+    path = path + kPathDelimiter + relative_dir_path;
+  }
   // Check for our file that verifies the root dir.
-  std::string current_path(working_dir);
-  FILE* file = NULL;
-  int path_delimiter_index = current_path.find_last_of(kPathDelimiter);
-  while (path_delimiter_index > -1) {
-    std::string root_filename = current_path + kPathDelimiter +
-        kProjectRootFileName;
-    file = fopen(root_filename.c_str(), "r");
-    if (file != NULL) {
-      fclose(file);
-      return current_path + kPathDelimiter;
+  size_t path_delimiter_index = path.find_last_of(kPathDelimiter);
+  while (path_delimiter_index != std::string::npos) {
+    std::string root_filename = path + kPathDelimiter + kProjectRootFileName;
+    if (FileExists(root_filename)) {
+      return path + kPathDelimiter;
     }
     // Move up one directory in the directory tree.
-    current_path = current_path.substr(0, path_delimiter_index);
-    path_delimiter_index = current_path.find_last_of(kPathDelimiter);
+    path = path.substr(0, path_delimiter_index);
+    path_delimiter_index = path.find_last_of(kPathDelimiter);
   }
   // Reached the root directory.
   fprintf(stderr, "Cannot find project root directory!\n");
   return kCannotFindProjectRootDir;
 }
-
-#ifdef WEBRTC_ANDROID
-
-std::string OutputPath() {
-  // We need to touch this variable so it doesn't get flagged as unused.
-  (void)kOutputDirName;
-  return "/sdcard/";
-}
-
-#else  // WEBRTC_ANDROID
 
 std::string OutputPath() {
   std::string path = ProjectRootPath();
@@ -94,8 +125,6 @@ std::string OutputPath() {
   return path + kPathDelimiter;
 }
 
-#endif  // !WEBRTC_ANDROID
-
 std::string WorkingDir() {
   char path_buffer[FILENAME_MAX];
   if (!GET_CURRENT_DIR(path_buffer, sizeof(path_buffer))) {
@@ -105,6 +134,8 @@ std::string WorkingDir() {
     return std::string(path_buffer);
   }
 }
+
+#endif  // !WEBRTC_ANDROID
 
 bool CreateDirectory(std::string directory_name) {
   struct stat path_info = {0};
@@ -126,11 +157,6 @@ bool CreateDirectory(std::string directory_name) {
   return true;
 }
 
-bool FileExists(std::string file_name) {
-  struct stat file_info = {0};
-  return stat(file_name.c_str(), &file_info) == 0;
-}
-
 std::string ResourcePath(std::string name, std::string extension) {
   std::string platform = "win";
 #ifdef WEBRTC_LINUX
@@ -146,9 +172,6 @@ std::string ResourcePath(std::string name, std::string extension) {
   std::string architecture = "32";
 #endif  // WEBRTC_ARCH_64_BITS
 
-#ifdef WEBRTC_ANDROID
-  std::string resources_path = kResourcesDirName;
-#else
   std::string resources_path = ProjectRootPath() + kResourcesDirName +
       kPathDelimiter;
   std::string resource_file = resources_path + name + "_" + platform + "_" +
@@ -166,7 +189,7 @@ std::string ResourcePath(std::string name, std::string extension) {
   if (FileExists(resource_file)) {
     return resource_file;
   }
-#endif
+
   // Fall back on name without architecture or platform.
   return resources_path + name + "." + extension;
 }
