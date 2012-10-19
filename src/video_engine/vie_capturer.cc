@@ -567,9 +567,9 @@ bool ViECapturer::ViECaptureProcess() {
 void ViECapturer::DeliverI420Frame(VideoFrame* video_frame) {
   // Apply image enhancement and effect filter.
   if (deflicker_frame_stats_) {
-    if (image_proc_module_->GetFrameStats(*deflicker_frame_stats_,
+    if (image_proc_module_->GetFrameStats(deflicker_frame_stats_,
                                           *video_frame) == 0) {
-      image_proc_module_->Deflickering(*video_frame, *deflicker_frame_stats_);
+      image_proc_module_->Deflickering(video_frame, deflicker_frame_stats_);
     } else {
       WEBRTC_TRACE(kTraceStream, kTraceVideo, ViEId(engine_id_, capture_id_),
                    "%s: could not get frame stats for captured frame",
@@ -577,10 +577,10 @@ void ViECapturer::DeliverI420Frame(VideoFrame* video_frame) {
     }
   }
   if (denoising_enabled_) {
-    image_proc_module_->Denoising(*video_frame);
+    image_proc_module_->Denoising(video_frame);
   }
   if (brightness_frame_stats_) {
-    if (image_proc_module_->GetFrameStats(*brightness_frame_stats_,
+    if (image_proc_module_->GetFrameStats(brightness_frame_stats_,
                                           *video_frame) == 0) {
       WebRtc_Word32 brightness = image_proc_module_->BrightnessDetection(
           *video_frame, *brightness_frame_stats_);
@@ -896,11 +896,6 @@ void ViECapturer::OnNoPictureAlarm(const WebRtc_Word32 id,
   CriticalSectionScoped cs(observer_cs_.get());
   CaptureAlarm vie_alarm = (alarm == Raised) ? AlarmRaised : AlarmCleared;
   observer_->NoPictureAlarm(id, vie_alarm);
-}
-
-WebRtc_Word32 ViECapturer::SetCaptureDeviceImage(
-    const VideoFrame& capture_device_image) {
-  return capture_module_->StartSendImage(capture_device_image, 10);
 }
 
 }  // namespace webrtc
