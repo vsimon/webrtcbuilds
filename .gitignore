@@ -39,9 +39,6 @@
 /Makefile
 /out
 /resources
-/src/supplement.gypi
-/src/video_engine/main/test/android_test/bin
-/src/video_engine/main/test/android_test/gen
 /testing
 /third_party/asan
 /third_party/cygwin
@@ -59,6 +56,7 @@
 /third_party/libyuv
 /third_party/llvm-build
 /third_party/oauth2
+/third_party/opus/source
 /third_party/protobuf
 /third_party/valgrind
 /third_party/yasm
@@ -67,5 +65,8 @@
 /tools/python
 /tools/valgrind
 /tools/win
+/webrtc/supplement.gypi
+/webrtc/video_engine/main/test/android_test/bin
+/webrtc/video_engine/main/test/android_test/gen
 /x86-generic_out/
 /xcodebuild
