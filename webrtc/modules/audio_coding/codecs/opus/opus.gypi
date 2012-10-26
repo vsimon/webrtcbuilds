@@ -21,9 +21,6 @@
           'dependencies': [
             '<(DEPTH)/third_party/opus/opus.gyp:opus'
           ],
-          'include_dirs': [
-            '<(webrtc_root)/../third_party/opus/source/include',
-          ],
         }],
       ],
       'direct_dependent_settings': {
