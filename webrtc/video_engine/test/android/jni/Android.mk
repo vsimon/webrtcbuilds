@@ -120,6 +120,23 @@ LOCAL_SRC_FILES := \
     $(MY_LIBS_PATH)/webrtc/modules/libisac_neon.a
 include $(PREBUILT_STATIC_LIBRARY)
 
+# Remove the following file existense check when opus is always enabled.
+ifneq ($(wildcard jni/$(MY_LIBS_PATH)/third_party/opus/libopus.a),)
+include $(CLEAR_VARS)
+LOCAL_MODULE := libopus
+LOCAL_SRC_FILES := \
+    $(MY_LIBS_PATH)/third_party/opus/libopus.a
+include $(PREBUILT_STATIC_LIBRARY)
+endif
+
+ifneq ($(wildcard jni/$(MY_LIBS_PATH)/webrtc/modules/libwebrtc_opus.a),)
+include $(CLEAR_VARS)
+LOCAL_MODULE := libwebrtc_opus
+LOCAL_SRC_FILES := \
+    $(MY_LIBS_PATH)/webrtc/modules/libwebrtc_opus.a
+include $(PREBUILT_STATIC_LIBRARY)
+endif
+
 include $(CLEAR_VARS)
 LOCAL_MODULE := libvad
 LOCAL_SRC_FILES := \
@@ -292,11 +309,14 @@ LOCAL_STATIC_LIBRARIES := \
     libiLBC \
     libiSACFix \
     libisac_neon \
+    libwebrtc_opus \
+    libopus \
     libvad \
     libbitrate_controller \
     libresampler \
     libsignal_processing \
     libsignal_processing_neon \
+    libcommon_video \
     libsystem_wrappers \
     libcpu_features_android \
     libaudio_device \
@@ -306,7 +326,6 @@ LOCAL_STATIC_LIBRARIES := \
     libudp_transport \
     libwebrtc_utility \
     libaudio_conference_mixer \
-    libcommon_video \
     libyuv \
     libwebrtc_i420 \
     libwebrtc_vp8 \

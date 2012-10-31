@@ -23,15 +23,6 @@
           ],
         }],
       ],
-      'direct_dependent_settings': {
-        'conditions': [
-          ['build_with_mozilla==1', {
-            'include_dirs': [
-              '$(DIST)/include/opus',
-            ],
-          }],
-        ],
-      },
       'sources': [
         'interface/opus_interface.h',
         'opus_interface.c',

@@ -240,7 +240,7 @@ int ViECodecImpl::SetSendCodec(const int video_channel,
     }
   }
 
-  // TODO(mflodman) Break out this part in GetLocalSsrcListi().
+  // TODO(mflodman) Break out this part in GetLocalSsrcList().
   // Update all SSRCs to ViEEncoder.
   std::list<unsigned int> ssrcs;
   if (video_codec_internal.numberOfSimulcastStreams == 0) {
