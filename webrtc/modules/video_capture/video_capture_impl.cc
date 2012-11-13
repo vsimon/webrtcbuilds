@@ -216,7 +216,8 @@ WebRtc_Word32 VideoCaptureImpl::DeliverCapturedFrame(I420VideoFrame&
 }
 
 WebRtc_Word32 VideoCaptureImpl::DeliverEncodedCapturedFrame(
-    VideoFrame& captureFrame, WebRtc_Word64 capture_time) {
+    VideoFrame& captureFrame, WebRtc_Word64 capture_time,
+    VideoCodecType codecType) {
   UpdateFrameCount();  // frame count used for local frame rate callback.
 
   const bool callOnCaptureDelayChanged = _setCaptureDelay != _captureDelay;
@@ -243,7 +244,7 @@ WebRtc_Word32 VideoCaptureImpl::DeliverEncodedCapturedFrame(
     if (callOnCaptureDelayChanged) {
       _dataCallBack->OnCaptureDelayChanged(_id, _captureDelay);
     }
-    _dataCallBack->OnIncomingCapturedEncodedFrame(_id, captureFrame);
+    _dataCallBack->OnIncomingCapturedEncodedFrame(_id, captureFrame, codecType);
   }
 
   return 0;
@@ -320,7 +321,8 @@ WebRtc_Word32 VideoCaptureImpl::IncomingFrame(
                        "Failed to copy captured frame of length %d",
                        static_cast<int>(videoFrameLength));
         }
-        DeliverEncodedCapturedFrame(_capture_encoded_frame, captureTime);
+        DeliverEncodedCapturedFrame(_capture_encoded_frame, captureTime,
+                                    frameInfo.codecType);
     }
 
     const WebRtc_UWord32 processTime =
@@ -340,8 +342,8 @@ WebRtc_Word32 VideoCaptureImpl::IncomingFrameI420(
 
   CriticalSectionScoped cs(&_callBackCs);
   int size_y = video_frame.height * video_frame.y_pitch;
-  int size_u = video_frame.u_pitch * (video_frame.height + 1) / 2;
-  int size_v =  video_frame.v_pitch * (video_frame.height + 1) / 2;
+  int size_u = video_frame.u_pitch * ((video_frame.height + 1) / 2);
+  int size_v =  video_frame.v_pitch * ((video_frame.height + 1) / 2);
   // TODO(mikhal): Can we use Swap here? This will do a memcpy.
   int ret = _captureFrame.CreateFrame(size_y, video_frame.y_plane,
                                       size_u, video_frame.u_plane,

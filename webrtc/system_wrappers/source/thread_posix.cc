@@ -59,10 +59,6 @@
 #include <sys/prctl.h>
 #endif
 
-#if defined(WEBRTC_MAC)
-#include <mach/mach.h>
-#endif
-
 #include "system_wrappers/interface/critical_section_wrapper.h"
 #include "system_wrappers/interface/event_wrapper.h"
 #include "system_wrappers/interface/trace.h"
@@ -148,8 +144,6 @@ ThreadPosix::ThreadPosix(ThreadRunFunction func, ThreadObj obj,
 uint32_t ThreadWrapper::GetThreadId() {
 #if defined(WEBRTC_ANDROID) || defined(WEBRTC_LINUX)
   return static_cast<uint32_t>(syscall(__NR_gettid));
-#elif defined(WEBRTC_MAC)
-  return static_cast<uint32_t>(mach_thread_self());
 #else
   return reinterpret_cast<uint32_t>(pthread_self());
 #endif
@@ -304,20 +298,6 @@ void ThreadPosix::SetNotAlive()
 {
     CriticalSectionScoped cs(_crit_state);
     _alive = false;
-}
-
-bool ThreadPosix::Shutdown()
-{
-#if !defined(WEBRTC_ANDROID)
-    if (_thread && (0 != pthread_cancel(_thread)))
-    {
-        return false;
-    }
-
-    return true;
-#else
-    return false;
-#endif
 }
 
 bool ThreadPosix::Stop()

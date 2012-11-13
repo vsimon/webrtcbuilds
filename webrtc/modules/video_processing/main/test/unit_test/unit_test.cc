@@ -14,7 +14,7 @@
 
 #include "common_video/libyuv/include/webrtc_libyuv.h"
 #include "system_wrappers/interface/tick_util.h"
-#include "testsupport/fileutils.h"
+#include "test/testsupport/fileutils.h"
 
 namespace webrtc {
 
@@ -265,6 +265,10 @@ TEST_F(VideoProcessingModuleTest, Resampler)
     // initiate test timer
     t0 = TickTime::Now();
 
+    // Init the sourceFrame with a timestamp.
+    sourceFrame.set_render_time_ms(t0.MillisecondTimestamp());
+    sourceFrame.set_timestamp(t0.MillisecondTimestamp() * 90);
+
     // Test scaling to different sizes: source is of |width|/|height| = 352/288.
     // Scaling mode in VPM is currently fixed to kScaleBox (mode = 3).
     TestSize(sourceFrame, 100, 50, 3, 24.0, _vpm);
@@ -283,7 +287,7 @@ TEST_F(VideoProcessingModuleTest, Resampler)
 
     // stop timer
     t1 = TickTime::Now();
-    accTicks += t1 - t0;
+    accTicks += (t1 - t0);
 
     if (accTicks.Microseconds() < minRuntime || runIdx == 0)  {
       minRuntime = accTicks.Microseconds();
@@ -308,6 +312,11 @@ void TestSize(const I420VideoFrame& source_frame, int target_width,
 
   ASSERT_EQ(VPM_OK, vpm->SetTargetResolution(target_width, target_height, 30));
   ASSERT_EQ(VPM_OK, vpm->PreprocessFrame(source_frame, &out_frame));
+
+  if (out_frame) {
+    EXPECT_EQ(source_frame.render_time_ms(), out_frame->render_time_ms());
+    EXPECT_EQ(source_frame.timestamp(), out_frame->timestamp());
+  }
 
   // If the frame was resampled (scale changed) then:
   // (1) verify the new size and write out processed frame for viewing.
