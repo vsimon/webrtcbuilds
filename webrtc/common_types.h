@@ -57,6 +57,7 @@ protected:
 
 enum TraceModule
 {
+    kTraceUndefined          = 0,
     // not a module, triggered from the engine code
     kTraceVoice              = 0x0001,
     // not a module, triggered from the engine code
@@ -102,17 +103,14 @@ enum TraceLevel
 };
 
 // External Trace API
-class TraceCallback
-{
-public:
-    virtual void Print(const TraceLevel level,
-                       const char *traceString,
-                       const int length) = 0;
-protected:
-    virtual ~TraceCallback() {}
-    TraceCallback() {}
-};
+class TraceCallback {
+ public:
+  virtual void Print(TraceLevel level, const char* message, int length) = 0;
 
+ protected:
+  virtual ~TraceCallback() {}
+  TraceCallback() {}
+};
 
 enum FileFormats
 {
