@@ -8,13 +8,13 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_WINDOWS_VIDEO_CAPTURE_WINDOWS_H_
-#define WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_WINDOWS_VIDEO_CAPTURE_WINDOWS_H_
+#ifndef WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_WINDOWS_VIDEO_CAPTURE_DS_H_
+#define WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_WINDOWS_VIDEO_CAPTURE_DS_H_
 
 #include "../video_capture_impl.h"
 #include <tchar.h>
 
-#include "device_info_windows.h"
+#include "device_info_ds.h"
 
 #define CAPTURE_FILTER_NAME L"VideoCaptureFilter"
 #define SINK_FILTER_NAME L"SinkFilter"
@@ -29,10 +29,6 @@ class CaptureSinkFilter;
 class VideoCaptureDS: public VideoCaptureImpl
 {
 public:
-
-    static VideoCaptureModule* Create(const WebRtc_Word32 id,
-                                      const WebRtc_UWord8* deviceUniqueIdUTF8);
-
     VideoCaptureDS(const WebRtc_Word32 id);
 
     virtual WebRtc_Word32 Init(const WebRtc_Word32 id,
@@ -66,7 +62,7 @@ protected:
     WebRtc_Word32 DisconnectGraph();
     HRESULT VideoCaptureDS::ConnectDVCamera();
 
-    DeviceInfoWindows _dsInfo;
+    DeviceInfoDS _dsInfo;
 
     IBaseFilter* _captureFilter;
     IGraphBuilder* _graphBuilder;
@@ -83,4 +79,4 @@ protected:
 };
 } // namespace videocapturemodule
 } //namespace webrtc
-#endif // WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_WINDOWS_VIDEO_CAPTURE_WINDOWS_H_
+#endif // WEBRTC_MODULES_VIDEO_CAPTURE_MAIN_SOURCE_WINDOWS_VIDEO_CAPTURE_DS_H_
