@@ -90,11 +90,8 @@ class ViEVideoVerificationTest : public testing::Test {
  private:
   void SetUpFileRenderer(ViEToFileRenderer* file_renderer,
                          const std::string& suffix) {
-    std::string test_case_name =
-        ::testing::UnitTest::GetInstance()->current_test_info()->name();
-
     std::string output_path = ViETest::GetResultOutputPath();
-    std::string filename = test_case_name + suffix;
+    std::string filename = "render_output" + suffix;
 
     if (!file_renderer->PrepareForRendering(output_path, filename)) {
       FAIL() << "Could not open output file " << filename <<
@@ -109,12 +106,38 @@ class ViEVideoVerificationTest : public testing::Test {
       if (test_failed) {
         // Leave the files for analysis if the test failed.
         file_renderer->SaveOutputFile("failed-");
-      } else {
-        // No reason to keep the files if we succeeded.
-        file_renderer->DeleteOutputFile();
       }
       delete file_renderer;
     }
+};
+
+class ParameterizedFullStackTest : public ViEVideoVerificationTest,
+                                   public ::testing::WithParamInterface<int> {
+ protected:
+  struct TestParameters {
+    int packet_loss_rate;
+    int round_trip_time;
+    int bitrate;
+    double avg_psnr_threshold;
+    double avg_ssim_threshold;
+  };
+
+  void SetUp() {
+    int i = 0;
+    parameter_table_[i].packet_loss_rate = 0;
+    parameter_table_[i].round_trip_time = 0;
+    parameter_table_[i].bitrate = 300;
+    parameter_table_[i].avg_psnr_threshold = 35;
+    parameter_table_[i].avg_ssim_threshold = 0.96;
+    ++i;
+    parameter_table_[i].packet_loss_rate = 5;
+    parameter_table_[i].round_trip_time = 50;
+    parameter_table_[i].bitrate = 300;
+    parameter_table_[i].avg_psnr_threshold = 35;
+    parameter_table_[i].avg_ssim_threshold = 0.96;
+  }
+
+  TestParameters parameter_table_[2];
 };
 
 // TODO(phoglund): Needs to be rewritten to use external transport. Currently
@@ -154,48 +177,13 @@ TEST_F(ViEVideoVerificationTest, DISABLED_RunsBaseStandardTestWithoutErrors) {
       kVerifyingTestMaxNumAttempts << " attempts.";
 }
 
-TEST_F(ViEVideoVerificationTest, RunsCodecTestWithoutErrors)  {
-  // We compare the local and remote here instead of with the original.
-  // The reason is that it is hard to say when the three consecutive tests
-  // switch over into each other, at which point we would have to restart the
-  // original to get a fair comparison.
-  //
-  // The PSNR and SSIM values are quite low here, and they have to be since
-  // the codec switches will lead to lag in the output. This is considered
-  // acceptable, but it probably shouldn't get worse than this.
-  const double kExpectedMinimumPSNR = 20;
-  const double kExpectedMinimumSSIM = 0.7;
-
-  for (int attempt = 0; attempt < kVerifyingTestMaxNumAttempts; attempt++) {
-    InitializeFileRenderers();
-    ASSERT_TRUE(tests_.TestCodecs(input_file_, kInputWidth, kInputHeight,
-                                  local_file_renderer_,
-                                  remote_file_renderer_));
-    std::string reference_file = local_file_renderer_->GetFullOutputPath();
-    std::string output_file = remote_file_renderer_->GetFullOutputPath();
-    StopRenderers();
-
-    double actual_psnr = 0;
-    double actual_ssim = 0;
-    CompareFiles(reference_file, output_file, &actual_psnr, &actual_ssim);
-
-    TearDownFileRenderers();
-
-    if (actual_psnr >= kExpectedMinimumPSNR &&
-        actual_ssim >= kExpectedMinimumSSIM) {
-      // Test succeeded!
-      return;
-    }
-  }
-}
-
 // Runs a whole stack processing with tracking of which frames are dropped
-// in the encoder. The local and remote file will not be of equal size because
-// of unknown reasons. Tests show that they start at the same frame, which is
+// in the encoder. Tests show that they start at the same frame, which is
 // the important thing when doing frame-to-frame comparison with PSNR/SSIM.
-// TODO(phoglund): This is flaky and a bit incomplete - enable again when it has
-// been made more deterministic.
-TEST_F(ViEVideoVerificationTest, DISABLED_RunsFullStackWithoutErrors)  {
+TEST_P(ParameterizedFullStackTest, RunsFullStackWithoutErrors)  {
+  // Using CIF here since it's a more common resolution than QCIF, and higher
+  // resolutions shouldn't be a problem for a test using VP8.
+  input_file_ = webrtc::test::ResourcePath("foreman_cif", "yuv");
   FrameDropDetector detector;
   local_file_renderer_ = new ViEToFileRenderer();
   remote_file_renderer_ = new FrameDropMonitoringRemoteFileRenderer(&detector);
@@ -204,13 +192,15 @@ TEST_F(ViEVideoVerificationTest, DISABLED_RunsFullStackWithoutErrors)  {
 
   // Set a low bit rate so the encoder budget will be tight, causing it to drop
   // frames every now and then.
-  const int kBitRateKbps = 50;
-  const int kPacketLossPercent = 5;
-  const int kNetworkDelayMs = 100;
+  const int kBitRateKbps = parameter_table_[GetParam()].bitrate;
+  const int kPacketLossPercent = parameter_table_[GetParam()].packet_loss_rate;
+  const int kNetworkDelayMs = parameter_table_[GetParam()].round_trip_time;
+  int width = 352;
+  int height = 288;
   ViETest::Log("Bit rate     : %5d kbps", kBitRateKbps);
   ViETest::Log("Packet loss  : %5d %%", kPacketLossPercent);
   ViETest::Log("Network delay: %5d ms", kNetworkDelayMs);
-  tests_.TestFullStack(input_file_, kInputWidth, kInputHeight, kBitRateKbps,
+  tests_.TestFullStack(input_file_, width, height, kBitRateKbps,
                        kPacketLossPercent, kNetworkDelayMs,
                        local_file_renderer_, remote_file_renderer_, &detector);
   const std::string reference_file = local_file_renderer_->GetFullOutputPath();
@@ -220,12 +210,12 @@ TEST_F(ViEVideoVerificationTest, DISABLED_RunsFullStackWithoutErrors)  {
   detector.CalculateResults();
   detector.PrintReport();
 
-  if (detector.GetNumberOfFramesDroppedAt(FrameDropDetector::kRendered) !=
+  if (detector.GetNumberOfFramesDroppedAt(FrameDropDetector::kRendered) >
       detector.GetNumberOfFramesDroppedAt(FrameDropDetector::kDecoded)) {
     detector.PrintDebugDump();
   }
 
-  ASSERT_EQ(detector.GetNumberOfFramesDroppedAt(FrameDropDetector::kRendered),
+  ASSERT_GE(detector.GetNumberOfFramesDroppedAt(FrameDropDetector::kRendered),
       detector.GetNumberOfFramesDroppedAt(FrameDropDetector::kDecoded))
       << "The number of dropped frames on the decode and render steps are not "
       "equal. This may be because we have a major problem in the buffers of "
@@ -236,7 +226,7 @@ TEST_F(ViEVideoVerificationTest, DISABLED_RunsFullStackWithoutErrors)  {
   // To make the quality measurement correct, we must adjust the output file to
   // that by copying the last successful frame into the place where the dropped
   // frame would be, for all dropped frames.
-  const int frame_length_in_bytes = 3 * kInputHeight * kInputWidth / 2;
+  const int frame_length_in_bytes = 3 * width * height / 2;
   ViETest::Log("Frame length: %d bytes", frame_length_in_bytes);
   std::vector<Frame*> all_frames = detector.GetAllFrames();
   FixOutputFileForComparison(output_file, frame_length_in_bytes, all_frames);
@@ -248,19 +238,24 @@ TEST_F(ViEVideoVerificationTest, DISABLED_RunsFullStackWithoutErrors)  {
       "of frames multiplied by the frame size. This will likely affect "
       "PSNR/SSIM calculations in a bad way.";
 
+  TearDownFileRenderers();
+
   // We are running on a lower bitrate here so we need to settle for somewhat
   // lower PSNR and SSIM values.
   double actual_psnr = 0;
   double actual_ssim = 0;
   CompareFiles(reference_file, output_file, &actual_psnr, &actual_ssim);
 
-  TearDownFileRenderers();
-
-  const double kExpectedMinimumPSNR = 24;
-  const double kExpectedMinimumSSIM = 0.7;
+  const double kExpectedMinimumPSNR =
+      parameter_table_[GetParam()].avg_psnr_threshold;
+  const double kExpectedMinimumSSIM =
+      parameter_table_[GetParam()].avg_ssim_threshold;
 
   EXPECT_GE(actual_psnr, kExpectedMinimumPSNR);
   EXPECT_GE(actual_ssim, kExpectedMinimumSSIM);
 }
+
+INSTANTIATE_TEST_CASE_P(FullStackTests, ParameterizedFullStackTest,
+                        ::testing::Values(0, 1));
 
 }  // namespace

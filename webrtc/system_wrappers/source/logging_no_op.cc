@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -8,14 +8,16 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "system_wrappers/interface/cpu_wrapper.h"
-
-#include <stddef.h>
+#include "webrtc/system_wrappers/interface/logging.h"
 
 namespace webrtc {
 
-CpuWrapper* CpuWrapper::CreateCpu() {
-  return NULL;
+LogMessage::LogMessage(const char*, int, LoggingSeverity) {
+  // Avoid an unused-private-field warning.
+  (void)severity_;
 }
 
-} // namespace webrtc
+LogMessage::~LogMessage() {
+}
+
+}  // namespace webrtc
