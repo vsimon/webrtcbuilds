@@ -281,12 +281,13 @@ WebRtc_Word32 VideoCaptureImpl::IncomingFrame(
             return -1;
         }
 
+        int stride_y = width;
+        int stride_uv = (width + 1) / 2;
+        // TODO(mikhal): Update correct aligned stride values.
+        //Calc16ByteAlignedStride(target_width, &stride_y, &stride_uv);
         // Setting absolute height (in case it was negative).
         // In Windows, the image starts bottom left, instead of top left.
         // Setting a negative source height, inverts the image (within LibYuv).
-        int stride_y = 0;
-        int stride_uv = 0;
-        Calc16ByteAlignedStride(width, &stride_y, &stride_uv);
         int ret = _captureFrame.CreateEmptyFrame(width, abs(height),
                                                  stride_y,
                                                  stride_uv, stride_uv);
