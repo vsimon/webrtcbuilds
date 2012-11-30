@@ -111,9 +111,7 @@ int VP8EncoderImpl::SetRates(uint32_t new_bitrate_kbit,
   config_->rc_target_bitrate = new_bitrate_kbit;  // in kbit/s
 
 #if WEBRTC_LIBVPX_VERSION >= 971
-  if (temporal_layers_) {
-    temporal_layers_->ConfigureBitrates(new_bitrate_kbit, config_);
-  }
+  temporal_layers_->ConfigureBitrates(new_bitrate_kbit, config_);
 #endif
   codec_.maxFramerate = new_framerate;
 
@@ -159,12 +157,12 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
 
   codec_ = *inst;
 
+  int num_temporal_layers = inst->codecSpecific.VP8.numberOfTemporalLayers > 1 ?
+      inst->codecSpecific.VP8.numberOfTemporalLayers : 1;
+
 #if WEBRTC_LIBVPX_VERSION >= 971
-  if (inst->codecSpecific.VP8.numberOfTemporalLayers > 1) {
-    assert(temporal_layers_ == NULL);
-    temporal_layers_ =
-        new TemporalLayers(inst->codecSpecific.VP8.numberOfTemporalLayers);
-  }
+  assert(temporal_layers_ == NULL);
+  temporal_layers_ = new TemporalLayers(num_temporal_layers);
 #endif
   // random start 16 bits is enough.
   picture_id_ = static_cast<uint16_t>(rand()) & 0x7FFF;
@@ -177,11 +175,11 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
   encoded_image_._buffer = new uint8_t[encoded_image_._size];
   encoded_image_._completeFrame = true;
 
-  unsigned int align = 1;
-  if (codec_.width % 32 == 0) {
-    align = 32;
-  }
-  raw_ = vpx_img_alloc(NULL, IMG_FMT_I420, codec_.width, codec_.height, align);
+  // Creating a wrapper to the image - setting image data to NULL. Actual
+  // pointer will be set in encode. Setting align to 1, as it is meaningless
+  // (actual memory is not allocated).
+  raw_ = vpx_img_wrap(NULL, IMG_FMT_I420, codec_.width, codec_.height,
+                      1, NULL);
   // populate encoder configuration with default values
   if (vpx_codec_enc_config_default(vpx_codec_vp8_cx(), config_, 0)) {
     return WEBRTC_VIDEO_CODEC_ERROR;
@@ -191,9 +189,7 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
   config_->rc_target_bitrate = inst->startBitrate;  // in kbit/s
 
 #if WEBRTC_LIBVPX_VERSION >= 971
-  if (temporal_layers_) {
-    temporal_layers_->ConfigureBitrates(inst->startBitrate, config_);
-  }
+  temporal_layers_->ConfigureBitrates(inst->startBitrate, config_);
 #endif
   // setting the time base of the codec
   config_->g_timebase.num = 1;
@@ -204,8 +200,8 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
     case kResilienceOff:
       config_->g_error_resilient = 0;
 #if WEBRTC_LIBVPX_VERSION >= 971
-      if (temporal_layers_) {
-        // Must be on for temporal layers.
+      if (num_temporal_layers > 1) {
+        // Must be on for temporal layers (i.e., |num_temporal_layers| > 1).
         config_->g_error_resilient = 1;
       }
 #endif
@@ -273,7 +269,7 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
       cpu_speed_ = -6;
       break;
   }
-#ifdef WEBRTC_ANDROID
+#if defined(WEBRTC_ARCH_ARM)
   // On mobile platform, always set to -12 to leverage between cpu usage
   // and video quality
   cpu_speed_ = -12;
@@ -298,8 +294,11 @@ int VP8EncoderImpl::InitAndSetControlSettings(const VideoCodec* inst) {
   vpx_codec_control(encoder_, VP8E_SET_CPUUSED, cpu_speed_);
   vpx_codec_control(encoder_, VP8E_SET_TOKEN_PARTITIONS,
                     static_cast<vp8e_token_partitions>(token_partitions_));
+#if !defined(WEBRTC_ARCH_ARM)
+  // TODO(fbarchard): Enable Noise reduction for ARM once optimized.
   vpx_codec_control(encoder_, VP8E_SET_NOISE_SENSITIVITY,
                     inst->codecSpecific.VP8.denoisingOn ? 1 : 0);
+#endif
 #if WEBRTC_LIBVPX_VERSION >= 971
   vpx_codec_control(encoder_, VP8E_SET_MAX_INTRA_BITRATE_PCT,
                     rc_max_intra_target_);
@@ -363,9 +362,7 @@ int VP8EncoderImpl::Encode(const I420VideoFrame& input_image,
 
   int flags = 0;
 #if WEBRTC_LIBVPX_VERSION >= 971
-  if (temporal_layers_) {
-    flags |= temporal_layers_->EncodeFlags();
-  }
+  flags |= temporal_layers_->EncodeFlags();
 #endif
   bool send_keyframe = (frame_type == kKeyFrame);
   if (send_keyframe) {
@@ -442,17 +439,13 @@ void VP8EncoderImpl::PopulateCodecSpecific(CodecSpecificInfo* codec_specific,
   vp8Info->keyIdx = kNoKeyIdx;  // TODO(hlundin) populate this
   vp8Info->nonReference = (pkt.data.frame.flags & VPX_FRAME_IS_DROPPABLE) != 0;
 #if WEBRTC_LIBVPX_VERSION >= 971
-  if (temporal_layers_) {
-    temporal_layers_->PopulateCodecSpecific(
-        (pkt.data.frame.flags & VPX_FRAME_IS_KEY) ? true : false, vp8Info,
-        timestamp);
-  } else {
-#endif
-    vp8Info->temporalIdx = kNoTemporalIdx;
-    vp8Info->layerSync = false;
-    vp8Info->tl0PicIdx = kNoTl0PicIdx;
-#if WEBRTC_LIBVPX_VERSION >= 971
-  }
+  temporal_layers_->PopulateCodecSpecific(
+      (pkt.data.frame.flags & VPX_FRAME_IS_KEY) ? true : false, vp8Info,
+          timestamp);
+#else
+  vp8Info->temporalIdx = kNoTemporalIdx;
+  vp8Info->layerSync = false;
+  vp8Info->tl0PicIdx = kNoTl0PicIdx;
 #endif
   picture_id_ = (picture_id_ + 1) & 0x7FFF;  // prepare next
 }
@@ -636,7 +629,7 @@ int VP8DecoderImpl::InitDecode(const VideoCodec* inst, int number_of_cores) {
   cfg.h = cfg.w = 0;  // set after decode
 
   vpx_codec_flags_t flags = 0;
-#if (WEBRTC_LIBVPX_VERSION >= 971) && !defined(WEBRTC_ANDROID)
+#if (WEBRTC_LIBVPX_VERSION >= 971) && !defined(WEBRTC_ARCH_ARM)
   flags = VPX_CODEC_USE_POSTPROC;
   if (inst->codecSpecific.VP8.errorConcealmentOn) {
     flags |= VPX_CODEC_USE_ERROR_CONCEALMENT;
@@ -650,7 +643,7 @@ int VP8DecoderImpl::InitDecode(const VideoCodec* inst, int number_of_cores) {
     return WEBRTC_VIDEO_CODEC_MEMORY;
   }
 
-#if (WEBRTC_LIBVPX_VERSION >= 971) && !defined(WEBRTC_ANDROID)
+#if (WEBRTC_LIBVPX_VERSION >= 971) && !defined(WEBRTC_ARCH_ARM)
   vp8_postproc_cfg_t  ppcfg;
   ppcfg.post_proc_flag = VP8_DEMACROBLOCK | VP8_DEBLOCK;
   // Strength of deblocking filter. Valid range:[0,16]
@@ -691,7 +684,7 @@ int VP8DecoderImpl::Decode(const EncodedImage& input_image,
   }
 #endif
 
-#if (WEBRTC_LIBVPX_VERSION >= 971) && !defined(WEBRTC_ANDROID)
+#if (WEBRTC_LIBVPX_VERSION >= 971) && !defined(WEBRTC_ARCH_ARM)
   if (!mfqe_enabled_ && codec_specific_info &&
       codec_specific_info->codecSpecific.VP8.temporalIdx > 0) {
     // Enable MFQE if we are receiving layers.
@@ -970,10 +963,7 @@ VideoDecoder* VP8DecoderImpl::Copy() {
   if (!ref_frame_) {
     ref_frame_ = new vpx_ref_frame_t;
 
-    unsigned int align = 1;
-    if (decoded_image_.width() % 32 == 0) {
-      align = 32;
-    }
+    unsigned int align = 16;
     if (!vpx_img_alloc(&ref_frame_->img,
                        static_cast<vpx_img_fmt_t>(image_format_),
                        decoded_image_.width(), decoded_image_.height(),

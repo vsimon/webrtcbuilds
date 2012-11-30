@@ -25,6 +25,9 @@
 
 namespace webrtc {
 
+// Use this rtt if no value has been reported.
+static uint32_t kDefaultRtt = 200;
+
 // Predicates used when searching for frames in the frame buffer list
 class FrameSmallerTimestamp {
  public:
@@ -88,7 +91,7 @@ VCMJitterBuffer::VCMJitterBuffer(TickTimeBase* clock,
       num_discarded_packets_(0),
       jitter_estimate_(vcm_id, receiver_id),
       inter_frame_delay_(clock_->MillisecondTimestamp()),
-      rtt_ms_(0),
+      rtt_ms_(kDefaultRtt),
       nack_mode_(kNoNack),
       low_rtt_nack_threshold_ms_(-1),
       high_rtt_nack_threshold_ms_(-1),
@@ -190,7 +193,7 @@ void VCMJitterBuffer::Start() {
   first_packet_ = true;
   nack_seq_nums_length_ = 0;
   waiting_for_key_frame_ = false;
-  rtt_ms_ = 0;
+  rtt_ms_ = kDefaultRtt;
   num_not_decodable_packets_ = 0;
 
   WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVideoCoding,
@@ -796,6 +799,11 @@ void VCMJitterBuffer::SetNackMode(VCMNackMode mode,
   assert(low_rtt_nack_threshold_ms > -1 || high_rtt_nack_threshold_ms == -1);
   low_rtt_nack_threshold_ms_ = low_rtt_nack_threshold_ms;
   high_rtt_nack_threshold_ms_ = high_rtt_nack_threshold_ms;
+  // Don't set a high start rtt if high_rtt_nack_threshold_ms_ is used, to not
+  // disable NACK in hybrid mode.
+  if (rtt_ms_ == kDefaultRtt && high_rtt_nack_threshold_ms_ != -1) {
+    rtt_ms_ = 0;
+  }
   if (nack_mode_ == kNoNack) {
     jitter_estimate_.ResetNackCount();
   }
@@ -925,8 +933,7 @@ uint16_t* VCMJitterBuffer::CreateNackList(uint16_t* nack_list_size,
     // We don't need to check if frame is decoding since low_seq_num is based
     // on the last decoded sequence number.
     VCMFrameBufferStateEnum state = frame_buffers_[i]->GetState();
-    if ((kStateFree != state) &&
-        (kStateEmpty != state)) {
+    if (kStateFree != state) {
       // Reaching thus far means we are going to update the NACK list
       // When in hybrid mode, we use the soft NACKing feature.
       if (nack_mode_ == kNackHybrid) {
@@ -1263,11 +1270,11 @@ FrameList::iterator VCMJitterBuffer::FindOldestCompleteContinuousFrame(
 void VCMJitterBuffer::CleanUpOldFrames() {
   while (frame_list_.size() > 0) {
     VCMFrameBuffer* oldest_frame = frame_list_.front();
-    bool next_frame_empty =
-        (last_decoded_state_.ContinuousFrame(oldest_frame) &&
-         oldest_frame->GetState() == kStateEmpty);
-    if (last_decoded_state_.IsOldFrame(oldest_frame) ||
-        (next_frame_empty && frame_list_.size() > 1)) {
+    if (oldest_frame->GetState() == kStateEmpty && frame_list_.size() > 1) {
+      // This frame is empty, mark it as decoded, thereby making it old.
+      last_decoded_state_.UpdateEmptyFrame(oldest_frame);
+    }
+    if (last_decoded_state_.IsOldFrame(oldest_frame)) {
       ReleaseFrameIfNotDecoding(frame_list_.front());
       frame_list_.erase(frame_list_.begin());
     } else {
