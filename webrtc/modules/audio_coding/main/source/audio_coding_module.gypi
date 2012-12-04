@@ -119,6 +119,10 @@
             '<(webrtc_root)/test/test.gyp:test_support_main',
             '<(DEPTH)/testing/gtest.gyp:gtest',
             '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
+            '<(webrtc_root)/modules/modules.gyp:webrtc_utility',
+          ],
+          'include_dirs': [
+            '<(webrtc_root)/common_audio/resampler/include',
           ],
           'defines': [
             '<@(audio_coding_defines)',
@@ -127,6 +131,7 @@
              '../test/ACMTest.cc',
              '../test/APITest.cc',
              '../test/Channel.cc',
+             '../test/dual_stream_unittest.cc',
              '../test/EncodeDecodeTest.cc',
              '../test/iSACTest.cc',
              '../test/PCMFile.cc',
@@ -147,6 +152,8 @@
           'type': 'executable',
           'dependencies': [
             'audio_coding_module',
+            'CNG',
+            'iSACFix',
             'NetEq',
             '<(webrtc_root)/common_audio/common_audio.gyp:vad',
             '<(DEPTH)/testing/gtest.gyp:gtest',
@@ -155,6 +162,10 @@
           ],
           'sources': [
              'acm_neteq_unittest.cc',
+             '../../codecs/cng/cng_unittest.cc',
+             '../../codecs/isac/fix/source/filters_unittest.cc',
+             '../../codecs/isac/fix/source/filterbanks_unittest.cc',
+             '../../codecs/isac/fix/source/lpc_masking_model_unittest.cc',
           ],
         }, # audio_coding_unittests
       ],
