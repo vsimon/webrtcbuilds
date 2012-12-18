@@ -33,6 +33,7 @@
         '../interface/data_log.h',
         '../interface/data_log_c.h',
         '../interface/data_log_impl.h',
+        '../interface/event_tracer.h',
         '../interface/event_wrapper.h',
         '../interface/file_wrapper.h',
         '../interface/fix_interlocked_exchange_pointer_win.h',
@@ -49,6 +50,7 @@
         '../interface/thread_wrapper.h',
         '../interface/tick_util.h',
         '../interface/trace.h',
+        '../interface/trace_event.h',
         'aligned_malloc.cc',
         'atomic32_mac.cc',
         'atomic32_posix.cc',
@@ -79,6 +81,7 @@
         'event.cc',
         'event_posix.cc',
         'event_posix.h',
+        'event_tracer.cc',
         'event_win.cc',
         'event_win.h',
         'file_impl.cc',
@@ -201,8 +204,16 @@
           ],
           'conditions': [
             ['build_with_chromium==1', {
-              'dependencies': [
-                '<(android_ndk_root)/android_tools_ndk.gyp:cpu_features',
+              'conditions': [
+                ['android_build_type != 0', {
+                  'libraries': [
+                    'cpufeatures.a'
+                  ],
+                }, {
+                  'dependencies': [
+                    '<(android_ndk_root)/android_tools_ndk.gyp:cpu_features',
+                  ],
+                }],
               ],
             }, {
               'sources': [
@@ -231,6 +242,7 @@
             'cpu_measurement_harness.h',
             'cpu_measurement_harness.cc',
             'critical_section_unittest.cc',
+            'event_tracer_unittest.cc',
             'list_unittest.cc',
             'logging_unittest.cc',
             'map_unittest.cc',

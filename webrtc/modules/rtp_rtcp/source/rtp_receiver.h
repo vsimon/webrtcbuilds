@@ -29,13 +29,14 @@ class RtpRtcpFeedback;
 class ModuleRtpRtcpImpl;
 class Trace;
 
-class RTPReceiver : public RTPReceiverAudio, public RTPReceiverVideo, public Bitrate
+class RTPReceiver : public Bitrate
 {
 public:
     RTPReceiver(const WebRtc_Word32 id,
                 const bool audio,
                 RtpRtcpClock* clock,
-                ModuleRtpRtcpImpl* owner);
+                ModuleRtpRtcpImpl* owner,
+                RtpAudioFeedback* incomingMessagesCallback);
 
     virtual ~RTPReceiver();
 
@@ -154,10 +155,17 @@ public:
 
     void RTXStatus(bool* enable, WebRtc_UWord32* SSRC) const;
 
+    RTPReceiverAudio* GetAudioReceiver() const { return _rtpReceiverAudio; }
+
+    virtual WebRtc_Word32 CallbackOfReceivedPayloadData(
+        const WebRtc_UWord8* payloadData,
+        const WebRtc_UWord16 payloadSize,
+        const WebRtcRTPHeader* rtpHeader);
+
+    virtual WebRtc_Word8 REDPayloadType() const;
+
+    bool HaveNotReceivedPackets() const;
 protected:
-    virtual WebRtc_Word32 CallbackOfReceivedPayloadData(const WebRtc_UWord8* payloadData,
-                                                        const WebRtc_UWord16 payloadSize,
-                                                        const WebRtcRTPHeader* rtpHeader);
 
     virtual bool RetransmitOfOldPacket(const WebRtc_UWord16 sequenceNumber,
                                        const WebRtc_UWord32 rtpTimeStamp) const;
@@ -166,10 +174,6 @@ protected:
     void UpdateStatistics(const WebRtcRTPHeader* rtpHeader,
                           const WebRtc_UWord16 bytes,
                           const bool oldPacket);
-
-    virtual WebRtc_Word8 REDPayloadType() const;
-
-    bool HaveNotReceivedPackets() const;
 
 private:
     // Is RED configured with payload type payloadType
@@ -189,6 +193,9 @@ private:
     bool ProcessNACKBitRate(WebRtc_UWord32 now);
 
 private:
+    RTPReceiverAudio*       _rtpReceiverAudio;
+    RTPReceiverVideo*       _rtpReceiverVideo;
+
     WebRtc_Word32           _id;
     const bool              _audio;
     ModuleRtpRtcpImpl&      _rtpRtcp;

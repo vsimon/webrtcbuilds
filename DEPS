@@ -14,7 +14,7 @@ vars = {
 
   # External resources like video and audio files used for testing purposes.
   # Downloaded on demand when needed.
-  "webrtc_resources_revision": "10",
+  "webrtc_resources_revision": "12",
 }
 
 # NOTE: Prefer revision numbers to tags for svn deps. Use http rather than
@@ -52,10 +52,10 @@ deps = {
     From("chromium_deps", "src/third_party/libjpeg_turbo"),
 
   "third_party/libvpx/source/libvpx":
-    "http://git.chromium.org/webm/libvpx.git@fd3078fd8",
+    "http://git.chromium.org/webm/libvpx.git@7a09f6b8",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@507",
+    (Var("googlecode_url") % "libyuv") + "/trunk@520",
 
   "third_party/opus":
     Var("chromium_trunk") + "/src/third_party/opus@165570",

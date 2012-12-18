@@ -91,22 +91,8 @@
             '<(DEPTH)/testing/gtest.gyp:gtest',
           ],
          'sources': [
-            # header files
-            'test/benchmark.h',
-            'test/dual_decoder_test.h',
-            'test/normal_async_test.h',
-            'test/packet_loss_test.h',
-            'test/rps_test.h',
-            'test/vp8_unittest.h',
-
            # source files
-            'test/benchmark.cc',
-            'test/dual_decoder_test.cc',
-            'test/normal_async_test.cc',
-            'test/packet_loss_test.cc',
-            'test/rps_test.cc',
-            'test/tester.cc',
-            'test/vp8_unittest.cc',
+            'test/vp8_impl_unittest.cc',
           ],
         },
         {
@@ -114,6 +100,7 @@
           'type': 'executable',
           'dependencies': [
             'webrtc_vp8',
+            'test_framework',
             '<(DEPTH)/testing/gmock.gyp:gmock',
             '<(DEPTH)/testing/gtest.gyp:gtest',
             '<(webrtc_root)/test/test.gyp:test_support_main',
@@ -131,6 +118,22 @@
                 '<(DEPTH)/third_party/libvpx/libvpx.gyp:libvpx',
               ],
             }],
+          ],
+        },
+        {
+          'target_name': 'vp8_coder',
+          'type': 'executable',
+          'dependencies': [
+            'webrtc_vp8',
+            '<(webrtc_root)/common_video/common_video.gyp:common_video',
+            '<(webrtc_root)/test/metrics.gyp:metrics',
+            '<(DEPTH)/testing/gtest.gyp:gtest',
+            '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
+            '<(webrtc_root)/test/test.gyp:test_support_main',
+            '<(webrtc_root)/tools/tools.gyp:command_line_parser',
+          ],
+          'sources': [
+            'vp8_sequence_coder.cc',
           ],
         },
       ], # targets

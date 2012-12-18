@@ -150,6 +150,11 @@ public:
     WebRtc_Word32 SetISACMaxRate(int rateBps);
     WebRtc_Word32 SetISACMaxPayloadSize(int sizeBytes);
 
+    // VoE dual-streaming.
+    int SetSecondarySendCodec(const CodecInst& codec, int red_payload_type);
+    void RemoveSecondarySendCodec();
+    int GetSecondarySendCodec(CodecInst* codec);
+
     // VoENetwork
     WebRtc_Word32 RegisterExternalTransport(Transport& transport);
     WebRtc_Word32 DeRegisterExternalTransport();
@@ -226,6 +231,7 @@ public:
     int RegisterExternalMediaProcessing(ProcessingTypes type,
                                         VoEMediaProcess& processObject);
     int DeRegisterExternalMediaProcessing(ProcessingTypes type);
+    int SetExternalMixing(bool enabled);
 
     // VoEVolumeControl
     int GetSpeechOutputLevel(WebRtc_UWord32& level) const;
@@ -354,6 +360,7 @@ public:
     int InsertExtraRTPPacket(unsigned char payloadType, bool markerBit,
                              const char* payloadData,
                              unsigned short payloadSize);
+    uint32_t LastRemoteTimeStamp() { return _lastRemoteTimeStamp; }
 
 public:
     // From AudioPacketizationCallback in the ACM
@@ -488,6 +495,10 @@ public:
     {
         return _externalTransport;
     }
+    bool ExternalMixing() const
+    {
+        return _externalMixing;
+    }
     bool OutputIsOnHold() const
     {
         return _outputIsOnHold;
@@ -532,6 +543,7 @@ private:
     void RegisterReceiveCodecsToRTPModule();
     int ApmProcessRx(AudioFrame& audioFrame);
 
+    int SetRedPayloadType(int red_payload_type);
 private:
     CriticalSectionWrapper& _fileCritSect;
     CriticalSectionWrapper& _callbackCritSect;
@@ -604,6 +616,7 @@ private:
     // VoEBase
     bool _outputIsOnHold;
     bool _externalPlayout;
+    bool _externalMixing;
     bool _inputIsOnHold;
     bool _playing;
     bool _sending;
@@ -629,6 +642,7 @@ private:
     bool _insertExtraRTPPacket;
     bool _extraMarkerBit;
     WebRtc_UWord32 _lastLocalTimeStamp;
+    uint32_t _lastRemoteTimeStamp;
     WebRtc_Word8 _lastPayloadType;
     bool _includeAudioLevelIndication;
     // VoENetwork
