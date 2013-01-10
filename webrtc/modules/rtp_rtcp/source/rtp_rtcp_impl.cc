@@ -8,17 +8,22 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "common_types.h"
-#include "rtp_rtcp_impl.h"
-#include "trace.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_rtcp_impl.h"
+
+#include <cassert>
+#include <string.h>
+
+#include "webrtc/common_types.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_receiver_audio.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_receiver_video.h"
+#include "webrtc/system_wrappers/interface/logging.h"
+#include "webrtc/system_wrappers/interface/trace.h"
 
 #ifdef MATLAB
-#include "../test/BWEStandAlone/MatlabPlot.h"
+#include "webrtc/modules/rtp_rtcp/test/BWEStandAlone/MatlabPlot.h"
 extern MatlabEngine eng; // global variable defined elsewhere
 #endif
 
-#include <string.h> //memcpy
-#include <cassert> //assert
 
 // local for this file
 namespace {
@@ -225,6 +230,19 @@ WebRtc_Word32 ModuleRtpRtcpImpl::Process() {
       // No own rtt calculation or set rtt, use default value.
       max_rtt = kDefaultRtt;
     }
+
+    // Verify receiver reports are delivered and the reported sequence number is
+    // increasing.
+    if (_rtcpSender.Sending()) {
+      int64_t rtcp_interval = RtcpReportInterval();
+      if (_rtcpReceiver.RtcpRrTimeout(rtcp_interval)) {
+        LOG_F(LS_WARNING) << "Timeout: No RTCP RR received.";
+      } else if (_rtcpReceiver.RtcpRrSequenceNumberTimeout(rtcp_interval)) {
+        LOG_F(LS_WARNING) <<
+            "Timeout: No increase in RTCP RR extended highest sequence number.";
+      }
+    }
+
     if (remote_bitrate_) {
       // TODO(mflodman) Remove this and let this be propagated by CallStats.
       remote_bitrate_->SetRtt(max_rtt);
@@ -1492,6 +1510,8 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SendNACK(const WebRtc_UWord16* nackList,
   }
   const WebRtc_Word64 now = _clock.GetTimeInMS();
   const WebRtc_Word64 timeLimit = now - waitTime;
+  WebRtc_UWord16 nackLength = size;
+  WebRtc_UWord16 startId = 0;
 
   if (_nackLastTimeSent < timeLimit) {
     // send list
@@ -1501,7 +1521,17 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SendNACK(const WebRtc_UWord16* nackList,
       // last seq num is the same don't send list
       return 0;
     } else {
-      // send list
+      //
+      // send NACK's only for new sequence numbers to avoid re-sending
+      // of NACK's for sequences we have already sent
+      //
+      for (int i = 0; i < size; i++)  {
+        if (_nackLastSeqNumberSent == nackList[i]) {
+          startId = i+1;
+          break;
+        }
+      }
+      nackLength = size-startId;
     }
   }
   _nackLastTimeSent =  now;
@@ -1509,7 +1539,7 @@ WebRtc_Word32 ModuleRtpRtcpImpl::SendNACK(const WebRtc_UWord16* nackList,
 
   switch (_nackMethod) {
     case kNackRtcp:
-      return _rtcpSender.SendRTCP(kRtcpNack, size, nackList);
+      return _rtcpSender.SendRTCP(kRtcpNack, nackLength, &nackList[startId]);
     case kNackOff:
       return -1;
   };
@@ -2022,4 +2052,12 @@ WebRtc_Word32 ModuleRtpRtcpImpl::BoundingSet(bool& tmmbrOwner,
                                              TMMBRSet*& boundingSet) {
   return _rtcpReceiver.BoundingSet(tmmbrOwner, boundingSet);
 }
+
+int64_t ModuleRtpRtcpImpl::RtcpReportInterval() {
+  if (_audio)
+    return RTCP_INTERVAL_AUDIO_MS;
+  else
+    return RTCP_INTERVAL_VIDEO_MS;
+}
+
 }  // namespace webrtc

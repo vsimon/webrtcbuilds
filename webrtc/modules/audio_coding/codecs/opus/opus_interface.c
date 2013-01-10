@@ -42,8 +42,11 @@ int16_t WebRtcOpus_EncoderCreate(OpusEncInst** inst, int32_t channels) {
   state = (OpusEncInst*) calloc(1, sizeof(OpusEncInst));
   if (state) {
     int error;
-    state->encoder = opus_encoder_create(48000, channels, OPUS_APPLICATION_VOIP,
-                                         &error);
+    // Default to VoIP application for mono, and AUDIO for stereo.
+    int application = (channels == 1) ?
+        OPUS_APPLICATION_VOIP : OPUS_APPLICATION_AUDIO;
+
+    state->encoder = opus_encoder_create(48000, channels, application, &error);
     if (error == OPUS_OK || state->encoder != NULL ) {
       *inst = state;
       return 0;
@@ -279,4 +282,22 @@ int16_t WebRtcOpus_DecodePlc(OpusDecInst* inst, int16_t* decoded,
    * loss concealment, but I don't know how many samples
    * number_of_lost_frames corresponds to. */
   return -1;
+}
+
+int WebRtcOpus_DurationEst(OpusDecInst* inst,
+                           const uint8_t* payload,
+                           int payload_length_bytes)
+{
+  int frames, samples;
+  frames = opus_packet_get_nb_frames(payload, payload_length_bytes);
+  if (frames < 0) {
+    /* Invalid payload data. */
+    return 0;
+  }
+  samples = frames * opus_packet_get_samples_per_frame(payload, 48000);
+  if (samples < 120 || samples > 5760) {
+    /* Invalid payload duration. */
+    return 0;
+  }
+  return samples;
 }

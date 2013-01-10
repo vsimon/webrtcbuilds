@@ -15,6 +15,7 @@
 
 #include "common_types.h"
 #include "engine_configurations.h"
+#include "test/testsupport/gtest_disable.h"
 #include "voice_engine/include/voe_audio_processing.h"
 #include "voice_engine/include/voe_base.h"
 #include "voice_engine/include/voe_call_report.h"
@@ -39,25 +40,6 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
-// Helper macros for platform disables. These can be chained.
-#ifdef WEBRTC_LINUX
-#define DISABLED_ON_LINUX(test) DISABLED_##test
-#else
-#define DISABLED_ON_LINUX(test) test
-#endif
-
-#ifdef WEBRTC_MAC
-#define DISABLED_ON_MAC(test) DISABLED_##test
-#else
-#define DISABLED_ON_MAC(test) test
-#endif
-
-#ifdef _WIN32
-#define DISABLED_ON_WIN(test) DISABLED_##test
-#else
-#define DISABLED_ON_WIN(test) test
-#endif
-
 // This convenient fixture sets up all voice engine interfaces automatically for
 // use by testing subclasses. It allocates each interface and releases it once
 // which means that if a tests allocates additional interfaces from the voice
@@ -75,7 +57,7 @@ class BeforeInitializationFixture : public testing::Test {
   virtual ~BeforeInitializationFixture();
 
  protected:
-  // Use this sleep function to sleep in test (avoid sleep macro).
+  // Use this sleep function to sleep in tests.
   void Sleep(long milliseconds);
 
   webrtc::VoiceEngine*        voice_engine_;
