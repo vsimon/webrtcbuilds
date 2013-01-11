@@ -49,9 +49,9 @@
         {
           'target_name': 'libvpx_arm_neon',
           'type': 'static_library',
-          #'dependencies': [
-            #'gen_asm_offsets',
-          #],
+          'dependencies': [
+            'gen_asm_offsets',
+          ],
           'includes': [
             'libvpx_asm_conversion.gypi',
             'libvpx_src_neon.gypi',
