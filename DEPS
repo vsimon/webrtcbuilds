@@ -10,7 +10,7 @@ vars = {
   # If you do not know, use the full path while defining your new deps entry.
   "googlecode_url": "http://%s.googlecode.com/svn",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
-  "chromium_revision": "169394",
+  "chromium_revision": "176094",
 
   # External resources like video and audio files used for testing purposes.
   # Downloaded on demand when needed.
@@ -55,7 +55,7 @@ deps = {
     "http://git.chromium.org/webm/libvpx.git@7a09f6b8",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@520",
+    (Var("googlecode_url") % "libyuv") + "/trunk@534",
 
   "third_party/opus":
     Var("chromium_trunk") + "/src/third_party/opus@172355",

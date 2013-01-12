@@ -242,6 +242,16 @@
                'WEBRTC_ANDROID_OPENSLES',
              ],
            }],
+           ['clang!=1', {
+             # The Android NDK doesn't provide optimized versions of these
+             # functions. Ensure they are disabled for all compilers.
+             'cflags': [
+               '-fno-builtin-cos',
+               '-fno-builtin-sin',
+               '-fno-builtin-cosf',
+               '-fno-builtin-sinf',
+             ],
+           }],
          ],
       }],
     ], # conditions
