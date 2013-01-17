@@ -18,7 +18,9 @@
 #include "webrtc/modules/rtp_rtcp/source/bitrate.h"
 #include "webrtc/modules/rtp_rtcp/source/rtcp_receiver_help.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_header_extension.h"
+#include "webrtc/modules/rtp_rtcp/source/rtp_payload_registry.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_utility.h"
+#include "webrtc/system_wrappers/interface/scoped_ptr.h"
 #include "webrtc/typedefs.h"
 
 namespace webrtc {
@@ -32,11 +34,15 @@ class RTPReceiverStrategy;
 
 class RTPReceiver : public Bitrate {
  public:
+  // Callbacks passed in here may not be NULL (use Null object callbacks if you
+  // want callbacks to do nothing).
   RTPReceiver(const WebRtc_Word32 id,
               const bool audio,
-              RtpRtcpClock* clock,
+              Clock* clock,
               ModuleRtpRtcpImpl* owner,
-              RtpAudioFeedback* incoming_messages_callback);
+              RtpAudioFeedback* incoming_audio_messages_callback,
+              RtpData* incoming_payload_callback,
+              RtpFeedback* incoming_messages_callback);
 
   virtual ~RTPReceiver();
 
@@ -49,10 +55,6 @@ class RTPReceiver : public Bitrate {
   void ProcessDeadOrAlive(const bool RTCPalive, const WebRtc_Word64 now);
 
   void ProcessBitrate();
-
-  WebRtc_Word32 RegisterIncomingDataCallback(RtpData* incoming_data_callback);
-  WebRtc_Word32 RegisterIncomingRTPCallback(
-      RtpFeedback* incoming_messages_callback);
 
   WebRtc_Word32 RegisterReceivePayload(
       const char payload_name[RTP_PAYLOAD_NAME_SIZE],
@@ -75,11 +77,6 @@ class RTPReceiver : public Bitrate {
                                WebRtc_UWord32* frequency,
                                WebRtc_UWord8* channels,
                                WebRtc_UWord32* rate) const;
-
-  WebRtc_Word32 RemotePayload(char payload_name[RTP_PAYLOAD_NAME_SIZE],
-                              WebRtc_Word8* payload_type,
-                              WebRtc_UWord32* frequency,
-                              WebRtc_UWord8* channels) const;
 
   WebRtc_Word32 IncomingRTPPacket(
       WebRtcRTPHeader* rtpheader,
@@ -158,13 +155,8 @@ class RTPReceiver : public Bitrate {
   void RTXStatus(bool* enable, WebRtc_UWord32* ssrc) const;
 
   RTPReceiverAudio* GetAudioReceiver() const {
-    return rtp_receiver_audio_;
+    return rtp_receiver_audio_.get();
   }
-
-  virtual WebRtc_Word32 CallbackOfReceivedPayloadData(
-      const WebRtc_UWord8* payload_data,
-      const WebRtc_UWord16 payload_size,
-      const WebRtcRTPHeader* rtp_header);
 
   virtual WebRtc_Word8 REDPayloadType() const;
 
@@ -195,28 +187,23 @@ class RTPReceiver : public Bitrate {
   bool ProcessNACKBitRate(WebRtc_UWord32 now);
 
  private:
-  RTPReceiverAudio*       rtp_receiver_audio_;
-  RTPReceiverVideo*       rtp_receiver_video_;
-  RTPReceiverStrategy*    rtp_media_receiver_;
+  RTPPayloadRegistry           rtp_payload_registry_;
+  scoped_ptr<RTPReceiverAudio> rtp_receiver_audio_;
+  scoped_ptr<RTPReceiverVideo> rtp_receiver_video_;
+  RTPReceiverStrategy*         rtp_media_receiver_;
 
   WebRtc_Word32           id_;
   ModuleRtpRtcpImpl&      rtp_rtcp_;
 
-  CriticalSectionWrapper* critical_section_cbs_;
   RtpFeedback*            cb_rtp_feedback_;
-  RtpData*                cb_rtp_data_;
 
   CriticalSectionWrapper* critical_section_rtp_receiver_;
   mutable WebRtc_Word64   last_receive_time_;
   WebRtc_UWord16          last_received_payload_length_;
-  WebRtc_Word8            last_received_payload_type_;
-  WebRtc_Word8            last_received_media_payload_type_;
 
   WebRtc_UWord32          packet_timeout_ms_;
-  WebRtc_Word8            red_payload_type_;
 
-  ModuleRTPUtility::PayloadTypeMap payload_type_map_;
-  RtpHeaderExtensionMap            rtp_header_extension_map_;
+  RtpHeaderExtensionMap   rtp_header_extension_map_;
 
   // SSRCs.
   WebRtc_UWord32            ssrc_;

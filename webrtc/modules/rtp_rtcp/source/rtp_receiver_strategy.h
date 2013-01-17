@@ -22,22 +22,31 @@ namespace webrtc {
 // This class is not thread-safe and must be protected by its caller.
 class RTPReceiverStrategy {
  public:
-  RTPReceiverStrategy();
+  // The data callback is where we should send received payload data.
+  // See ParseRtpPacket. This class does not claim ownership of the callback.
+  // Implementations must NOT hold any critical sections while calling the
+  // callback.
+  //
+  // Note: Implementations may call the callback for other reasons than calls
+  // to ParseRtpPacket, for instance if the implementation somehow recovers a
+  // packet.
+  RTPReceiverStrategy(RtpData* data_callback);
   virtual ~RTPReceiverStrategy() {}
 
-  // Parses the RTP packet. Implementations should keep a reference to the
-  // calling RTPReceiver and call CallbackOfReceivedPayloadData if parsing
-  // succeeds.
-  // TODO(phoglund): This interaction is really ugly: clean up by removing
-  // the need of a back reference to parent, perhaps by returning something
-  // instead of calling back.
+  // Parses the RTP packet and calls the data callback with the payload data.
+  // Implementations are encouraged to use the provided packet buffer and RTP
+  // header as arguments to the callback; implementations are also allowed to
+  // make changes in the data as necessary. The specific_payload argument
+  // provides audio or video-specific data. The is_first_packet argument is true
+  // if this packet is either the first packet ever or the first in its frame.
   virtual WebRtc_Word32 ParseRtpPacket(
     WebRtcRTPHeader* rtp_header,
     const ModuleRTPUtility::PayloadUnion& specific_payload,
     const bool is_red,
     const WebRtc_UWord8* packet,
     const WebRtc_UWord16 packet_length,
-    const WebRtc_Word64 timestamp_ms) = 0;
+    const WebRtc_Word64 timestamp_ms,
+    const bool is_first_packet) = 0;
 
   // Retrieves the last known applicable frequency.
   virtual WebRtc_Word32 GetFrequencyHz() const = 0;
@@ -108,6 +117,7 @@ class RTPReceiverStrategy {
 
  protected:
   ModuleRTPUtility::PayloadUnion last_payload_;
+  RtpData* data_callback_;
 };
 
 }  // namespace webrtc

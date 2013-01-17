@@ -13,6 +13,7 @@
 
 #include "typedefs.h"
 #include "module_common_types.h"
+#include "webrtc/system_wrappers/interface/clock.h"
 
 #ifndef NULL
     #define NULL    0
@@ -255,18 +256,62 @@ class RtcpRttObserver {
   virtual ~RtcpRttObserver() {};
 };
 
-// A clock interface that allows reading of absolute and relative
-// timestamps in an RTP/RTCP module.
-class RtpRtcpClock {
+// Null object version of RtpFeedback.
+class NullRtpFeedback : public RtpFeedback {
  public:
-  virtual ~RtpRtcpClock() {}
+  virtual ~NullRtpFeedback() {}
 
-  // Return a timestamp in milliseconds relative to some arbitrary
-  // source; the source is fixed for this clock.
-  virtual WebRtc_Word64 GetTimeInMS() = 0;
+  virtual WebRtc_Word32 OnInitializeDecoder(
+      const WebRtc_Word32 id,
+      const WebRtc_Word8 payloadType,
+      const char payloadName[RTP_PAYLOAD_NAME_SIZE],
+      const int frequency,
+      const WebRtc_UWord8 channels,
+      const WebRtc_UWord32 rate) {
+   return 0;
+ }
 
-  // Retrieve an NTP absolute timestamp.
-  virtual void CurrentNTP(WebRtc_UWord32& secs, WebRtc_UWord32& frac) = 0;
+ virtual void OnPacketTimeout(const WebRtc_Word32 id) {}
+
+ virtual void OnReceivedPacket(const WebRtc_Word32 id,
+                               const RtpRtcpPacketType packetType) {}
+
+ virtual void OnPeriodicDeadOrAlive(const WebRtc_Word32 id,
+                                    const RTPAliveType alive) {}
+
+ virtual void OnIncomingSSRCChanged(const WebRtc_Word32 id,
+                                    const WebRtc_UWord32 SSRC) {}
+
+ virtual void OnIncomingCSRCChanged(const WebRtc_Word32 id,
+                                    const WebRtc_UWord32 CSRC,
+                                    const bool added) {}
+};
+
+// Null object version of RtpData.
+class NullRtpData : public RtpData {
+ public:
+  virtual ~NullRtpData() {}
+  virtual WebRtc_Word32 OnReceivedPayloadData(
+      const WebRtc_UWord8* payloadData,
+      const WebRtc_UWord16 payloadSize,
+      const WebRtcRTPHeader* rtpHeader) {
+   return 0;
+ }
+};
+
+// Null object version of RtpAudioFeedback.
+class NullRtpAudioFeedback : public RtpAudioFeedback {
+ public:
+  virtual ~NullRtpAudioFeedback() {}
+
+  virtual void OnReceivedTelephoneEvent(const WebRtc_Word32 id,
+                                        const WebRtc_UWord8 event,
+                                        const bool endOfEvent) {}
+
+  virtual void OnPlayTelephoneEvent(const WebRtc_Word32 id,
+                                    const WebRtc_UWord8 event,
+                                    const WebRtc_UWord16 lengthMs,
+                                    const WebRtc_UWord8 volume) {}
 };
 
 } // namespace webrtc

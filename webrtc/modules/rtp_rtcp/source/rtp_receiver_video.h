@@ -12,7 +12,6 @@
 #define WEBRTC_MODULES_RTP_RTCP_SOURCE_RTP_RECEIVER_VIDEO_H_
 
 #include "bitrate.h"
-#include "rtp_receiver.h"
 #include "rtp_receiver_strategy.h"
 #include "rtp_rtcp_defines.h"
 #include "rtp_utility.h"
@@ -23,11 +22,14 @@ namespace webrtc {
 class CriticalSectionWrapper;
 class ModuleRtpRtcpImpl;
 class ReceiverFEC;
+class RTPReceiver;
+class RTPPayloadRegistry;
 
 class RTPReceiverVideo : public RTPReceiverStrategy {
  public:
   RTPReceiverVideo(const WebRtc_Word32 id,
-                   RTPReceiver* parent,
+                   const RTPPayloadRegistry* rtp_payload_registry,
+                   RtpData* data_callback,
                    ModuleRtpRtcpImpl* owner);
 
   virtual ~RTPReceiverVideo();
@@ -38,7 +40,8 @@ class RTPReceiverVideo : public RTPReceiverStrategy {
       const bool is_red,
       const WebRtc_UWord8* packet,
       const WebRtc_UWord16 packet_length,
-      const WebRtc_Word64 timestamp);
+      const WebRtc_Word64 timestamp,
+      const bool is_first_packet);
 
   WebRtc_Word32 GetFrequencyHz() const;
 
@@ -83,7 +86,8 @@ class RTPReceiverVideo : public RTPReceiverStrategy {
       WebRtcRTPHeader* rtpHeader,
       const WebRtc_UWord8* payloadData,
       const WebRtc_UWord16 payloadDataLength,
-      const RtpVideoCodecTypes videoType);
+      const RtpVideoCodecTypes videoType,
+      const bool isFirstPacket);
 
   WebRtc_Word32 ReceiveGenericCodec(WebRtcRTPHeader *rtpHeader,
                                     const WebRtc_UWord8* payloadData,
@@ -105,10 +109,11 @@ class RTPReceiverVideo : public RTPReceiverStrategy {
       const bool isRED,
       const WebRtc_UWord8* incomingRtpPacket,
       const WebRtc_UWord16 incomingRtpPacketSize,
-      const WebRtc_Word64 nowMS);
+      const WebRtc_Word64 nowMS,
+      const bool isFirstPacket);
 
   WebRtc_Word32             _id;
-  RTPReceiver*              _parent;
+  const RTPPayloadRegistry* _rtpRtpPayloadRegistry;
 
   CriticalSectionWrapper*   _criticalSectionReceiverVideo;
 
