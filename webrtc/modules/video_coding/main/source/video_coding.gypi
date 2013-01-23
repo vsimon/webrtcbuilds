@@ -10,7 +10,7 @@
   'targets': [
     {
       'target_name': 'webrtc_video_coding',
-      'type': '<(library)',
+      'type': 'static_library',
       'dependencies': [
         'webrtc_i420',
         '<(webrtc_root)/common_video/common_video.gyp:common_video',
@@ -62,7 +62,6 @@
         'receiver.h',
         'rtt_filter.h',
         'session_info.h',
-        'tick_time_base.h',
         'timestamp_extrapolator.h',
         'timestamp_map.h',
         'timing.h',

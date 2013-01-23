@@ -151,15 +151,8 @@ void WebRtc_InitBinaryDelayEstimator(BinaryDelayEstimator* handle) {
   handle->last_delay = -2;
 }
 
-int WebRtc_ProcessBinarySpectrum(BinaryDelayEstimator* handle,
-                                 uint32_t binary_far_spectrum,
-                                 uint32_t binary_near_spectrum) {
-  int i = 0;
-  int candidate_delay = -1;
-
-  int32_t value_best_candidate = 16384;  // 32 in Q9, (max |mean_bit_counts|).
-  int32_t value_worst_candidate = 0;
-
+void WebRtc_AddBinaryFarSpectrum(BinaryDelayEstimator* handle,
+                                 uint32_t binary_far_spectrum) {
   assert(handle != NULL);
   // Shift binary spectrum history and insert current |binary_far_spectrum|.
   memmove(&(handle->binary_far_history[1]), &(handle->binary_far_history[0]),
@@ -171,7 +164,17 @@ int WebRtc_ProcessBinarySpectrum(BinaryDelayEstimator* handle,
   memmove(&(handle->far_bit_counts[1]), &(handle->far_bit_counts[0]),
           (handle->history_size - 1) * sizeof(int));
   handle->far_bit_counts[0] = BitCount(binary_far_spectrum);
+}
 
+int WebRtc_ProcessBinarySpectrum(BinaryDelayEstimator* handle,
+                                 uint32_t binary_near_spectrum) {
+  int i = 0;
+  int candidate_delay = -1;
+
+  int32_t value_best_candidate = 32 << 9;  // 32 in Q9, (max |mean_bit_counts|).
+  int32_t value_worst_candidate = 0;
+
+  assert(handle != NULL);
   if (handle->near_history_size > 1) {
     // If we apply lookahead, shift near-end binary spectrum history. Insert
     // current |binary_near_spectrum| and pull out the delayed one.
@@ -267,6 +270,18 @@ int WebRtc_ProcessBinarySpectrum(BinaryDelayEstimator* handle,
 int WebRtc_binary_last_delay(BinaryDelayEstimator* handle) {
   assert(handle != NULL);
   return handle->last_delay;
+}
+
+int WebRtc_binary_last_delay_quality(BinaryDelayEstimator* handle) {
+  assert(handle != NULL);
+  // |last_delay_probability| is the opposite of quality and states how deep the
+  // minimum of the cost function is. The value states how many non-matching
+  // bits we have between the binary spectra for the corresponding delay
+  // estimate. The range is thus from 0 to 32, since we use 32 bits in the
+  // binary spectra.
+
+  // Return the quality = 1 - |last_delay_probability| / 32 (in Q14).
+  return (32 << 9) - handle->last_delay_probability;
 }
 
 void WebRtc_MeanEstimatorFix(int32_t new_value,
