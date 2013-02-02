@@ -359,11 +359,11 @@ int NetEqImpl::InsertPacketInternal(const WebRtcRTPHeader& rtp_header,
   PacketList packet_list;
   RTPHeader main_header;
   {
-    // Convert to webrtc::Packet.
+    // Convert to Packet.
     // Create |packet| within this separate scope, since it should not be used
     // directly once it's been inserted in the packet list. This way, |packet|
     // is not defined outside of this block.
-    webrtc::Packet* packet = new webrtc::Packet;
+    Packet* packet = new Packet;
     packet->header.markerBit = false;
     packet->header.payloadType = rtp_header.header.payloadType;
     packet->header.sequenceNumber = rtp_header.header.sequenceNumber;
@@ -374,7 +374,9 @@ int NetEqImpl::InsertPacketInternal(const WebRtcRTPHeader& rtp_header,
     packet->primary = true;
     packet->waiting_time = 0;
     packet->payload = new uint8_t[packet->payload_length];
-    LOG_F(LS_ERROR) << "Payload pointer is NULL.";
+    if (!packet->payload) {
+      LOG_F(LS_ERROR) << "Payload pointer is NULL.";
+    }
     assert(payload);  // Already checked above.
     memcpy(packet->payload, payload, packet->payload_length);
     // Insert packet in a packet list.
@@ -844,7 +846,14 @@ int NetEqImpl::GetDecision(Operations* operation,
     delay_manager_->Reset();
     stats_.ResetMcu();
 
-    if (*operation == kRfc3389CngNoPacket) {
+    if (*operation == kRfc3389CngNoPacket
+#ifndef LEGACY_BITEXACT
+        // Without this check, it can happen that a non-CNG packet is sent to
+        // the CNG decoder as if it was a SID frame. This is clearly a bug,
+        // but is kept for now to maintain bit-exactness with the test vectors.
+        && decoder_database_->IsComfortNoise(header->payloadType)
+#endif
+        ) {
       // Change decision to CNG packet, since we do have a CNG packet, but it
       // was considered too early to use. Now, use it anyway.
       *operation = kRfc3389Cng;
@@ -1101,6 +1110,7 @@ int NetEqImpl::DecodeLoop(PacketList* packet_list, Operations* operation,
     assert(*operation == kNormal || *operation == kAccelerate ||
            *operation == kMerge || *operation == kPreemptiveExpand);
     packet_list->pop_front();
+    int payload_length = packet->payload_length;
     int16_t decode_length;
     if (!packet->primary) {
       // This is a redundant payload; call the special decoder method.
@@ -1136,7 +1146,7 @@ int NetEqImpl::DecodeLoop(PacketList* packet_list, Operations* operation,
           " samples per channel)";
     } else if (decode_length < 0) {
       // Error.
-      LOG_FERR2(LS_WARNING, Decode, decode_length, packet->payload_length);
+      LOG_FERR2(LS_WARNING, Decode, decode_length, payload_length);
       *decoded_length = -1;
       PacketBuffer::DeleteAllPackets(packet_list);
       break;
@@ -1399,14 +1409,31 @@ int NetEqImpl::DoRfc3389Cng(PacketList* packet_list, bool play_dtmf,
     assert(packet_list->size() == 1);
     Packet* packet = packet_list->front();
     packet_list->pop_front();
-    // Temp hack to get correct PT for CNG.
-    // TODO(hlundin): Update universal.rtp and remove this hack.
-    if (fs_hz_ == 16000) {
-      packet->header.payloadType = 98;
-    } else if (fs_hz_ == 32000) {
-      packet->header.payloadType = 99;
+    if (!decoder_database_->IsComfortNoise(packet->header.payloadType)) {
+#ifdef LEGACY_BITEXACT
+      // This can happen due to a bug in GetDecision. Change the payload type
+      // to a CNG type, and move on. Note that this means that we are in fact
+      // sending a non-CNG payload to the comfort noise decoder for decoding.
+      // Clearly wrong, but will maintain bit-exactness with legacy.
+      if (fs_hz_ == 8000) {
+        packet->header.payloadType =
+            decoder_database_->GetRtpPayloadType(kDecoderCNGnb);
+      } else if (fs_hz_ == 16000) {
+        packet->header.payloadType =
+            decoder_database_->GetRtpPayloadType(kDecoderCNGwb);
+      } else if (fs_hz_ == 32000) {
+        packet->header.payloadType =
+            decoder_database_->GetRtpPayloadType(kDecoderCNGswb32kHz);
+      } else if (fs_hz_ == 48000) {
+        packet->header.payloadType =
+            decoder_database_->GetRtpPayloadType(kDecoderCNGswb48kHz);
+      }
+      assert(decoder_database_->IsComfortNoise(packet->header.payloadType));
+#else
+      LOG(LS_ERROR) << "Trying to decode non-CNG payload as CNG.";
+      return kOtherError;
+#endif
     }
-    // End of hack.
     // UpdateParameters() deletes |packet|.
     if (comfort_noise_->UpdateParameters(packet) ==
         ComfortNoise::kInternalError) {
@@ -1581,7 +1608,7 @@ int NetEqImpl::ExtractPackets(int required_samples, PacketList* packet_list) {
   uint16_t prev_sequence_number = 0;
   bool next_packet_available = false;
 
-  const webrtc::RTPHeader* header = packet_buffer_->NextRtpHeader();
+  const RTPHeader* header = packet_buffer_->NextRtpHeader();
   assert(header);
   if (!header) {
     return -1;
@@ -1593,7 +1620,7 @@ int NetEqImpl::ExtractPackets(int required_samples, PacketList* packet_list) {
   do {
     timestamp_ = header->timestamp;
     int discard_count = 0;
-    webrtc::Packet* packet = packet_buffer_->GetNextPacket(&discard_count);
+    Packet* packet = packet_buffer_->GetNextPacket(&discard_count);
     // |header| may be invalid after the |packet_buffer_| operation.
     header = NULL;
     if (!packet) {
@@ -1737,10 +1764,8 @@ NetEqOutputType NetEqImpl::LastOutputType() {
   } else if (last_mode_ == kModeExpand && expand_->MuteFactor(0) == 0) {
     // Expand mode has faded down to background noise only (very long expand).
     return kOutputPLCtoCNG;
-
   } else if (last_mode_ == kModeExpand) {
     return kOutputPLC;
-
   } else {
     return kOutputNormal;
   }
