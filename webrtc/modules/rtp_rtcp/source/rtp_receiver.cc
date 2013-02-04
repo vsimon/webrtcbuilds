@@ -91,6 +91,7 @@ RTPReceiver::RTPReceiver(const WebRtc_Word32 id,
       last_report_jitter_transmission_time_offset_(0),
 
       nack_method_(kNackOff),
+      max_reordering_threshold_(kDefaultMaxReorderingThreshold),
       rtx_(false),
       ssrc_rtx_(0) {
   assert(incoming_audio_messages_callback &&
@@ -211,8 +212,24 @@ WebRtc_Word32 RTPReceiver::RegisterReceivePayload(
     const WebRtc_UWord8 channels,
     const WebRtc_UWord32 rate) {
   CriticalSectionScoped lock(critical_section_rtp_receiver_);
-  return rtp_payload_registry_->RegisterReceivePayload(
-      payload_name, payload_type, frequency, channels, rate);
+
+  // TODO(phoglund): Try to streamline handling of the RED codec and some other
+  // cases which makes it necessary to keep track of whether we created a
+  // payload or not.
+  bool created_new_payload = false;
+  WebRtc_Word32 result = rtp_payload_registry_->RegisterReceivePayload(
+      payload_name, payload_type, frequency, channels, rate,
+      &created_new_payload);
+  if (created_new_payload) {
+    if (rtp_media_receiver_->OnNewPayloadTypeCreated(payload_name, payload_type,
+                                                     frequency) != 0) {
+      WEBRTC_TRACE(kTraceError, kTraceRtpRtcp, id_,
+                   "%s failed to register payload",
+                   __FUNCTION__);
+      return -1;
+    }
+  }
+  return result;
 }
 
 WebRtc_Word32 RTPReceiver::DeRegisterReceivePayload(
@@ -230,17 +247,6 @@ WebRtc_Word32 RTPReceiver::ReceivePayloadType(
   CriticalSectionScoped lock(critical_section_rtp_receiver_);
   return rtp_payload_registry_->ReceivePayloadType(
       payload_name, frequency, channels, rate, payload_type);
-}
-
-WebRtc_Word32 RTPReceiver::ReceivePayload(
-    const WebRtc_Word8 payload_type,
-    char payload_name[RTP_PAYLOAD_NAME_SIZE],
-    WebRtc_UWord32* frequency,
-    WebRtc_UWord8* channels,
-    WebRtc_UWord32* rate) const {
-  CriticalSectionScoped lock(critical_section_rtp_receiver_);
-  return rtp_payload_registry_->ReceivePayload(
-      payload_type, payload_name, frequency, channels, rate);
 }
 
 WebRtc_Word32 RTPReceiver::RegisterRtpHeaderExtension(
@@ -267,8 +273,16 @@ NACKMethod RTPReceiver::NACK() const {
 }
 
 // Turn negative acknowledgment requests on/off.
-WebRtc_Word32 RTPReceiver::SetNACKStatus(const NACKMethod method) {
+WebRtc_Word32 RTPReceiver::SetNACKStatus(const NACKMethod method,
+                                         int max_reordering_threshold) {
   CriticalSectionScoped lock(critical_section_rtp_receiver_);
+  if (max_reordering_threshold < 0) {
+    return -1;
+  } else if (method == kNackRtcp) {
+    max_reordering_threshold_ = max_reordering_threshold;
+  } else {
+    max_reordering_threshold_ = kDefaultMaxReorderingThreshold;
+  }
   nack_method_ = method;
   return 0;
 }
@@ -572,7 +586,7 @@ bool RTPReceiver::InOrderPacket(const WebRtc_UWord16 sequence_number) const {
   if (received_seq_max_ >= sequence_number) {
     // Detect wrap-around.
     if (!(received_seq_max_ > 0xff00 && sequence_number < 0x0ff)) {
-      if (received_seq_max_ - NACK_PACKETS_MAX_SIZE > sequence_number) {
+      if (received_seq_max_ - max_reordering_threshold_ > sequence_number) {
         // We have a restart of the remote side.
       } else {
         // we received a retransmit of a packet we already have.
@@ -582,7 +596,7 @@ bool RTPReceiver::InOrderPacket(const WebRtc_UWord16 sequence_number) const {
   } else {
     // Detect wrap-around.
     if (sequence_number > 0xff00 && received_seq_max_ < 0x0ff) {
-      if (received_seq_max_ - NACK_PACKETS_MAX_SIZE > sequence_number) {
+      if (received_seq_max_ - max_reordering_threshold_ > sequence_number) {
         // We have a restart of the remote side
       } else {
         // We received a retransmit of a packet we already have
@@ -606,13 +620,6 @@ WebRtc_UWord32 RTPReceiver::TimeStamp() const {
 int32_t RTPReceiver::LastReceivedTimeMs() const {
   CriticalSectionScoped lock(critical_section_rtp_receiver_);
   return last_received_frame_time_ms_;
-}
-
-WebRtc_UWord32 RTPReceiver::PayloadTypeToPayload(
-    const WebRtc_UWord8 payload_type,
-    Payload*& payload) const {
-  CriticalSectionScoped lock(critical_section_rtp_receiver_);
-  return rtp_payload_registry_->PayloadTypeToPayload(payload_type, payload);
 }
 
 // Compute time stamp of the last incoming packet that is the first packet of

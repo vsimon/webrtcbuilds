@@ -463,12 +463,6 @@ class RtpRtcp : public Module {
                              WebRtc_UWord32* nackRate) const = 0;
 
     /*
-     *  Get the receive-side estimate of the available bandwidth.
-     */
-    virtual int EstimatedReceiveBandwidth(
-        WebRtc_UWord32* available_bandwidth) const = 0;
-
-    /*
     *   Used by the codec module to deliver a video or audio frame for
     *   packetization.
     *
@@ -739,10 +733,14 @@ class RtpRtcp : public Module {
 
     /*
     *   Turn negative acknowledgement requests on/off
+    *   |max_reordering_threshold| should be set to how much a retransmitted
+    *   packet can be expected to be reordered (in sequence numbers) compared to
+    *   a packet which has not been retransmitted.
     *
     *   return -1 on failure else 0
     */
-    virtual WebRtc_Word32 SetNACKStatus(const NACKMethod method) = 0;
+    virtual WebRtc_Word32 SetNACKStatus(const NACKMethod method,
+                                        int max_reordering_threshold) = 0;
 
     /*
      *  TODO(holmer): Propagate this API to VideoEngine.
@@ -780,7 +778,7 @@ class RtpRtcp : public Module {
     */
     virtual WebRtc_Word32 SetStorePacketsStatus(
         const bool enable,
-        const WebRtc_UWord16 numberToStore = 200) = 0;
+        const WebRtc_UWord16 numberToStore) = 0;
 
     /**************************************************************************
     *

@@ -312,7 +312,8 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   virtual NACKMethod NACK() const;
 
   // Turn negative acknowledgment requests on/off.
-  virtual WebRtc_Word32 SetNACKStatus(const NACKMethod method);
+  virtual WebRtc_Word32 SetNACKStatus(const NACKMethod method,
+                                      int max_reordering_threshold);
 
   virtual int SelectiveRetransmissions() const;
 
@@ -325,7 +326,7 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   // Store the sent packets, needed to answer to a negative acknowledgment
   // requests.
   virtual WebRtc_Word32 SetStorePacketsStatus(
-      const bool enable, const WebRtc_UWord16 number_to_store = 200);
+      const bool enable, const WebRtc_UWord16 number_to_store);
 
   // (APP) Application specific data.
   virtual WebRtc_Word32 SetRTCPApplicationSpecificData(
@@ -427,9 +428,6 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
                            WebRtc_UWord32* fec_rate,
                            WebRtc_UWord32* nackRate) const;
 
-  virtual int EstimatedReceiveBandwidth(
-      WebRtc_UWord32* available_bandwidth) const;
-
   virtual void SetRemoteSSRC(const WebRtc_UWord32 ssrc);
 
   virtual WebRtc_UWord32 SendTimeOfSendReport(const WebRtc_UWord32 send_report);
@@ -450,8 +448,7 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   void OnReceivedReferencePictureSelectionIndication(
       const WebRtc_UWord64 picture_id);
 
-  void OnReceivedNACK(const WebRtc_UWord16 nack_sequence_numbers_length,
-                      const WebRtc_UWord16* nack_sequence_numbers);
+  void OnReceivedNACK(const std::list<uint16_t>& nack_sequence_numbers);
 
   void OnRequestSendReport();
 
@@ -493,6 +490,7 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   WebRtc_Word64             last_process_time_;
   WebRtc_Word64             last_bitrate_process_time_;
   WebRtc_Word64             last_packet_timeout_process_time_;
+  WebRtc_Word64             last_rtt_process_time_;
   WebRtc_UWord16            packet_overhead_;
 
   scoped_ptr<CriticalSectionWrapper> critical_section_module_ptrs_;

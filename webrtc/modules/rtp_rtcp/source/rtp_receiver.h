@@ -74,12 +74,6 @@ class RTPReceiver : public Bitrate {
       const WebRtc_UWord32 rate,
       WebRtc_Word8* payload_type) const;
 
-  WebRtc_Word32 ReceivePayload(const WebRtc_Word8 payload_type,
-                               char payload_name[RTP_PAYLOAD_NAME_SIZE],
-                               WebRtc_UWord32* frequency,
-                               WebRtc_UWord8* channels,
-                               WebRtc_UWord32* rate) const;
-
   WebRtc_Word32 IncomingRTPPacket(
       WebRtcRTPHeader* rtpheader,
       const WebRtc_UWord8* incoming_rtp_packet,
@@ -88,7 +82,8 @@ class RTPReceiver : public Bitrate {
   NACKMethod NACK() const ;
 
   // Turn negative acknowledgement requests on/off.
-  WebRtc_Word32 SetNACKStatus(const NACKMethod method);
+  WebRtc_Word32 SetNACKStatus(const NACKMethod method,
+                              int max_reordering_threshold);
 
   // Returns the last received timestamp.
   virtual WebRtc_UWord32 TimeStamp() const;
@@ -147,10 +142,6 @@ class RTPReceiver : public Bitrate {
 
   void GetHeaderExtensionMapCopy(RtpHeaderExtensionMap* map) const;
 
-  virtual WebRtc_UWord32 PayloadTypeToPayload(
-      const WebRtc_UWord8 payload_type,
-      ModuleRTPUtility::Payload*& payload) const;
-
   // RTX.
   void SetRTXStatus(const bool enable, const WebRtc_UWord32 ssrc);
 
@@ -159,7 +150,6 @@ class RTPReceiver : public Bitrate {
   virtual WebRtc_Word8 REDPayloadType() const;
 
   bool HaveNotReceivedPackets() const;
- protected:
 
   virtual bool RetransmitOfOldPacket(const WebRtc_UWord16 sequence_number,
                                      const WebRtc_UWord32 rtp_time_stamp) const;
@@ -184,7 +174,6 @@ class RTPReceiver : public Bitrate {
   void UpdateNACKBitRate(WebRtc_Word32 bytes, WebRtc_UWord32 now);
   bool ProcessNACKBitRate(WebRtc_UWord32 now);
 
- private:
   RTPPayloadRegistry*             rtp_payload_registry_;
   scoped_ptr<RTPReceiverStrategy> rtp_media_receiver_;
 
@@ -243,6 +232,7 @@ class RTPReceiver : public Bitrate {
   mutable WebRtc_UWord32    last_report_jitter_transmission_time_offset_;
 
   NACKMethod nack_method_;
+  int max_reordering_threshold_;
 
   bool rtx_;
   WebRtc_UWord32 ssrc_rtx_;

@@ -113,6 +113,19 @@ RTCPReceiver::LastReceived()
     return _lastReceived;
 }
 
+WebRtc_Word64
+RTCPReceiver::LastReceivedReceiverReport() const {
+    CriticalSectionScoped lock(_criticalSectionRTCPReceiver);
+    WebRtc_Word64 last_received_rr = -1;
+    for (ReceivedInfoMap::const_iterator it = _receivedInfoMap.begin();
+         it != _receivedInfoMap.end(); ++it) {
+      if (it->second->lastTimeReceived > last_received_rr) {
+        last_received_rr = it->second->lastTimeReceived;
+      }
+    }
+    return last_received_rr;
+}
+
 WebRtc_Word32
 RTCPReceiver::SetRemoteSSRC( const WebRtc_UWord32 ssrc)
 {
@@ -787,7 +800,6 @@ RTCPReceiver::HandleNACK(RTCPUtility::RTCPParserV2& rtcpParser,
         rtcpParser.Iterate();
         return;
     }
-
     rtcpPacketInformation.ResetNACKPacketIdArray();
 
     RTCPUtility::RTCPPacketTypes pktType = rtcpParser.Iterate();
@@ -1258,13 +1270,11 @@ void RTCPReceiver::TriggerCallbacksFromRTCPPacket(
     _rtpRtcp.OnRequestSendReport();
   }
   if (rtcpPacketInformation.rtcpPacketTypeFlags & kRtcpNack) {
-    if (rtcpPacketInformation.nackSequenceNumbersLength > 0) {
+    if (rtcpPacketInformation.nackSequenceNumbers.size() > 0) {
       WEBRTC_TRACE(kTraceStateInfo, kTraceRtpRtcp, _id,
                    "SIG [RTCP] Incoming NACK length:%d",
-                   rtcpPacketInformation.nackSequenceNumbersLength);
-      _rtpRtcp.OnReceivedNACK(
-          rtcpPacketInformation.nackSequenceNumbersLength,
-          rtcpPacketInformation.nackSequenceNumbers);
+                   rtcpPacketInformation.nackSequenceNumbers.size());
+      _rtpRtcp.OnReceivedNACK(rtcpPacketInformation.nackSequenceNumbers);
     }
   }
   {
@@ -1438,4 +1448,5 @@ void RTCPReceiver::PacketTimeout()
         _cbRtcpFeedback->OnRTCPPacketTimeout(_id);
     }
 }
+
 } // namespace webrtc

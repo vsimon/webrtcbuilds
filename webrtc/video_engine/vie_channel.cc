@@ -35,6 +35,7 @@ namespace webrtc {
 
 const int kMaxDecodeWaitTimeMs = 50;
 const int kInvalidRtpExtensionId = 0;
+static const int kMaxTargetDelayMs = 10000;
 
 // Helper class receiving statistics callbacks.
 class ChannelStatsObserver : public StatsObserver {
@@ -102,7 +103,8 @@ ViEChannel::ViEChannel(WebRtc_Word32 channel_id,
       color_enhancement_(false),
       file_recorder_(channel_id),
       mtu_(0),
-      sender_(sender) {
+      sender_(sender),
+      nack_history_size_sender_(kSendSidePacketHistorySize) {
   WEBRTC_TRACE(kTraceMemory, kTraceVideo, ViEId(engine_id, channel_id),
                "ViEChannel::ViEChannel(channel_id: %d, engine_id: %d)",
                channel_id, engine_id);
@@ -123,6 +125,7 @@ ViEChannel::ViEChannel(WebRtc_Word32 channel_id,
 
   rtp_rtcp_.reset(RtpRtcp::CreateRtpRtcp(configuration));
   vie_receiver_.SetRtpRtcpModule(rtp_rtcp_.get());
+  vcm_.SetNackSettings(kMaxNackListSize, kMaxPacketAgeToNack);
 }
 
 WebRtc_Word32 ViEChannel::Init() {
@@ -150,7 +153,8 @@ WebRtc_Word32 ViEChannel::Init() {
                  "%s: RTP::SetRTCPStatus failure", __FUNCTION__);
   }
   if (paced_sender_) {
-    if (rtp_rtcp_->SetStorePacketsStatus(true, kNackHistorySize) != 0) {
+    if (rtp_rtcp_->SetStorePacketsStatus(true, nack_history_size_sender_) !=
+        0) {
       WEBRTC_TRACE(kTraceWarning, kTraceVideo, ViEId(engine_id_, channel_id_),
                    "%s:SetStorePacketsStatus failure", __FUNCTION__);
     }
@@ -293,10 +297,10 @@ WebRtc_Word32 ViEChannel::SetSendCodec(const VideoCodec& video_codec,
                      "%s: RTP::SetRTCPStatus failure", __FUNCTION__);
       }
       if (nack_method != kNackOff) {
-        rtp_rtcp->SetStorePacketsStatus(true, kNackHistorySize);
-        rtp_rtcp->SetNACKStatus(nack_method);
+        rtp_rtcp->SetStorePacketsStatus(true, nack_history_size_sender_);
+        rtp_rtcp->SetNACKStatus(nack_method, kMaxPacketAgeToNack);
       } else if (paced_sender_) {
-        rtp_rtcp->SetStorePacketsStatus(true, kNackHistorySize);
+        rtp_rtcp->SetStorePacketsStatus(true, nack_history_size_sender_);
       }
       if (fec_enabled) {
         rtp_rtcp->SetGenericFECStatus(fec_enabled, payload_type_red,
@@ -618,7 +622,7 @@ WebRtc_Word32 ViEChannel::ProcessNACKRequest(const bool enable) {
                    "%s: Could not enable NACK, RTPC not on ", __FUNCTION__);
       return -1;
     }
-    if (rtp_rtcp_->SetNACKStatus(nackMethod) != 0) {
+    if (rtp_rtcp_->SetNACKStatus(nackMethod, kMaxPacketAgeToNack) != 0) {
       WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
                    "%s: Could not set NACK method %d", __FUNCTION__,
                    nackMethod);
@@ -626,7 +630,7 @@ WebRtc_Word32 ViEChannel::ProcessNACKRequest(const bool enable) {
     }
     WEBRTC_TRACE(kTraceInfo, kTraceVideo, ViEId(engine_id_, channel_id_),
                  "%s: Using NACK method %d", __FUNCTION__, nackMethod);
-    rtp_rtcp_->SetStorePacketsStatus(true, kNackHistorySize);
+    rtp_rtcp_->SetStorePacketsStatus(true, nack_history_size_sender_);
 
     vcm_.RegisterPacketRequestCallback(this);
 
@@ -636,8 +640,8 @@ WebRtc_Word32 ViEChannel::ProcessNACKRequest(const bool enable) {
          it != simulcast_rtp_rtcp_.end();
          it++) {
       RtpRtcp* rtp_rtcp = *it;
-      rtp_rtcp->SetNACKStatus(nackMethod);
-      rtp_rtcp->SetStorePacketsStatus(true, kNackHistorySize);
+      rtp_rtcp->SetNACKStatus(nackMethod, kMaxPacketAgeToNack);
+      rtp_rtcp->SetStorePacketsStatus(true, nack_history_size_sender_);
     }
   } else {
     CriticalSectionScoped cs(rtp_rtcp_cs_.get());
@@ -648,13 +652,13 @@ WebRtc_Word32 ViEChannel::ProcessNACKRequest(const bool enable) {
       if (paced_sender_ == NULL) {
         rtp_rtcp->SetStorePacketsStatus(false, 0);
       }
-      rtp_rtcp->SetNACKStatus(kNackOff);
+      rtp_rtcp->SetNACKStatus(kNackOff, kMaxPacketAgeToNack);
     }
     vcm_.RegisterPacketRequestCallback(NULL);
     if (paced_sender_ == NULL) {
       rtp_rtcp_->SetStorePacketsStatus(false, 0);
     }
-    if (rtp_rtcp_->SetNACKStatus(kNackOff) != 0) {
+    if (rtp_rtcp_->SetNACKStatus(kNackOff, kMaxPacketAgeToNack) != 0) {
       WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
                    "%s: Could not turn off NACK", __FUNCTION__);
       return -1;
@@ -717,6 +721,45 @@ WebRtc_Word32 ViEChannel::SetHybridNACKFECStatus(
     return ret_val;
   }
   return ProcessFECRequest(enable, payload_typeRED, payload_typeFEC);
+}
+
+int ViEChannel::EnableSenderStreamingMode(int target_delay_ms) {
+  if ((target_delay_ms < 0) || (target_delay_ms > kMaxTargetDelayMs)) {
+    WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
+                 "%s: Target streaming delay out of bounds: %d", __FUNCTION__,
+                 target_delay_ms);
+    return -1;
+  }
+  if (target_delay_ms == 0) {
+    // Real-time mode.
+    nack_history_size_sender_ = kSendSidePacketHistorySize;
+    vcm_.EnableFrameDropper(true);
+  } else {
+    // The max size of the nack list should be large enough to accommodate the
+    // the number of packets(frames) resulting from the increased delay.
+    // Roughly estimating for ~15 packets per frame @ 30fps.
+    nack_history_size_sender_ = target_delay_ms * 15 * 30 / 1000;
+    // Don't allow a number lower than the default value.
+    if (nack_history_size_sender_ < kSendSidePacketHistorySize) {
+      nack_history_size_sender_ = kSendSidePacketHistorySize;
+    }
+    // Disable external VCM frame-dropper. In streaming mode, we are more
+    // flexible with rate control constraints.
+    vcm_.EnableFrameDropper(false);
+  }
+  // Setting nack_history_size_.
+  // First disabling (forcing free) and then resetting to desired value.
+  if (rtp_rtcp_->SetStorePacketsStatus(false, 0) != 0) {
+    WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
+                 "%s:SetStorePacketsStatus failure", __FUNCTION__);
+    return -1;
+  }
+  if (rtp_rtcp_->SetStorePacketsStatus(true, nack_history_size_sender_) != 0) {
+    WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
+                 "%s:SetStorePacketsStatus failure", __FUNCTION__);
+    return -1;
+  }
+  return 0;
 }
 
 WebRtc_Word32 ViEChannel::SetKeyFrameRequestMethod(
@@ -1158,7 +1201,9 @@ void ViEChannel::GetBandwidthUsage(uint32_t* total_bitrate_sent,
 
 int ViEChannel::GetEstimatedReceiveBandwidth(
     uint32_t* estimated_bandwidth) const {
-  return rtp_rtcp_->EstimatedReceiveBandwidth(estimated_bandwidth);
+  if (!vie_receiver_.EstimatedReceiveBandwidth(estimated_bandwidth))
+    return -1;
+  return 0;
 }
 
 WebRtc_Word32 ViEChannel::StartRTPDump(const char file_nameUTF8[1024],
