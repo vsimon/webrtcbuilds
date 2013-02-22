@@ -10,7 +10,7 @@ vars = {
   # If you do not know, use the full path while defining your new deps entry.
   "googlecode_url": "http://%s.googlecode.com/svn",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
-  "chromium_revision": "176094",
+  "chromium_revision": "182149",
 
   # External resources like video and audio files used for testing purposes.
   # Downloaded on demand when needed.
@@ -51,8 +51,8 @@ deps = {
   "third_party/libjpeg_turbo":
     From("chromium_deps", "src/third_party/libjpeg_turbo"),
 
-  "third_party/libvpx/source/libvpx":
-    "http://git.chromium.org/webm/libvpx.git@7a09f6b8",
+  "third_party/libvpx":
+    Var("chromium_trunk") + "/deps/third_party/libvpx@180104",
 
   "third_party/libyuv":
     (Var("googlecode_url") % "libyuv") + "/trunk@540",
@@ -105,6 +105,16 @@ deps_os = {
   "unix": {
     "third_party/gold":
       From("chromium_deps", "src/third_party/gold"),
+  },
+  "android": {
+    "third_party/android_tools":
+      From("chromium_deps", "src/third_party/android_tools"),
+
+    "third_party/android_testrunner":
+      Var("chromium_trunk") + "/src/third_party/android_testrunner@" + Var("chromium_revision"),
+
+    "third_party/WebKit/Tools/Scripts":
+      From("chromium_deps", "src/third_party/WebKit/Tools/Scripts"),
   },
 }
 

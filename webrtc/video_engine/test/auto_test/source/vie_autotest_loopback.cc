@@ -58,7 +58,7 @@ int VideoEngineSampleCode(void* window1, void* window2)
     error = ptrViE->SetTraceFilter(webrtc::kTraceAll);
     if (error == -1)
     {
-        printf("ERROR in VideoEngine::SetTraceLevel\n");
+        printf("ERROR in VideoEngine::SetTraceFilter\n");
         return -1;
     }
 
@@ -97,8 +97,8 @@ int VideoEngineSampleCode(void* window1, void* window2)
     }
 
     printf("Bandwidth estimation modes:\n");
-    printf("1. Multi-stream bandwidth estimation\n");
-    printf("2. Single-stream bandwidth estimation\n");
+    printf("1. Single-stream bandwidth estimation\n");
+    printf("2. Multi-stream bandwidth estimation\n");
     printf("Choose bandwidth estimation mode (default is 1): ");
     std::string str;
     std::getline(std::cin, str);
@@ -106,13 +106,13 @@ int VideoEngineSampleCode(void* window1, void* window2)
     webrtc::BandwidthEstimationMode bwe_mode;
     switch (bwe_mode_choice) {
       case 1:
-        bwe_mode = webrtc::kViEMultiStreamEstimation;
-        break;
-      case 2:
         bwe_mode = webrtc::kViESingleStreamEstimation;
         break;
-      default:
+      case 2:
         bwe_mode = webrtc::kViEMultiStreamEstimation;
+        break;
+      default:
+        bwe_mode = webrtc::kViESingleStreamEstimation;
         break;
     }
 

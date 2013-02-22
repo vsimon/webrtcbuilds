@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "webrtc/common_audio/signal_processing/include/signal_processing_library.h"
+#include "webrtc/modules/audio_processing/aec/aec_core_internal.h"
 #include "webrtc/modules/audio_processing/aec/aec_rdft.h"
 #include "webrtc/modules/audio_processing/utility/delay_estimator_wrapper.h"
 #include "webrtc/modules/audio_processing/utility/ring_buffer.h"
@@ -105,22 +106,32 @@ const float WebRtcAec_overDriveCurve[65] = {
     1.9682f, 1.9763f, 1.9843f, 1.9922f, 2.0000f
 };
 
-// "Private" function prototypes.
-static void ProcessBlock(aec_t* aec);
+// Target suppression levels for nlp modes.
+// log{0.001, 0.00001, 0.00000001}
+static const float kTargetSupp[3] = { -6.9f, -11.5f, -18.4f };
+static const float kMinOverDrive[3] = { 1.0f, 2.0f, 5.0f };
 
-static void NonLinearProcessing(aec_t *aec, short *output, short *outputH);
+#ifdef WEBRTC_AEC_DEBUG_DUMP
+extern int webrtc_aec_instance_count;
+#endif
+
+// "Private" function prototypes.
+static void ProcessBlock(AecCore* aec);
+
+static void NonLinearProcessing(AecCore* aec, short *output, short *outputH);
 
 static void GetHighbandGain(const float *lambda, float *nlpGainHband);
 
 // Comfort_noise also computes noise for H band returned in comfortNoiseHband
-static void ComfortNoise(aec_t *aec, float efw[2][PART_LEN1],
+static void ComfortNoise(AecCore* aec, float efw[2][PART_LEN1],
                                   complex_t *comfortNoiseHband,
                                   const float *noisePow, const float *lambda);
 
-static void WebRtcAec_InitLevel(power_level_t *level);
-static void WebRtcAec_InitStats(stats_t *stats);
-static void UpdateLevel(power_level_t* level, float in[2][PART_LEN1]);
-static void UpdateMetrics(aec_t *aec);
+static void InitLevel(PowerLevel* level);
+static void InitStats(Stats* stats);
+static void InitMetrics(AecCore* aec);
+static void UpdateLevel(PowerLevel* level, float in[2][PART_LEN1]);
+static void UpdateMetrics(AecCore* aec);
 // Convert from time domain to frequency domain. Note that |time_data| are
 // overwritten.
 static void TimeToFrequency(float time_data[PART_LEN2],
@@ -145,9 +156,9 @@ static int CmpFloat(const void *a, const void *b)
     return (*da > *db) - (*da < *db);
 }
 
-int WebRtcAec_CreateAec(aec_t **aecInst)
+int WebRtcAec_CreateAec(AecCore** aecInst)
 {
-    aec_t *aec = malloc(sizeof(aec_t));
+    AecCore* aec = malloc(sizeof(AecCore));
     *aecInst = aec;
     if (aec == NULL) {
         return -1;
@@ -205,6 +216,17 @@ int WebRtcAec_CreateAec(aec_t **aecInst)
         aec = NULL;
         return -1;
     }
+    {
+        char filename[64];
+        sprintf(filename, "aec_far%d.pcm", webrtc_aec_instance_count);
+        aec->farFile = fopen(filename, "wb");
+        sprintf(filename, "aec_near%d.pcm", webrtc_aec_instance_count);
+        aec->nearFile = fopen(filename, "wb");
+        sprintf(filename, "aec_out%d.pcm", webrtc_aec_instance_count);
+        aec->outFile = fopen(filename, "wb");
+        sprintf(filename, "aec_out_linear%d.pcm", webrtc_aec_instance_count);
+        aec->outLinearFile = fopen(filename, "wb");
+    }
 #endif
     aec->delay_estimator_farend =
         WebRtc_CreateDelayEstimatorFarend(PART_LEN1, kHistorySizeBlocks);
@@ -225,7 +247,7 @@ int WebRtcAec_CreateAec(aec_t **aecInst)
     return 0;
 }
 
-int WebRtcAec_FreeAec(aec_t *aec)
+int WebRtcAec_FreeAec(AecCore* aec)
 {
     if (aec == NULL) {
         return -1;
@@ -241,6 +263,10 @@ int WebRtcAec_FreeAec(aec_t *aec)
     WebRtc_FreeBuffer(aec->far_buf_windowed);
 #ifdef WEBRTC_AEC_DEBUG_DUMP
     WebRtc_FreeBuffer(aec->far_time_buf);
+    fclose(aec->farFile);
+    fclose(aec->nearFile);
+    fclose(aec->outFile);
+    fclose(aec->outLinearFile);
 #endif
     WebRtc_FreeDelayEstimator(aec->delay_estimator);
     WebRtc_FreeDelayEstimatorFarend(aec->delay_estimator_farend);
@@ -249,7 +275,7 @@ int WebRtcAec_FreeAec(aec_t *aec)
     return 0;
 }
 
-static void FilterFar(aec_t *aec, float yf[2][PART_LEN1])
+static void FilterFar(AecCore* aec, float yf[2][PART_LEN1])
 {
   int i;
   for (i = 0; i < NR_PART; i++) {
@@ -270,7 +296,7 @@ static void FilterFar(aec_t *aec, float yf[2][PART_LEN1])
   }
 }
 
-static void ScaleErrorSignal(aec_t *aec, float ef[2][PART_LEN1])
+static void ScaleErrorSignal(AecCore* aec, float ef[2][PART_LEN1])
 {
   int i;
   float absEf;
@@ -293,7 +319,7 @@ static void ScaleErrorSignal(aec_t *aec, float ef[2][PART_LEN1])
 
 // Time-unconstrined filter adaptation.
 // TODO(andrew): consider for a low-complexity mode.
-//static void FilterAdaptationUnconstrained(aec_t *aec, float *fft,
+//static void FilterAdaptationUnconstrained(AecCore* aec, float *fft,
 //                                          float ef[2][PART_LEN1]) {
 //  int i, j;
 //  for (i = 0; i < NR_PART; i++) {
@@ -317,7 +343,7 @@ static void ScaleErrorSignal(aec_t *aec, float ef[2][PART_LEN1])
 //  }
 //}
 
-static void FilterAdaptation(aec_t *aec, float *fft, float ef[2][PART_LEN1]) {
+static void FilterAdaptation(AecCore* aec, float *fft, float ef[2][PART_LEN1]) {
   int i, j;
   for (i = 0; i < NR_PART; i++) {
     int xPos = (i + aec->xfBufBlockPos)*(PART_LEN1);
@@ -364,7 +390,7 @@ static void FilterAdaptation(aec_t *aec, float *fft, float ef[2][PART_LEN1]) {
   }
 }
 
-static void OverdriveAndSuppress(aec_t *aec, float hNl[PART_LEN1],
+static void OverdriveAndSuppress(AecCore* aec, float hNl[PART_LEN1],
                                  const float hNlFb,
                                  float efw[2][PART_LEN1]) {
   int i;
@@ -391,7 +417,7 @@ WebRtcAec_ScaleErrorSignal_t WebRtcAec_ScaleErrorSignal;
 WebRtcAec_FilterAdaptation_t WebRtcAec_FilterAdaptation;
 WebRtcAec_OverdriveAndSuppress_t WebRtcAec_OverdriveAndSuppress;
 
-int WebRtcAec_InitAec(aec_t *aec, int sampFreq)
+int WebRtcAec_InitAec(AecCore* aec, int sampFreq)
 {
     int i;
 
@@ -445,9 +471,8 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq)
     aec->delay_logging_enabled = 0;
     memset(aec->delay_histogram, 0, sizeof(aec->delay_histogram));
 
-    // Default target suppression level
-    aec->targetSupp = -11.5;
-    aec->minOverDrive = 2.0;
+    // Default target suppression mode.
+    aec->nlp_mode = 1;
 
     // Sampling frequency multiplier
     // SWB is processed as 160 frame size
@@ -521,7 +546,7 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq)
 
     // Metrics disabled by default
     aec->metricsMode = 0;
-    WebRtcAec_InitMetrics(aec);
+    InitMetrics(aec);
 
     // Assembly optimization
     WebRtcAec_FilterFar = FilterFar;
@@ -540,21 +565,7 @@ int WebRtcAec_InitAec(aec_t *aec, int sampFreq)
     return 0;
 }
 
-void WebRtcAec_InitMetrics(aec_t *aec)
-{
-    aec->stateCounter = 0;
-    WebRtcAec_InitLevel(&aec->farlevel);
-    WebRtcAec_InitLevel(&aec->nearlevel);
-    WebRtcAec_InitLevel(&aec->linoutlevel);
-    WebRtcAec_InitLevel(&aec->nlpoutlevel);
-
-    WebRtcAec_InitStats(&aec->erl);
-    WebRtcAec_InitStats(&aec->erle);
-    WebRtcAec_InitStats(&aec->aNlp);
-    WebRtcAec_InitStats(&aec->rerl);
-}
-
-void WebRtcAec_BufferFarendPartition(aec_t *aec, const float* farend) {
+void WebRtcAec_BufferFarendPartition(AecCore* aec, const float* farend) {
   float fft[PART_LEN2];
   float xf[2][PART_LEN1];
 
@@ -573,7 +584,7 @@ void WebRtcAec_BufferFarendPartition(aec_t *aec, const float* farend) {
   WebRtc_WriteBuffer(aec->far_buf_windowed, &xf[0][0], 1);
 }
 
-int WebRtcAec_MoveFarReadPtr(aec_t *aec, int elements) {
+int WebRtcAec_MoveFarReadPtr(AecCore* aec, int elements) {
   int elements_moved = WebRtc_MoveReadPtr(aec->far_buf_windowed, elements);
   WebRtc_MoveReadPtr(aec->far_buf, elements);
 #ifdef WEBRTC_AEC_DEBUG_DUMP
@@ -583,22 +594,29 @@ int WebRtcAec_MoveFarReadPtr(aec_t *aec, int elements) {
   return elements_moved;
 }
 
-void WebRtcAec_ProcessFrame(aec_t *aec,
-                            const short *nearend,
-                            const short *nearendH,
-                            int knownDelay)
-{
+void WebRtcAec_ProcessFrame(AecCore* aec,
+                            const short* nearend,
+                            const short* nearendH,
+                            int knownDelay,
+                            int16_t* out,
+                            int16_t* outH) {
+    int out_elements = 0;
+    int16_t* out_ptr = NULL;
+    int16_t out_tmp[FRAME_LEN];
+
     // For each frame the process is as follows:
     // 1) If the system_delay indicates on being too small for processing a
     //    frame we stuff the buffer with enough data for 10 ms.
     // 2) Adjust the buffer to the system delay, by moving the read pointer.
-    // 3) If we can't move read pointer due to buffer size limitations we
+    // 3) TODO(bjornv): Investigate if we need to add this:
+    //    If we can't move read pointer due to buffer size limitations we
     //    flush/stuff the buffer.
     // 4) Process as many partitions as possible.
     // 5) Update the |system_delay| with respect to a full frame of FRAME_LEN
     //    samples. Even though we will have data left to process (we work with
     //    partitions) we consider updating a whole frame, since that's the
     //    amount of data we input and output in audio_processing.
+    // 6) Update the outputs.
 
     // TODO(bjornv): Investigate how we should round the delay difference; right
     // now we know that incoming |knownDelay| is underestimated when it's less
@@ -641,9 +659,131 @@ void WebRtcAec_ProcessFrame(aec_t *aec,
 
     // 5) Update system delay with respect to the entire frame.
     aec->system_delay -= FRAME_LEN;
+
+    // 6) Update output frame.
+    // Stuff the out buffer if we have less than a frame to output.
+    // This should only happen for the first frame.
+    out_elements = (int) WebRtc_available_read(aec->outFrBuf);
+    if (out_elements < FRAME_LEN) {
+      WebRtc_MoveReadPtr(aec->outFrBuf, out_elements - FRAME_LEN);
+      if (aec->sampFreq == 32000) {
+        WebRtc_MoveReadPtr(aec->outFrBufH, out_elements - FRAME_LEN);
+      }
+    }
+    // Obtain an output frame.
+    WebRtc_ReadBuffer(aec->outFrBuf, (void**) &out_ptr, out_tmp, FRAME_LEN);
+    memcpy(out, out_ptr, sizeof(int16_t) * FRAME_LEN);
+    // For H band.
+    if (aec->sampFreq == 32000) {
+      WebRtc_ReadBuffer(aec->outFrBufH, (void**) &out_ptr, out_tmp, FRAME_LEN);
+      memcpy(outH, out_ptr, sizeof(int16_t) * FRAME_LEN);
+    }
 }
 
-static void ProcessBlock(aec_t* aec) {
+int WebRtcAec_GetDelayMetricsCore(AecCore* self, int* median, int* std) {
+  int i = 0;
+  int delay_values = 0;
+  int num_delay_values = 0;
+  int my_median = 0;
+  const int kMsPerBlock = PART_LEN / (self->mult * 8);
+  float l1_norm = 0;
+
+  assert(self != NULL);
+  assert(median != NULL);
+  assert(std != NULL);
+
+  if (self->delay_logging_enabled == 0) {
+    // Logging disabled.
+    return -1;
+  }
+
+  // Get number of delay values since last update.
+  for (i = 0; i < kHistorySizeBlocks; i++) {
+    num_delay_values += self->delay_histogram[i];
+  }
+  if (num_delay_values == 0) {
+    // We have no new delay value data. Even though -1 is a valid estimate, it
+    // will practically never be used since multiples of |kMsPerBlock| will
+    // always be returned.
+    *median = -1;
+    *std = -1;
+    return 0;
+  }
+
+  delay_values = num_delay_values >> 1;  // Start value for median count down.
+  // Get median of delay values since last update.
+  for (i = 0; i < kHistorySizeBlocks; i++) {
+    delay_values -= self->delay_histogram[i];
+    if (delay_values < 0) {
+      my_median = i;
+      break;
+    }
+  }
+  // Account for lookahead.
+  *median = (my_median - kLookaheadBlocks) * kMsPerBlock;
+
+  // Calculate the L1 norm, with median value as central moment.
+  for (i = 0; i < kHistorySizeBlocks; i++) {
+    l1_norm += (float) (fabs(i - my_median) * self->delay_histogram[i]);
+  }
+  *std = (int) (l1_norm / (float) num_delay_values + 0.5f) * kMsPerBlock;
+
+  // Reset histogram.
+  memset(self->delay_histogram, 0, sizeof(self->delay_histogram));
+
+  return 0;
+}
+
+int WebRtcAec_echo_state(AecCore* self) {
+  assert(self != NULL);
+  return self->echoState;
+}
+
+void WebRtcAec_GetEchoStats(AecCore* self, Stats* erl, Stats* erle,
+                            Stats* a_nlp) {
+  assert(self != NULL);
+  assert(erl != NULL);
+  assert(erle != NULL);
+  assert(a_nlp != NULL);
+  *erl = self->erl;
+  *erle = self->erle;
+  *a_nlp = self->aNlp;
+}
+
+#ifdef WEBRTC_AEC_DEBUG_DUMP
+void* WebRtcAec_far_time_buf(AecCore* self) {
+  assert(self != NULL);
+  return self->far_time_buf;
+}
+#endif
+
+void WebRtcAec_SetConfigCore(AecCore* self, int nlp_mode, int metrics_mode,
+                             int delay_logging) {
+  assert(self != NULL);
+  assert(nlp_mode >= 0 && nlp_mode < 3);
+  self->nlp_mode = nlp_mode;
+  self->metricsMode = metrics_mode;
+  if (self->metricsMode) {
+    InitMetrics(self);
+  }
+  self->delay_logging_enabled = delay_logging;
+  if (self->delay_logging_enabled) {
+    memset(self->delay_histogram, 0, sizeof(self->delay_histogram));
+  }
+}
+
+int WebRtcAec_system_delay(AecCore* self) {
+  assert(self != NULL);
+  return self->system_delay;
+}
+
+void WebRtcAec_SetSystemDelay(AecCore* self, int delay) {
+  assert(self != NULL);
+  assert(delay >= 0);
+  self->system_delay = delay;
+}
+
+static void ProcessBlock(AecCore* aec) {
     int i;
     float d[PART_LEN], y[PART_LEN], e[PART_LEN], dH[PART_LEN];
     float scale;
@@ -862,7 +1002,7 @@ static void ProcessBlock(aec_t* aec) {
 #endif
 }
 
-static void NonLinearProcessing(aec_t *aec, short *output, short *outputH)
+static void NonLinearProcessing(AecCore* aec, short *output, short *outputH)
 {
     float efw[2][PART_LEN1], dfw[2][PART_LEN1], xfw[2][PART_LEN1];
     complex_t comfortNoiseHband[PART_LEN1];
@@ -1050,7 +1190,7 @@ static void NonLinearProcessing(aec_t *aec, short *output, short *outputH)
 
     if (aec->hNlXdAvgMin == 1) {
         aec->echoState = 0;
-        aec->overDrive = aec->minOverDrive;
+        aec->overDrive = kMinOverDrive[aec->nlp_mode];
 
         if (aec->stNearState == 1) {
             memcpy(hNl, cohde, sizeof(hNl));
@@ -1104,8 +1244,9 @@ static void NonLinearProcessing(aec_t *aec, short *output, short *outputH)
     if (aec->hNlMinCtr == 2) {
         aec->hNlNewMin = 0;
         aec->hNlMinCtr = 0;
-        aec->overDrive = WEBRTC_SPL_MAX(aec->targetSupp /
-            ((float)log(aec->hNlFbMin + 1e-10f) + 1e-10f), aec->minOverDrive);
+        aec->overDrive = WEBRTC_SPL_MAX(kTargetSupp[aec->nlp_mode] /
+            ((float)log(aec->hNlFbMin + 1e-10f) + 1e-10f),
+            kMinOverDrive[aec->nlp_mode]);
     }
 
     // Smooth the overdrive.
@@ -1215,7 +1356,7 @@ static void GetHighbandGain(const float *lambda, float *nlpGainHband)
     nlpGainHband[0] /= (float)(PART_LEN1 - 1 - freqAvgIc);
 }
 
-static void ComfortNoise(aec_t *aec, float efw[2][PART_LEN1],
+static void ComfortNoise(AecCore* aec, float efw[2][PART_LEN1],
     complex_t *comfortNoiseHband, const float *noisePow, const float *lambda)
 {
     int i, num;
@@ -1300,33 +1441,45 @@ static void ComfortNoise(aec_t *aec, float efw[2][PART_LEN1],
     }
 }
 
-static void WebRtcAec_InitLevel(power_level_t *level)
-{
-    const float bigFloat = 1E17f;
+static void InitLevel(PowerLevel* level) {
+  const float kBigFloat = 1E17f;
 
-    level->averagelevel = 0;
-    level->framelevel = 0;
-    level->minlevel = bigFloat;
-    level->frsum = 0;
-    level->sfrsum = 0;
-    level->frcounter = 0;
-    level->sfrcounter = 0;
+  level->averagelevel = 0;
+  level->framelevel = 0;
+  level->minlevel = kBigFloat;
+  level->frsum = 0;
+  level->sfrsum = 0;
+  level->frcounter = 0;
+  level->sfrcounter = 0;
 }
 
-static void WebRtcAec_InitStats(stats_t *stats)
-{
-    stats->instant = offsetLevel;
-    stats->average = offsetLevel;
-    stats->max = offsetLevel;
-    stats->min = offsetLevel * (-1);
-    stats->sum = 0;
-    stats->hisum = 0;
-    stats->himean = offsetLevel;
-    stats->counter = 0;
-    stats->hicounter = 0;
+static void InitStats(Stats* stats) {
+  stats->instant = kOffsetLevel;
+  stats->average = kOffsetLevel;
+  stats->max = kOffsetLevel;
+  stats->min = kOffsetLevel * (-1);
+  stats->sum = 0;
+  stats->hisum = 0;
+  stats->himean = kOffsetLevel;
+  stats->counter = 0;
+  stats->hicounter = 0;
 }
 
-static void UpdateLevel(power_level_t* level, float in[2][PART_LEN1]) {
+static void InitMetrics(AecCore* self) {
+  assert(self != NULL);
+  self->stateCounter = 0;
+  InitLevel(&self->farlevel);
+  InitLevel(&self->nearlevel);
+  InitLevel(&self->linoutlevel);
+  InitLevel(&self->nlpoutlevel);
+
+  InitStats(&self->erl);
+  InitStats(&self->erle);
+  InitStats(&self->aNlp);
+  InitStats(&self->rerl);
+}
+
+static void UpdateLevel(PowerLevel* level, float in[2][PART_LEN1]) {
   // Do the energy calculation in the frequency domain. The FFT is performed on
   // a segment of PART_LEN2 samples due to overlap, but we only want the energy
   // of half that data (the last PART_LEN samples). Parseval's relation states
@@ -1385,7 +1538,7 @@ static void UpdateLevel(power_level_t* level, float in[2][PART_LEN1]) {
   }
 }
 
-static void UpdateMetrics(aec_t *aec)
+static void UpdateMetrics(AecCore* aec)
 {
     float dtmp, dtmp2;
 

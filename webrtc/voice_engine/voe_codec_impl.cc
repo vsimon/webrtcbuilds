@@ -29,7 +29,7 @@ VoECodec* VoECodec::GetInterface(VoiceEngine* voiceEngine)
     {
         return NULL;
     }
-    VoiceEngineImpl* s = reinterpret_cast<VoiceEngineImpl*>(voiceEngine);
+    VoiceEngineImpl* s = static_cast<VoiceEngineImpl*>(voiceEngine);
     s->AddRef();
     return s;
 #endif
@@ -68,7 +68,7 @@ int VoECodecImpl::GetCodec(int index, CodecInst& codec)
     WEBRTC_TRACE(kTraceApiCall, kTraceVoice, VoEId(_shared->instance_id(), -1),
                  "GetCodec(index=%d, codec=?)", index);
     CodecInst acmCodec;
-    if (AudioCodingModule::Codec(index, (CodecInst&) acmCodec)
+    if (AudioCodingModule::Codec(index, &acmCodec)
             == -1)
     {
         _shared->SetLastError(VE_INVALID_LISTNR, kTraceError,

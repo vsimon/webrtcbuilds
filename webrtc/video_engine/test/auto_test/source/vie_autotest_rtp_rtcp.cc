@@ -448,8 +448,6 @@ void ViEAutoTest::ViERtpRtcpAPITest()
     // is valid to call before creating channels.
     EXPECT_EQ(0, ViE.rtp_rtcp->SetBandwidthEstimationMode(
         webrtc::kViESingleStreamEstimation));
-    EXPECT_EQ(0, ViE.rtp_rtcp->SetBandwidthEstimationMode(
-        webrtc::kViEMultiStreamEstimation));
 
     // Create a video channel
     TbVideoChannel tbChannel(ViE, webrtc::kVideoCodecVP8);
@@ -687,20 +685,51 @@ void ViEAutoTest::ViERtpRtcpAPITest()
     EXPECT_EQ(0, ViE.rtp_rtcp->SetTransmissionSmoothingStatus(
         tbChannel.videoChannel, false));
 
-    // Streaming Mode.
-    EXPECT_EQ(-1, ViE.rtp_rtcp->EnableSenderStreamingMode(
+    // Buffering mode - sender side.
+    // Set VoE (required to set up stream-sync).
+    webrtc::VoiceEngine* voice_engine = webrtc::VoiceEngine::Create();
+    EXPECT_TRUE(NULL != voice_engine);
+    webrtc::VoEBase* voe_base = webrtc::VoEBase::GetInterface(voice_engine);
+    EXPECT_TRUE(NULL != voe_base);
+    EXPECT_EQ(0, voe_base->Init());
+    int audio_channel = voe_base->CreateChannel();
+    EXPECT_NE(-1, audio_channel);
+    EXPECT_EQ(0, ViE.base->SetVoiceEngine(voice_engine));
+    EXPECT_EQ(0, ViE.base->ConnectAudioChannel(tbChannel.videoChannel,
+                                               audio_channel));
+
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetSenderBufferingMode(
         invalid_channel_id, 0));
     int invalid_delay = -1;
-    EXPECT_EQ(-1, ViE.rtp_rtcp->EnableSenderStreamingMode(
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetSenderBufferingMode(
         tbChannel.videoChannel, invalid_delay));
     invalid_delay = 15000;
-    EXPECT_EQ(-1, ViE.rtp_rtcp->EnableSenderStreamingMode(
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetSenderBufferingMode(
         tbChannel.videoChannel, invalid_delay));
-    EXPECT_EQ(0, ViE.rtp_rtcp->EnableSenderStreamingMode(
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetSenderBufferingMode(
         tbChannel.videoChannel, 5000));
-    // Real-time mode.
-    EXPECT_EQ(0, ViE.rtp_rtcp->EnableSenderStreamingMode(
+    // Buffering mode - receiver side.
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetReceiverBufferingMode(
+        invalid_channel_id, 0));
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetReceiverBufferingMode(
+        tbChannel.videoChannel, invalid_delay));
+    invalid_delay = 15000;
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetReceiverBufferingMode(
+        tbChannel.videoChannel, invalid_delay));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiverBufferingMode(
+        tbChannel.videoChannel, 5000));
+    // Real-time mode - sender side.
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetSenderBufferingMode(
         tbChannel.videoChannel, 0));
+    // Real-time mode - receiver side.
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiverBufferingMode(
+        tbChannel.videoChannel, 0));
+
+    EXPECT_EQ(0, ViE.base->DisconnectAudioChannel(tbChannel.videoChannel));
+    EXPECT_EQ(0, ViE.base->SetVoiceEngine(NULL));
+    EXPECT_EQ(0, voe_base->DeleteChannel(audio_channel));
+    voe_base->Release();
+    EXPECT_TRUE(webrtc::VoiceEngine::Delete(voice_engine));
 
     //***************************************************************
     //  Testing finished. Tear down Video Engine

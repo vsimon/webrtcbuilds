@@ -11,7 +11,7 @@
 #ifndef WEBRTC_MODULES_AUDIO_PROCESSING_AEC_INCLUDE_ECHO_CANCELLATION_H_
 #define WEBRTC_MODULES_AUDIO_PROCESSING_AEC_INCLUDE_ECHO_CANCELLATION_H_
 
-#include "typedefs.h"
+#include "webrtc/typedefs.h"
 
 // Errors
 #define AEC_UNSPECIFIED_ERROR           12000
@@ -43,10 +43,10 @@ typedef struct {
 } AecConfig;
 
 typedef struct {
-    WebRtc_Word16 instant;
-    WebRtc_Word16 average;
-    WebRtc_Word16 max;
-    WebRtc_Word16 min;
+  int instant;
+  int average;
+  int max;
+  int min;
 } AecLevel;
 
 typedef struct {
@@ -167,64 +167,48 @@ WebRtc_Word32 WebRtcAec_Process(void *aecInst,
  *
  * Inputs                       Description
  * -------------------------------------------------------------------
- * void           *aecInst      Pointer to the AEC instance
+ * void           *handle       Pointer to the AEC instance
  * AecConfig      config        Config instance that contains all
  *                              properties to be set
  *
  * Outputs                      Description
  * -------------------------------------------------------------------
- * WebRtc_Word32  return         0: OK
+ * int            return         0: OK
  *                              -1: error
  */
-WebRtc_Word32 WebRtcAec_set_config(void *aecInst, AecConfig config);
-
-/*
- * Gets the on-the-fly paramters.
- *
- * Inputs                       Description
- * -------------------------------------------------------------------
- * void           *aecInst      Pointer to the AEC instance
- *
- * Outputs                      Description
- * -------------------------------------------------------------------
- * AecConfig      *config       Pointer to the config instance that
- *                              all properties will be written to
- * WebRtc_Word32  return         0: OK
- *                              -1: error
- */
-WebRtc_Word32 WebRtcAec_get_config(void *aecInst, AecConfig *config);
+int WebRtcAec_set_config(void* handle, AecConfig config);
 
 /*
  * Gets the current echo status of the nearend signal.
  *
  * Inputs                       Description
  * -------------------------------------------------------------------
- * void           *aecInst      Pointer to the AEC instance
+ * void           *handle       Pointer to the AEC instance
  *
  * Outputs                      Description
  * -------------------------------------------------------------------
- * WebRtc_Word16  *status       0: Almost certainly nearend single-talk
+ * int            *status       0: Almost certainly nearend single-talk
  *                              1: Might not be neared single-talk
- * WebRtc_Word32  return         0: OK
+ * int            return         0: OK
  *                              -1: error
  */
-WebRtc_Word32 WebRtcAec_get_echo_status(void *aecInst, WebRtc_Word16 *status);
+int WebRtcAec_get_echo_status(void* handle, int* status);
 
 /*
  * Gets the current echo metrics for the session.
  *
  * Inputs                       Description
  * -------------------------------------------------------------------
- * void           *aecInst      Pointer to the AEC instance
+ * void           *handle       Pointer to the AEC instance
  *
  * Outputs                      Description
  * -------------------------------------------------------------------
  * AecMetrics     *metrics      Struct which will be filled out with the
  *                              current echo metrics.
- * WebRtc_Word32  return         0: OK
+ * int            return         0: OK
  *                              -1: error
  */
-WebRtc_Word32 WebRtcAec_GetMetrics(void *aecInst, AecMetrics *metrics);
+int WebRtcAec_GetMetrics(void* handle, AecMetrics* metrics);
 
 /*
  * Gets the current delay metrics for the session.

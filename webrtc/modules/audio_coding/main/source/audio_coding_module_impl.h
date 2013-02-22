@@ -68,7 +68,7 @@ class AudioCodingModuleImpl : public AudioCodingModule {
   int SecondarySendCodec(CodecInst* secondary_codec) const;
 
   // Get current send codec.
-  WebRtc_Word32 SendCodec(CodecInst& current_codec) const;
+  WebRtc_Word32 SendCodec(CodecInst* current_codec) const;
 
   // Get current send frequency.
   WebRtc_Word32 SendFrequency() const;
@@ -99,7 +99,7 @@ class AudioCodingModuleImpl : public AudioCodingModule {
   WebRtc_Word32 SetBackgroundNoiseMode(const ACMBackgroundNoiseMode mode);
 
   // Get current background noise mode.
-  WebRtc_Word32 BackgroundNoiseMode(ACMBackgroundNoiseMode& mode);
+  WebRtc_Word32 BackgroundNoiseMode(ACMBackgroundNoiseMode* mode);
 
   /////////////////////////////////////////
   // (FEC) Forward Error Correction
@@ -121,8 +121,8 @@ class AudioCodingModuleImpl : public AudioCodingModule {
                        const bool enable_vad = false,
                        const ACMVADMode mode = VADNormal);
 
-  WebRtc_Word32 VAD(bool& dtx_enabled, bool& vad_enabled,
-                    ACMVADMode& mode) const;
+  WebRtc_Word32 VAD(bool* dtx_enabled, bool* vad_enabled,
+                    ACMVADMode* mode) const;
 
   WebRtc_Word32 RegisterVADCallback(ACMVADCallback* vad_callback);
 
@@ -153,7 +153,7 @@ class AudioCodingModuleImpl : public AudioCodingModule {
   WebRtc_Word32 RegisterReceiveCodec(const CodecInst& receive_codec);
 
   // Get current received codec.
-  WebRtc_Word32 ReceiveCodec(CodecInst& current_codec) const;
+  WebRtc_Word32 ReceiveCodec(CodecInst* current_codec) const;
 
   // Incoming packet from network parsed and ready for decode.
   WebRtc_Word32 IncomingPacket(const WebRtc_UWord8* incoming_payload,
@@ -189,18 +189,18 @@ class AudioCodingModuleImpl : public AudioCodingModule {
   AudioPlayoutMode PlayoutMode() const;
 
   // Get playout timestamp.
-  WebRtc_Word32 PlayoutTimestamp(WebRtc_UWord32& timestamp);
+  WebRtc_Word32 PlayoutTimestamp(WebRtc_UWord32* timestamp);
 
   // Get 10 milliseconds of raw audio data to play out, and
   // automatic resample to the requested frequency if > 0.
-  WebRtc_Word32 PlayoutData10Ms(const WebRtc_Word32 desired_freq_hz,
-                                AudioFrame &audio_frame);
+  WebRtc_Word32 PlayoutData10Ms(WebRtc_Word32 desired_freq_hz,
+                                AudioFrame* audio_frame);
 
   /////////////////////////////////////////
   //   Statistics
   //
 
-  WebRtc_Word32 NetworkStatistics(ACMNetworkStatistics& statistics) const;
+  WebRtc_Word32 NetworkStatistics(ACMNetworkStatistics* statistics) const;
 
   void DestructEncoderInst(void* inst);
 
@@ -221,7 +221,7 @@ class AudioCodingModuleImpl : public AudioCodingModule {
 
   WebRtc_Word32 ReplaceInternalDTXWithWebRtc(const bool use_webrtc_dtx);
 
-  WebRtc_Word32 IsInternalDTXReplacedWithWebRtc(bool& uses_webrtc_dtx);
+  WebRtc_Word32 IsInternalDTXReplacedWithWebRtc(bool* uses_webrtc_dtx);
 
   WebRtc_Word32 SetISACMaxRate(const WebRtc_UWord32 max_bit_per_sec);
 
@@ -282,6 +282,14 @@ class AudioCodingModuleImpl : public AudioCodingModule {
   int PreprocessToAddData(const AudioFrame& in_frame,
                           const AudioFrame** ptr_out);
 
+  // Set initial playout delay.
+  //  -delay_ms: delay in millisecond.
+  //
+  // Return value:
+  //  -1: if cannot set the delay.
+  //   0: if delay set successfully.
+  int SetInitialPlayoutDelay(int delay_ms);
+
  private:
   // Change required states after starting to receive the codec corresponding
   // to |index|.
@@ -301,6 +309,8 @@ class AudioCodingModuleImpl : public AudioCodingModule {
                           uint8_t* stream);
 
   void ResetFragmentation(int vector_size);
+
+  bool GetSilence(int desired_sample_rate_hz, AudioFrame* frame);
 
   AudioPacketizationCallback* packetization_callback_;
   WebRtc_Word32 id_;
@@ -375,6 +385,16 @@ class AudioCodingModuleImpl : public AudioCodingModule {
   AudioFrame preprocess_frame_;
   CodecInst secondary_send_codec_inst_;
   scoped_ptr<ACMGenericCodec> secondary_encoder_;
+
+  // Initial delay.
+  int initial_delay_ms_;
+  int num_packets_accumulated_;
+  int num_bytes_accumulated_;
+  int accumulated_audio_ms_;
+  int first_payload_received_;
+  uint32_t last_incoming_send_timestamp_;
+  bool track_neteq_buffer_;
+  uint32_t playout_ts_;
 };
 
 }  // namespace webrtc

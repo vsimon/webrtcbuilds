@@ -11,7 +11,7 @@
 #ifndef WEBRTC_MODULES_AUDIO_PROCESSING_AEC_ECHO_CANCELLATION_INTERNAL_H_
 #define WEBRTC_MODULES_AUDIO_PROCESSING_AEC_ECHO_CANCELLATION_INTERNAL_H_
 
-#include "modules/audio_processing/aec/aec_core.h"
+#include "webrtc/modules/audio_processing/aec/aec_core.h"
 
 typedef struct {
   int delayCtr;
@@ -19,12 +19,12 @@ typedef struct {
   int splitSampFreq;
   int scSampFreq;
   float sampFactor;  // scSampRate / sampFreq
-  short nlpMode;
   short autoOnOff;
   short activity;
   short skewMode;
   int bufSizeStart;
   int knownDelay;
+  int rate_factor;
 
   short initFlag;  // indicates if AEC has been initialized
 
@@ -61,7 +61,7 @@ typedef struct {
 
   int lastError;
 
-  aec_t* aec;
+  AecCore* aec;
 } aecpc_t;
 
 #endif  // WEBRTC_MODULES_AUDIO_PROCESSING_AEC_ECHO_CANCELLATION_INTERNAL_H_

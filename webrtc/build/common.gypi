@@ -17,11 +17,13 @@
           # This will be set to zero in the supplement.gypi triggered by a
           # gclient hook in the standalone build.
           'build_with_chromium%': 1,
+          'build_with_libjingle%': 0,
         },
         'build_with_chromium%': '<(build_with_chromium)',
+        'build_with_libjingle%': '<(build_with_libjingle)',
 
         'conditions': [
-          ['build_with_chromium==1', {
+          ['build_with_chromium==1 or build_with_libjingle==1', {
             'webrtc_root%': '<(DEPTH)/third_party/webrtc',
           }, {
             'webrtc_root%': '<(DEPTH)/webrtc',
@@ -29,12 +31,14 @@
         ],
       },
       'build_with_chromium%': '<(build_with_chromium)',
+      'build_with_libjingle%': '<(build_with_libjingle)',
       'webrtc_root%': '<(webrtc_root)',
 
       'webrtc_vp8_dir%': '<(webrtc_root)/modules/video_coding/codecs/vp8',
       'include_opus%': 1,
     },
     'build_with_chromium%': '<(build_with_chromium)',
+    'build_with_libjingle%': '<(build_with_libjingle)',
     'webrtc_root%': '<(webrtc_root)',
     'webrtc_vp8_dir%': '<(webrtc_vp8_dir)',
     'include_opus%': '<(include_opus)',
@@ -68,6 +72,12 @@
     'build_with_mozilla%': 0,
 
     'libyuv_dir%': '<(DEPTH)/third_party/libyuv',
+
+    # Define MIPS architecture variant, MIPS DSP variant and MIPS FPU
+    # This may be subject to change in accordance to Chromium's MIPS flags
+    'mips_arch_variant%': 'mips32r1',
+    'mips_dsp_rev%': 0,
+    'mips_fpu%' : 1,
 
     'conditions': [
       ['build_with_chromium==1', {
@@ -119,6 +129,9 @@
         'build_libjpeg%': 0,
         'build_libyuv%': 0,
         'build_libvpx%': 0,
+        'include_tests%': 0,
+      }],
+      ['build_with_libjingle==1', {
         'include_tests%': 0,
       }],
       ['target_arch=="arm"', {
@@ -188,6 +201,59 @@
               }, {
                 'defines': ['WEBRTC_DETECT_ARM_NEON',],
               }],
+            ],
+          }],
+        ],
+      }],
+      ['target_arch=="mipsel"', {
+        'defines': [
+          'MIPS32_LE',
+        ],
+        'conditions': [
+          ['mips_fpu==1', {
+            'defines': [
+              'MIPS_FPU_LE',
+            ],
+            'cflags': [
+              '-mhard-float',
+            ],
+          }, {
+            'cflags': [
+              '-msoft-float',
+            ],
+          }],
+          ['mips_arch_variant=="mips32r2"', {
+            'defines': [
+              'MIPS32_R2_LE',
+            ],
+            'cflags': [
+              '-mips32r2',
+            ],
+            'cflags_cc': [
+              '-mips32r2',
+            ],
+          }],
+          ['mips_dsp_rev==1', {
+            'defines': [
+              'MIPS_DSP_R1_LE',
+            ],
+            'cflags': [
+              '-mdsp',
+            ],
+            'cflags_cc': [
+              '-mdsp',
+            ],
+          }],
+          ['mips_dsp_rev==2', {
+            'defines': [
+              'MIPS_DSP_R1_LE',
+              'MIPS_DSP_R2_LE',
+            ],
+            'cflags': [
+              '-mdspr2',
+            ],
+            'cflags_cc': [
+              '-mdspr2',
             ],
           }],
         ],
