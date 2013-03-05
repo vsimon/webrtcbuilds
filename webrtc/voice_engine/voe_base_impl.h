@@ -30,7 +30,11 @@ public:
 
     virtual int DeRegisterVoiceEngineObserver();
 
-    virtual int Init(AudioDeviceModule* external_adm = NULL);
+    virtual int Init(AudioDeviceModule* external_adm = NULL,
+                     AudioProcessing* audioproc = NULL);
+    virtual AudioProcessing* audio_processing() {
+      return _shared->audio_processing();
+    }
 
     virtual int Terminate();
 
@@ -74,11 +78,6 @@ public:
     virtual int SetNetEQPlayoutMode(int channel, NetEqModes mode);
 
     virtual int GetNetEQPlayoutMode(int channel, NetEqModes& mode);
-
-    virtual int SetNetEQBGNMode(int channel, NetEqBgnModes mode);
-
-    virtual int GetNetEQBGNMode(int channel, NetEqBgnModes& mode);
-
 
     virtual int SetOnHoldStatus(int channel,
                                 bool enable,
