@@ -9,6 +9,7 @@
 
 """Script for constraining traffic on the local machine."""
 
+import ctypes
 import logging
 import os
 import subprocess
@@ -19,17 +20,17 @@ class NetworkEmulatorError(BaseException):
   """Exception raised for errors in the network emulator.
 
   Attributes:
-    msg: User defined error message.
+    fail_msg: User defined error message.
     cmd: Command for which the exception was raised.
     returncode: Return code of running the command.
     stdout: Output of running the command.
     stderr: Error output of running the command.
   """
 
-  def __init__(self, msg, cmd=None, returncode=None, output=None,
+  def __init__(self, fail_msg, cmd=None, returncode=None, output=None,
                error=None):
-    BaseException.__init__(self, msg)
-    self.msg = msg
+    BaseException.__init__(self, fail_msg)
+    self.fail_msg = fail_msg
     self.cmd = cmd
     self.returncode = returncode
     self.output = output
@@ -88,21 +89,15 @@ class NetworkEmulator(object):
       NetworkEmulatorError: If permissions to run Dummynet commands are not
       available.
     """
-    if os.geteuid() != 0:
-      _run_shell_command(
-          ['sudo', '-n', 'ipfw', '-h'],
-          msg=('Cannot run \'ipfw\' command. This script must be run as '
-               'root or have password-less sudo access to this command.'))
+    try:
+      if os.getuid() != 0:
+        raise NetworkEmulatorError('You must run this script with sudo.')
+    except AttributeError:
 
-  @staticmethod
-  def cleanup():
-    """Stops the network emulation by flushing all Dummynet rules.
-
-    Notice that this will flush any rules that may have been created previously
-    before starting the emulation.
-    """
-    _run_shell_command(['sudo', 'ipfw', '-f', 'flush'],
-                        'Failed to flush Dummynet rules!')
+    # AttributeError will be raised on Windows.
+      if ctypes.windll.shell32.IsUserAnAdmin() == 0:
+        raise NetworkEmulatorError('You must run this script with administrator'
+                                   ' privileges.')
 
   def _create_dummynet_rule(self, pipe_id, from_address, to_address,
                             port_range):
@@ -121,12 +116,12 @@ class NetworkEmulator(object):
         each rule being added.
     """
     self._rule_counter += 100
-    add_part = ['sudo', 'ipfw', 'add', self._rule_counter, 'pipe', pipe_id,
+    add_part = ['add', self._rule_counter, 'pipe', pipe_id,
                 'ip', 'from', from_address, 'to', to_address]
-    _run_shell_command(add_part + ['src-port', '%s-%s' % port_range],
-                       'Failed to add Dummynet src-port rule.')
-    _run_shell_command(add_part + ['dst-port', '%s-%s' % port_range],
-                       'Failed to add Dummynet dst-port rule.')
+    _run_ipfw_command(add_part + ['src-port', '%s-%s' % port_range],
+                            'Failed to add Dummynet src-port rule.')
+    _run_ipfw_command(add_part + ['dst-port', '%s-%s' % port_range],
+                            'Failed to add Dummynet dst-port rule.')
     return self._rule_counter
 
   def _create_dummynet_pipe(self, bandwidth_kbps, delay_ms, packet_loss_percent,
@@ -142,7 +137,7 @@ class NetworkEmulator(object):
         The ID of the pipe, starting at 1.
     """
     self._pipe_counter += 1
-    cmd = ['sudo', 'ipfw', 'pipe', self._pipe_counter, 'config',
+    cmd = ['pipe', self._pipe_counter, 'config',
            'bw', str(bandwidth_kbps/8) + 'KByte/s',
            'delay', '%sms' % delay_ms,
            'plr', (packet_loss_percent/100.0),
@@ -150,32 +145,45 @@ class NetworkEmulator(object):
     error_message = 'Failed to create Dummynet pipe. '
     if sys.platform.startswith('linux'):
       error_message += ('Make sure you have loaded the ipfw_mod.ko module to '
-                        'your kernel (sudo insmod /path/to/ipfw_mod.ko)')
-    _run_shell_command(cmd, error_message)
+                        'your kernel (sudo insmod /path/to/ipfw_mod.ko).')
+    _run_ipfw_command(cmd, error_message)
     return self._pipe_counter
 
+def cleanup():
+  """Stops the network emulation by flushing all Dummynet rules.
 
-def _run_shell_command(command, msg=None):
-  """Executes a command.
+  Notice that this will flush any rules that may have been created previously
+  before starting the emulation.
+  """
+  _run_ipfw_command(['-f', 'flush'],
+                          'Failed to flush Dummynet rules!')
+  _run_ipfw_command(['-f', 'pipe', 'flush'],
+                          'Failed to flush Dummynet pipes!')
+
+def _run_ipfw_command(command, fail_msg=None):
+  """Executes a command and prefixes the appropriate command for
+     Windows or Linux/UNIX.
 
   Args:
     command: Command list to execute.
-    msg: Message describing the error in case the command fails.
-
-  Returns:
-    The standard output from running the command.
+    fail_msg: Message describing the error in case the command fails.
 
   Raises:
-    NetworkEmulatorError: If command fails. Message is set by the msg
-      parameter.
+    NetworkEmulatorError: If command fails a message is set by the fail_msg
+    parameter.
   """
-  cmd_list = [str(x) for x in command]
-  cmd = ' '.join(cmd_list)
-  logging.debug('Running command: %s', cmd)
+  if sys.platform == 'win32':
+    ipfw_command = ['ipfw.exe']
+  else:
+    ipfw_command = ['sudo', '-n', 'ipfw']
 
+  cmd_list = ipfw_command[:] + [str(x) for x in command]
+  cmd_string = ' '.join(cmd_list)
+  logging.debug('Running command: %s', cmd_string)
   process = subprocess.Popen(cmd_list, stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
   output, error = process.communicate()
   if process.returncode != 0:
-    raise NetworkEmulatorError(msg, cmd, process.returncode, output, error)
+    raise NetworkEmulatorError(fail_msg, cmd_string, process.returncode, output,
+                               error)
   return output.strip()
