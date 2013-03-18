@@ -807,8 +807,8 @@ int ViEChannel::SetReceiverBufferingMode(int target_delay_ms) {
 int ViEChannel::GetRequiredNackListSize(int target_delay_ms) {
   // The max size of the nack list should be large enough to accommodate the
   // the number of packets (frames) resulting from the increased delay.
-  // Roughly estimating for ~20 packets per frame @ 30fps.
-  return target_delay_ms * 20 * 30 / 1000;
+  // Roughly estimating for ~40 packets per frame @ 30fps.
+  return target_delay_ms * 40 * 30 / 1000;
 }
 
 WebRtc_Word32 ViEChannel::SetKeyFrameRequestMethod(
@@ -915,7 +915,7 @@ WebRtc_Word32 ViEChannel::SetSSRC(const WebRtc_UWord32 SSRC,
   }
   RtpRtcp* rtp_rtcp = *it;
   if (usage == kViEStreamTypeRtx) {
-    return rtp_rtcp->SetRTXSendStatus(true, true, SSRC);
+    return rtp_rtcp->SetRTXSendStatus(kRtxRetransmitted, true, SSRC);
   }
   return rtp_rtcp->SetSSRC(SSRC);
 }

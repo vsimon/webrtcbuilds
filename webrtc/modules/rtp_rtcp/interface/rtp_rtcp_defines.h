@@ -107,6 +107,12 @@ enum RetransmissionMode {
   kRetransmitAllPackets   = 0xFF
 };
 
+enum RtxMode {
+  kRtxOff = 0,
+  kRtxRetransmitted = 1,  // Apply RTX only to retransmitted packets.
+  kRtxAll = 2  // Apply RTX to all packets (source + retransmissions).
+};
+
 struct RTCPSenderInfo
 {
     WebRtc_UWord32 NTPseconds;
@@ -207,9 +213,6 @@ protected:
 
 class RtpAudioFeedback {
  public:
-  virtual void OnReceivedTelephoneEvent(const WebRtc_Word32 id,
-                                        const WebRtc_UWord8 event,
-                                        const bool endOfEvent) = 0;
 
   virtual void OnPlayTelephoneEvent(const WebRtc_Word32 id,
                                     const WebRtc_UWord8 event,
@@ -303,10 +306,6 @@ class NullRtpData : public RtpData {
 class NullRtpAudioFeedback : public RtpAudioFeedback {
  public:
   virtual ~NullRtpAudioFeedback() {}
-
-  virtual void OnReceivedTelephoneEvent(const WebRtc_Word32 id,
-                                        const WebRtc_UWord8 event,
-                                        const bool endOfEvent) {}
 
   virtual void OnPlayTelephoneEvent(const WebRtc_Word32 id,
                                     const WebRtc_UWord8 event,

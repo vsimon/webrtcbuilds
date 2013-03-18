@@ -13,8 +13,8 @@
 
 #include <vector>
 
-#include "modules/interface/module.h"
-#include "modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
+#include "webrtc/modules/interface/module.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
 
 namespace webrtc {
 // Forward declarations.
@@ -416,14 +416,14 @@ class RtpRtcp : public Module {
     /*
     * Turn on/off sending RTX (RFC 4588) on a specific SSRC.
     */
-    virtual WebRtc_Word32 SetRTXSendStatus(const bool enable,
+    virtual WebRtc_Word32 SetRTXSendStatus(const RtxMode mode,
                                            const bool setSSRC,
                                            const WebRtc_UWord32 SSRC) = 0;
 
     /*
     * Get status of sending RTX (RFC 4588) on a specific SSRC.
     */
-    virtual WebRtc_Word32 RTXSendStatus(bool* enable,
+    virtual WebRtc_Word32 RTXSendStatus(RtxMode* mode,
                                         WebRtc_UWord32* SSRC) const = 0;
 
     /*
@@ -796,19 +796,11 @@ class RtpRtcp : public Module {
         const WebRtc_UWord16 packetSizeSamples) = 0;
 
     /*
-    *   Outband TelephoneEvent(DTMF) detection
+    *   Forward DTMF to decoder for playout.
     *
     *   return -1 on failure else 0
     */
-    virtual WebRtc_Word32 SetTelephoneEventStatus(
-        const bool enable,
-        const bool forwardToDecoder,
-        const bool detectEndOfTone = false) = 0;
-
-    /*
-    *   Is outband TelephoneEvent(DTMF) turned on/off?
-    */
-    virtual bool TelephoneEvent() const = 0;
+    virtual int SetTelephoneEventForwardToDecoder(bool forwardToDecoder) = 0;
 
     /*
     *   Returns true if received DTMF events are forwarded to the decoder using
