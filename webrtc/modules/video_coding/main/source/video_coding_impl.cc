@@ -167,10 +167,8 @@ VideoCodingModuleImpl::Process()
             WebRtc_UWord32 frameRate;
             {
                 CriticalSectionScoped cs(_sendCritSect);
-                bitRate = static_cast<WebRtc_UWord32>(
-                    _mediaOpt.SentBitRate() + 0.5f);
-                frameRate = static_cast<WebRtc_UWord32>(
-                    _mediaOpt.SentFrameRate() + 0.5f);
+                bitRate = _mediaOpt.SentBitRate();
+                frameRate = _mediaOpt.SentFrameRate();
             }
             _sendStatsCallback->SendStatistics(bitRate, frameRate);
         }
@@ -349,9 +347,9 @@ VideoCodingModuleImpl::RegisterSendCodec(const VideoCodec* sendCodec,
                            kVideoFrameDelta);
 
     _mediaOpt.SetEncodingData(_sendCodecType,
-                              sendCodec->maxBitrate,
-                              sendCodec->maxFramerate,
-                              sendCodec->startBitrate,
+                              sendCodec->maxBitrate * 1000,
+                              sendCodec->maxFramerate * 1000,
+                              sendCodec->startBitrate * 1000,
                               sendCodec->width,
                               sendCodec->height,
                               numLayers);
@@ -447,14 +445,14 @@ int VideoCodingModuleImpl::FrameRate(unsigned int* framerate) const
 
 // Set channel parameters
 WebRtc_Word32
-VideoCodingModuleImpl::SetChannelParameters(WebRtc_UWord32 availableBandWidth,
+VideoCodingModuleImpl::SetChannelParameters(WebRtc_UWord32 target_bitrate,
                                             WebRtc_UWord8 lossRate,
                                             WebRtc_UWord32 rtt)
 {
     WebRtc_Word32 ret = 0;
     {
         CriticalSectionScoped sendCs(_sendCritSect);
-        WebRtc_UWord32 targetRate = _mediaOpt.SetTargetRates(availableBandWidth,
+        WebRtc_UWord32 targetRate = _mediaOpt.SetTargetRates(target_bitrate,
                                                              lossRate,
                                                              rtt);
         if (_encoder != NULL)
@@ -700,7 +698,7 @@ VideoCodingModuleImpl::AddVideoFrame(const I420VideoFrame& videoFrame,
     }
     else
     {
-        _mediaOpt.updateContentData(contentMetrics);
+        _mediaOpt.UpdateContentData(contentMetrics);
         WebRtc_Word32 ret = _encoder->Encode(videoFrame,
                                              codecSpecificInfo,
                                              _nextFrameTypes);

@@ -17,6 +17,8 @@
 #include "media_opt_util.h"
 #include "qm_select.h"
 
+#include <list>
+
 namespace webrtc {
 
 class Clock;
@@ -28,12 +30,16 @@ namespace media_optimization {
 enum { kBitrateMaxFrameSamples = 60 };
 enum { kBitrateAverageWinMs    = 1000 };
 
-struct VCMEncodedFrameSample
-{
-    VCMEncodedFrameSample() : _sizeBytes(-1), _timeCompleteMs(-1) {}
+struct VCMEncodedFrameSample {
+  VCMEncodedFrameSample(int size_bytes, uint32_t timestamp,
+                        int64_t time_complete_ms)
+      : size_bytes(size_bytes),
+        timestamp(timestamp),
+        time_complete_ms(time_complete_ms) {}
 
-    WebRtc_Word64     _sizeBytes;
-    WebRtc_Word64     _timeCompleteMs;
+  uint32_t size_bytes;
+  uint32_t timestamp;
+  int64_t time_complete_ms;
 };
 
 class VCMMediaOptimization
@@ -47,14 +53,13 @@ public:
     WebRtc_Word32 Reset();
     /**
     * Set target Rates for the encoder given the channel parameters
-    * Inputs:       bitRate - target bitRate, in the conference case this is the rate
-    *                         between the sending client and the server
+    * Inputs:       target bitrate - the encoder target bitrate in bits/s.
     *               fractionLost - packet loss in % in the network
-    *               roundTripTimeMs - round trip time in miliseconds
+    *               roundTripTimeMs - round trip time in milliseconds
     *               minBitRate - the bit rate of the end-point with lowest rate
     *               maxBitRate - the bit rate of the end-point with highest rate
     */
-    WebRtc_UWord32 SetTargetRates(WebRtc_UWord32 bitRate,
+    WebRtc_UWord32 SetTargetRates(WebRtc_UWord32 target_bitrate,
                                   WebRtc_UWord8 &fractionLost,
                                   WebRtc_UWord32 roundTripTimeMs);
 
@@ -88,11 +93,11 @@ public:
     /*
     * Get actual sent frame rate
     */
-    float SentFrameRate();
+    uint32_t SentFrameRate();
     /*
     * Get actual sent bit rate
     */
-    float SentBitRate();
+    uint32_t SentBitRate();
     /*
     * Get maximum allowed bit rate
     */
@@ -100,7 +105,8 @@ public:
     /*
     * Inform Media Optimization of encoding output: Length and frame type
     */
-    WebRtc_Word32 UpdateWithEncodedData(WebRtc_Word32 encodedLength,
+    WebRtc_Word32 UpdateWithEncodedData(int encodedLength,
+                                        uint32_t timestamp,
                                         FrameType encodedFrameType);
     /*
     * Register a protection callback to be used to inform the user about the
@@ -129,7 +135,7 @@ public:
     /**
     * Update content metric Data
     */
-    void updateContentData(const VideoContentMetrics* contentMetrics);
+    void UpdateContentData(const VideoContentMetrics* contentMetrics);
 
     /**
     * Compute new Quality Mode
@@ -137,6 +143,7 @@ public:
     WebRtc_Word32 SelectQuality();
 
 private:
+    typedef std::list<VCMEncodedFrameSample> FrameSampleList;
 
     /*
      *  Update protection callback with protection settings
@@ -146,7 +153,10 @@ private:
                                  uint32_t* nack_overhead_rate_bps,
                                  uint32_t* fec_overhead_rate_bps);
 
-    void UpdateBitRateEstimate(WebRtc_Word64 encodedLength, WebRtc_Word64 nowMs);
+    void PurgeOldFrameSamples(int64_t now_ms);
+    void UpdateSentBitrate(int64_t nowMs);
+    void UpdateSentFramerate();
+
     /*
     * verify if QM settings differ from default, i.e. if an update is required
     * Compute actual values, as will be sent to the encoder
@@ -156,7 +166,7 @@ private:
     * check if we should make a QM change
     * will return 1 if yes, 0 otherwise
     */
-    bool checkStatusForQMchange();
+    bool CheckStatusForQMchange();
 
     void ProcessIncomingFrameRate(WebRtc_Word64 now);
 
@@ -189,8 +199,9 @@ private:
     VCMProtectionCallback*            _videoProtectionCallback;
     VCMQMSettingsCallback*            _videoQMSettingsCallback;
 
-    VCMEncodedFrameSample             _encodedFrameSamples[kBitrateMaxFrameSamples];
-    float                             _avgSentBitRateBps;
+    std::list<VCMEncodedFrameSample>  _encodedFrameSamples;
+    uint32_t                          _avgSentBitRateBps;
+    uint32_t                          _avgSentFramerate;
 
     WebRtc_UWord32                    _keyFrameCnt;
     WebRtc_UWord32                    _deltaFrameCnt;
