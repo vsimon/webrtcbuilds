@@ -55,13 +55,13 @@ deps = {
     Var("chromium_trunk") + "/deps/third_party/libvpx@186754",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@590",
+    (Var("googlecode_url") % "libyuv") + "/trunk@618",
 
   "third_party/opus":
-    Var("chromium_trunk") + "/src/third_party/opus@172355",
+    Var("chromium_trunk") + "/src/third_party/opus@185405",
 
   "third_party/opus/src":
-    Var("chromium_trunk") + "/deps/third_party/opus@173498",
+    Var("chromium_trunk") + "/deps/third_party/opus@185324",
 
   "third_party/protobuf":
     Var("chromium_trunk") + "/src/third_party/protobuf@" + Var("chromium_revision"),
