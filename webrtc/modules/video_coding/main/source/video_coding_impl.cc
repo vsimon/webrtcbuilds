@@ -47,50 +47,48 @@ VideoCodingModuleImpl::VideoCodingModuleImpl(const WebRtc_Word32 id,
                                              Clock* clock,
                                              EventFactory* event_factory,
                                              bool owns_event_factory)
-:
-_id(id),
-clock_(clock),
-_receiveCritSect(CriticalSectionWrapper::CreateCriticalSection()),
-_receiverInited(false),
-_timing(clock_, id, 1),
-_dualTiming(clock_, id, 2, &_timing),
-_receiver(&_timing, clock_, event_factory, id, 1, true),
-_dualReceiver(&_dualTiming, clock_, event_factory, id, 2, false),
-_decodedFrameCallback(_timing, clock_),
-_dualDecodedFrameCallback(_dualTiming, clock_),
-_frameTypeCallback(NULL),
-_frameStorageCallback(NULL),
-_receiveStatsCallback(NULL),
-_packetRequestCallback(NULL),
-_decoder(NULL),
-_dualDecoder(NULL),
+    : _id(id),
+      clock_(clock),
+      _receiveCritSect(CriticalSectionWrapper::CreateCriticalSection()),
+      _receiverInited(false),
+      _timing(clock_, id, 1),
+      _dualTiming(clock_, id, 2, &_timing),
+      _receiver(&_timing, clock_, event_factory, id, 1, true),
+      _dualReceiver(&_dualTiming, clock_, event_factory, id, 2, false),
+      _decodedFrameCallback(_timing, clock_),
+      _dualDecodedFrameCallback(_dualTiming, clock_),
+      _frameTypeCallback(NULL),
+      _frameStorageCallback(NULL),
+      _receiveStatsCallback(NULL),
+      _packetRequestCallback(NULL),
+      _decoder(NULL),
+      _dualDecoder(NULL),
 #ifdef DEBUG_DECODER_BIT_STREAM
-_bitStreamBeforeDecoder(NULL),
+      _bitStreamBeforeDecoder(NULL),
 #endif
-_frameFromFile(),
-_keyRequestMode(kKeyOnError),
-_scheduleKeyRequest(false),
-max_nack_list_size_(0),
-
-_sendCritSect(CriticalSectionWrapper::CreateCriticalSection()),
-_encoder(),
-_encodedFrameCallback(),
-_nextFrameTypes(1, kVideoFrameDelta),
-_mediaOpt(id, clock_),
-_sendCodecType(kVideoCodecUnknown),
-_sendStatsCallback(NULL),
-_encoderInputFile(NULL),
-_codecDataBase(id),
-_receiveStatsTimer(1000, clock_),
-_sendStatsTimer(1000, clock_),
-_retransmissionTimer(10, clock_),
-_keyRequestTimer(500, clock_),
-event_factory_(event_factory),
-owns_event_factory_(owns_event_factory)
-{
-    assert(clock_);
+      _frameFromFile(),
+      _keyRequestMode(kKeyOnError),
+      _scheduleKeyRequest(false),
+      max_nack_list_size_(0),
+      _sendCritSect(CriticalSectionWrapper::CreateCriticalSection()),
+      _encoder(),
+      _encodedFrameCallback(),
+      _nextFrameTypes(1, kVideoFrameDelta),
+      _mediaOpt(id, clock_),
+      _sendCodecType(kVideoCodecUnknown),
+      _sendStatsCallback(NULL),
+      _encoderInputFile(NULL),
+      _codecDataBase(id),
+      _receiveStatsTimer(1000, clock_),
+      _sendStatsTimer(1000, clock_),
+      _retransmissionTimer(10, clock_),
+      _keyRequestTimer(500, clock_),
+      event_factory_(event_factory),
+      owns_event_factory_(owns_event_factory),
+      frame_dropper_enabled_(true) {
+  assert(clock_);
 #ifdef DEBUG_DECODER_BIT_STREAM
-    _bitStreamBeforeDecoder = fopen("decoderBitStream.bit", "wb");
+  _bitStreamBeforeDecoder = fopen("decoderBitStream.bit", "wb");
 #endif
 }
 
@@ -338,10 +336,14 @@ VideoCodingModuleImpl::RegisterSendCodec(const VideoCodec* sendCodec,
     _sendCodecType = sendCodec->codecType;
     int numLayers = (_sendCodecType != kVideoCodecVP8) ? 1 :
                         sendCodec->codecSpecific.VP8.numberOfTemporalLayers;
-    // Disable frame dropper if screensharing if we have layers.
+    // If we have screensharing and we have layers, we disable frame dropper.
     bool disable_frame_dropper =
         numLayers > 1 && sendCodec->mode == kScreensharing;
-    _mediaOpt.EnableFrameDropper(!disable_frame_dropper);
+    if (disable_frame_dropper) {
+      _mediaOpt.EnableFrameDropper(false);
+    } else if (frame_dropper_enabled_) {
+      _mediaOpt.EnableFrameDropper(true);
+    }
     _nextFrameTypes.clear();
     _nextFrameTypes.resize(VCM_MAX(sendCodec->numberOfSimulcastStreams, 1),
                            kVideoFrameDelta);
@@ -745,6 +747,7 @@ WebRtc_Word32
 VideoCodingModuleImpl::EnableFrameDropper(bool enable)
 {
     CriticalSectionScoped cs(_sendCritSect);
+    frame_dropper_enabled_ = enable;
     _mediaOpt.EnableFrameDropper(enable);
     return VCM_OK;
 }
