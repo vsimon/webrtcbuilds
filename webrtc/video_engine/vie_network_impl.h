@@ -25,8 +25,6 @@ class ViENetworkImpl
  public:
   // Implements ViENetwork.
   virtual int Release();
-  virtual void SetNetworkTransmissionState(const int video_channel,
-                                           const bool is_transmitting);
   virtual int SetLocalReceiver(const int video_channel,
                                const uint16_t rtp_port,
                                const uint16_t rtcp_port,

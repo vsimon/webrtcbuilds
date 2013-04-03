@@ -987,24 +987,14 @@ void ModuleRtpRtcpImpl::TimeToSendPacket(uint32_t ssrc,
         (*it)->rtp_sender_.TimeToSendPacket(sequence_number, capture_time_ms);
         return;
       }
-      ++it;
+      it++;
     }
   } else {
-    bool have_child_modules = !child_modules_.empty();
+    bool have_child_modules(child_modules_.empty() ? false : true);
     if (!have_child_modules) {
       // Don't send from default module.
       if (SendingMedia() && ssrc == rtp_sender_.SSRC()) {
         rtp_sender_.TimeToSendPacket(sequence_number, capture_time_ms);
-      }
-    } else {
-      CriticalSectionScoped lock(critical_section_module_ptrs_.get());
-      std::list<ModuleRtpRtcpImpl*>::iterator it = child_modules_.begin();
-      while (it != child_modules_.end()) {
-        if ((*it)->SendingMedia() && ssrc == (*it)->rtp_sender_.SSRC()) {
-          (*it)->rtp_sender_.TimeToSendPacket(sequence_number, capture_time_ms);
-          return;
-        }
-        ++it;
       }
     }
   }

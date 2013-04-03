@@ -30,6 +30,9 @@
 #ifndef WEBRTC_EXTERNAL_TRANSPORT
 #include "webrtc/modules/udp_transport/interface/udp_transport.h"
 #endif
+#ifdef WEBRTC_SRTP
+#include "SrtpModule.h"
+#endif
 #ifdef WEBRTC_DTMF_DETECTION
 #include "voe_dtmf.h" // TelephoneEventDetectionMethods, TelephoneEventObserver
 #endif
@@ -256,6 +259,28 @@ public:
     int GetRtpRtcp(RtpRtcp* &rtpRtcpModule) const;
 
     // VoEEncryption
+#ifdef WEBRTC_SRTP
+    int EnableSRTPSend(
+            CipherTypes cipherType,
+            int cipherKeyLength,
+            AuthenticationTypes authType,
+            int authKeyLength,
+            int authTagLength,
+            SecurityLevels level,
+            const unsigned char key[kVoiceEngineMaxSrtpKeyLength],
+            bool useForRTCP);
+    int DisableSRTPSend();
+    int EnableSRTPReceive(
+            CipherTypes cipherType,
+            int cipherKeyLength,
+            AuthenticationTypes authType,
+            int authKeyLength,
+            int authTagLength,
+            SecurityLevels level,
+            const unsigned char key[kVoiceEngineMaxSrtpKeyLength],
+            bool useForRTCP);
+    int DisableSRTPReceive();
+#endif
     int RegisterExternalEncryption(Encryption& encryption);
     int DeRegisterExternalEncryption();
 
@@ -513,6 +538,9 @@ private:
 #ifndef WEBRTC_EXTERNAL_TRANSPORT
     WebRtc_UWord8 _numSocketThreads;
     UdpTransport& _socketTransportModule;
+#endif
+#ifdef WEBRTC_SRTP
+    SrtpModule& _srtpModule;
 #endif
     RtpDump& _rtpDumpIn;
     RtpDump& _rtpDumpOut;

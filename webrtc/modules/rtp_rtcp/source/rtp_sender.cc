@@ -603,6 +603,7 @@ void RTPSender::TimeToSendPacket(uint16_t sequence_number,
   }
   if (!packet_history_->GetRTPPacket(sequence_number, 0, data_buffer, &length,
                                      &stored_time_ms, &type)) {
+    assert(false);
     return;
   }
   assert(length > 0);
@@ -672,7 +673,7 @@ WebRtc_Word32 RTPSender::SendToNetwork(
     }
   }
 
-  if (paced_sender_ && storage != kDontStore) {
+  if (paced_sender_) {
     if (!paced_sender_->SendPacket(
         PacedSender::kNormalPriority, rtp_header.header.ssrc,
         rtp_header.header.sequenceNumber, capture_time_ms,

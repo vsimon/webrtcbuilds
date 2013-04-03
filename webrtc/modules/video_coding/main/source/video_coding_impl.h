@@ -319,7 +319,6 @@ private:
     VCMProcessTimer                     _keyRequestTimer;
     EventFactory*                       event_factory_;
     bool                                owns_event_factory_;
-    bool                                frame_dropper_enabled_;
 };
 } // namespace webrtc
 #endif // WEBRTC_MODULES_VIDEO_CODING_VIDEO_CODING_IMPL_H_
