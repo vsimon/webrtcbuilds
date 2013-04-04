@@ -215,7 +215,6 @@ public class VideoCaptureAndroid implements PreviewCallback, Callback {
             int width = 0;
             int height = 0;
             int framerate = 0;
-            boolean wasCaptureRunning = isCaptureRunning;
 
             if (isCaptureRunning) {
                 width = mCaptureWidth;
@@ -238,7 +237,7 @@ public class VideoCaptureAndroid implements PreviewCallback, Callback {
             }
             camera.setDisplayOrientation(resultRotation);
 
-            if (wasCaptureRunning) {
+            if (isCaptureRunning) {
                 StartCapture(width, height, framerate);
             }
             previewBufferLock.unlock();
@@ -265,9 +264,7 @@ public class VideoCaptureAndroid implements PreviewCallback, Callback {
         Log.d(TAG, "VideoCaptureAndroid::surfaceDestroyed");
         captureLock.lock();
         try {
-            if (camera != null) {
-                camera.setPreviewDisplay(null);
-            }
+            camera.setPreviewDisplay(null);
         } catch (IOException e) {
             Log.e(TAG, "Failed to clear preview surface!", e);
         }

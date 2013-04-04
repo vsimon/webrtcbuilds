@@ -208,6 +208,14 @@ enum { kVoiceEngineMaxRtpExtensionId = 14 };
 #define CHECK_CHANNEL(channel)  if (CheckChannel(channel) == -1) return -1;
 
 // ----------------------------------------------------------------------------
+//  Default Trace filter
+// ----------------------------------------------------------------------------
+
+#define WEBRTC_VOICE_ENGINE_DEFAULT_TRACE_FILTER \
+    kTraceStateInfo | kTraceWarning | kTraceError | kTraceCritical | \
+    kTraceApiCall
+
+// ----------------------------------------------------------------------------
 //  Inline functions
 // ----------------------------------------------------------------------------
 

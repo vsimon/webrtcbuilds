@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2013 The WebRTC project authors. All Rights Reserved.
+ *  Copyright (c) 2011 The WebRTC project authors. All Rights Reserved.
  *
  *  Use of this source code is governed by a BSD-style license
  *  that can be found in the LICENSE file in the root of the source
@@ -8,12 +8,12 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#ifndef WEBRTC_SYSTEM_WRAPPERS_SOURCE_CONDITION_VARIABLE_NATIVE_WIN_H_
-#define WEBRTC_SYSTEM_WRAPPERS_SOURCE_CONDITION_VARIABLE_NATIVE_WIN_H_
+#ifndef WEBRTC_SYSTEM_WRAPPERS_SOURCE_CONDITION_VARIABLE_WIN_H_
+#define WEBRTC_SYSTEM_WRAPPERS_SOURCE_CONDITION_VARIABLE_WIN_H_
 
 #include <windows.h>
 
-#include "webrtc/system_wrappers/interface/condition_variable_wrapper.h"
+#include "condition_variable_wrapper.h"
 
 namespace webrtc {
 
@@ -31,10 +31,10 @@ typedef BOOL (WINAPI* PSleepConditionVariableCS)(PCONDITION_VARIABLE,
 typedef void (WINAPI* PWakeConditionVariable)(PCONDITION_VARIABLE);
 typedef void (WINAPI* PWakeAllConditionVariable)(PCONDITION_VARIABLE);
 
-class ConditionVariableNativeWin : public ConditionVariableWrapper {
+class ConditionVariableWindows : public ConditionVariableWrapper {
  public:
-  static ConditionVariableWrapper* Create();
-  virtual ~ConditionVariableNativeWin();
+  ConditionVariableWindows();
+  ~ConditionVariableWindows();
 
   void SleepCS(CriticalSectionWrapper& crit_sect);
   bool SleepCS(CriticalSectionWrapper& crit_sect, unsigned long max_time_inMS);
@@ -42,13 +42,24 @@ class ConditionVariableNativeWin : public ConditionVariableWrapper {
   void WakeAll();
 
  private:
-  ConditionVariableNativeWin();
+  enum EventWakeUpType {
+    WAKEALL_0   = 0,
+    WAKEALL_1   = 1,
+    WAKE        = 2,
+    EVENT_COUNT = 3
+  };
 
-  bool Init();
+ private:
+  // Native support for Windows Vista+
+  static bool              win_support_condition_variables_primitive_;
+  CONDITION_VARIABLE       condition_variable_;
 
-  CONDITION_VARIABLE condition_variable_;
+  unsigned int     num_waiters_[2];
+  EventWakeUpType  eventID_;
+  CRITICAL_SECTION num_waiters_crit_sect_;
+  HANDLE           events_[EVENT_COUNT];
 };
 
-}  // namespace webrtc
+} // namespace webrtc
 
-#endif  // WEBRTC_SYSTEM_WRAPPERS_SOURCE_CONDITION_VARIABLE_NATIVE_WIN_H_
+#endif  // WEBRTC_SYSTEM_WRAPPERS_SOURCE_CONDITION_VARIABLE_WIN_H_

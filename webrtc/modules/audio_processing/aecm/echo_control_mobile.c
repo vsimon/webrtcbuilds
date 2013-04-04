@@ -95,8 +95,6 @@ WebRtc_Word32 WebRtcAecm_Create(void **aecmInst)
         return -1;
     }
 
-    WebRtcSpl_Init();
-
     if (WebRtcAecm_CreateCore(&aecm->aecmCore) == -1)
     {
         WebRtcAecm_Free(aecm);
@@ -112,6 +110,8 @@ WebRtc_Word32 WebRtcAecm_Create(void **aecmInst)
         aecm = NULL;
         return -1;
     }
+
+    WebRtcSpl_Init();
 
     aecm->initFlag = 0;
     aecm->lastError = 0;

@@ -45,11 +45,6 @@ namespace webrtc {
 
 namespace ModuleRTPUtility {
 
-enum {
-  kRtcpMinHeaderLength = 4,
-  kRtcpExpectedVersion = 2
-};
-
 /*
  * Time routines.
  */
@@ -274,18 +269,11 @@ bool RTPHeaderParser::RTCP() const {
   * FMT 15:    Application layer FB message
   */
 
-  const ptrdiff_t length = _ptrRTPDataEnd - _ptrRTPDataBegin;
-  if (length < kRtcpMinHeaderLength) {
-    return false;
-  }
-
-  const WebRtc_UWord8 V  = _ptrRTPDataBegin[0] >> 6;
-  if (V != kRtcpExpectedVersion) {
-    return false;
-  }
-
   const WebRtc_UWord8  payloadType = _ptrRTPDataBegin[1];
+
   bool RTCP = false;
+
+  // check if this is a RTCP packet
   switch (payloadType) {
     case 192:
       RTCP = true;

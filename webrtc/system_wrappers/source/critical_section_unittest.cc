@@ -10,6 +10,14 @@
 
 #include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 
+#ifdef _WIN32
+// For Sleep()
+#include <windows.h>
+#else
+// For nanosleep()
+#include <time.h>
+#endif
+
 #include "gtest/gtest.h"
 #include "webrtc/system_wrappers/interface/sleep.h"
 #include "webrtc/system_wrappers/interface/thread_wrapper.h"

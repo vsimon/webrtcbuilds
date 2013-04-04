@@ -104,7 +104,6 @@ void ViEAutoTest::ViERtpRtcpStandardTest()
     TbExternalTransport myTransport(*(ViE.network), tbChannel.videoChannel,
                                     NULL);
 
-    ViE.network->DeregisterSendTransport(tbChannel.videoChannel);
     EXPECT_EQ(0, ViE.network->RegisterSendTransport(
         tbChannel.videoChannel, myTransport));
 
@@ -392,7 +391,6 @@ void ViEAutoTest::ViERtpRtcpExtendedTest()
     TbExternalTransport myTransport(*(ViE.network), tbChannel.videoChannel,
                                     NULL);
 
-    EXPECT_EQ(0, ViE.network->DeregisterSendTransport(tbChannel.videoChannel));
     EXPECT_EQ(0, ViE.network->RegisterSendTransport(
         tbChannel.videoChannel, myTransport));
     EXPECT_EQ(0, ViE.base->StartReceive(tbChannel.videoChannel));

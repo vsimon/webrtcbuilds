@@ -22,7 +22,6 @@
       'dependencies': [
         '<(DEPTH)/testing/gtest.gyp:gtest',
         '<(DEPTH)/testing/gmock.gyp:gmock',
-        '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
       ],
       'all_dependent_settings': {
         'include_dirs': [
@@ -47,8 +46,6 @@
         'testsupport/packet_reader.h',
         'testsupport/perf_test.cc',
         'testsupport/perf_test.h',
-        'testsupport/trace_to_stderr.cc',
-        'testsupport/trace_to_stderr.h',
       ],
     },
     {
