@@ -1,0 +1,353 @@
+# Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
+#
+# Use of this source code is governed by a BSD-style license
+# that can be found in the LICENSE file in the root of the source
+# tree. An additional intellectual property rights grant can be found
+# in the file PATENTS.  All contributing project authors may
+# be found in the AUTHORS file in the root of the source tree.
+
+# This file is used in addition to the one already maintained in Chrome.
+# It acts as a place holder for future additions for WebRTC.
+# It must exist for the Python wrapper script to work properly.
+
+{
+   bug_716
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN6webrtc11ThreadPosix6CreateEPFbPvES1_NS_14ThreadPriorityEPKc
+   fun:_ZN6webrtc13ThreadWrapper12CreateThreadEPFbPvES1_NS_14ThreadPriorityEPKc
+   fun:_ZN6webrtc18videocapturemodule22VideoCaptureModuleV4L212StartCaptureERKNS_22VideoCaptureCapabilityE
+   fun:_ZN6webrtc11ViECapturer5StartERKNS_17CaptureCapabilityE
+   fun:_ZN6webrtc14ViECaptureImpl12StartCaptureEiRKNS_17CaptureCapabilityE
+   fun:_ZN15TbCaptureDeviceC1ER12TbInterfaces
+   fun:_ZN12_GLOBAL__N_114ViERtpFuzzTest5SetUpEv
+}
+
+{
+   bug_329_1
+   Memcheck:Unaddressable
+   fun:I422ToARGBRow_SSSE3
+   fun:I420ToARGB
+   fun:ConvertFromI420
+   fun:_ZN6webrtc15ConvertFromI420EPKhiNS_9VideoTypeEiiiPh
+   fun:_ZN6webrtc15VideoX11Channel12DeliverFrameEPhij
+   fun:_ZN6webrtc15VideoX11Channel11RenderFrameEjRNS_10VideoFrameE
+   fun:_ZN6webrtc19IncomingVideoStream26IncomingVideoStreamProcessEv
+   fun:_ZN6webrtc19IncomingVideoStream28IncomingVideoStreamThreadFunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_329_2
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN6webrtc18videocapturemodule16VideoCaptureImpl16CreateDeviceInfoEi
+   fun:_ZN6webrtc19VideoCaptureFactory16CreateDeviceInfoEi
+   fun:_ZN11ViEAutoTest22ViECaptureStandardTestEv
+   fun:_ZN12_GLOBAL__N_160ViEStandardIntegrationTest_RunsCaptureTestWithoutErrors_Test8TestBodyEv
+}
+
+{
+   bug_329_3
+   Memcheck:Unaddressable
+   fun:I422ToARGBRow_SSSE3
+   fun:I420ToARGB
+   fun:ConvertFromI420
+   fun:_ZN6webrtc15ConvertFromI420EPKhiNS_9VideoTypeEiiiPh
+   fun:_ZN6webrtc15VideoX11Channel12DeliverFrameEPhij
+   fun:_ZN6webrtc15VideoX11Channel11RenderFrameEjRNS_10VideoFrameE
+   fun:_ZN6webrtc19IncomingVideoStream26IncomingVideoStreamProcessEv
+   fun:_ZN6webrtc19IncomingVideoStream28IncomingVideoStreamThreadFunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_329_4
+   Memcheck:Param
+   socketcall.sendto(msg)
+   obj:*libpthread-*.so
+   fun:_ZN6webrtc14UdpSocketPosix6SendToEPKaiRKNS_13SocketAddressE
+   ...
+   fun:_ZN6webrtc17ModuleRtpRtcpImpl16SendOutgoingDataENS_9FrameTypeEajlPKhjPKNS_22RTPFragmentationHeaderEPKNS_14RTPVideoHeaderE
+   ...
+   fun:_ZN6webrtc10ViEEncoder12DeliverFrameEiPNS_10VideoFrameEiPKj
+   fun:_ZN6webrtc20ViEFrameProviderBase12DeliverFrameEPNS_10VideoFrameEiPKj
+   fun:_ZN6webrtc11ViECapturer16DeliverI420FrameEPNS_10VideoFrameE
+   fun:_ZN6webrtc11ViECapturer17ViECaptureProcessEv
+   fun:_ZN6webrtc11ViECapturer24ViECaptureThreadFunctionEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_329_5
+   Memcheck:Param
+   socketcall.sendto(msg)
+   obj:*libpthread-*.so
+   fun:_ZN6webrtc14UdpSocketPosix6SendToEPKaiRKNS_13SocketAddressE
+   fun:_ZN6webrtc16UdpTransportImpl14SendRTCPPacketEiPKvi
+   fun:_ZN6webrtc9ViESender14SendRTCPPacketEiPKvi
+   fun:_ZN6webrtc10RTCPSender13SendToNetworkEPKht
+   fun:_ZN6webrtc10RTCPSender8SendRTCPEjiPKtbm
+   fun:_ZN6webrtc17ModuleRtpRtcpImpl7ProcessEv
+   fun:_ZN6webrtc17ProcessThreadImpl7ProcessEv
+   fun:_ZN6webrtc17ProcessThreadImpl3RunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_329_6
+   Memcheck:Param
+   socketcall.sendto(msg)
+   obj:*libpthread-*.so
+   fun:_ZN6webrtc14UdpSocketPosix6SendToEPKaiRKNS_13SocketAddressE
+   ...
+   fun:_ZN6webrtc10ViEEncoder12DeliverFrameEiPNS_10VideoFrameEiPKj
+   fun:_ZN6webrtc20ViEFrameProviderBase12DeliverFrameEPNS_10VideoFrameEiPKj
+   fun:_ZN6webrtc11ViECapturer16DeliverI420FrameEPNS_10VideoFrameE
+   fun:_ZN6webrtc11ViECapturer17ViECaptureProcessEv
+}
+
+{
+   bug_329_7
+   Memcheck:Unaddressable
+   fun:I422ToARGBRow_SSSE3
+   fun:I420ToARGB
+   fun:ConvertFromI420
+   fun:_ZN6webrtc15ConvertFromI420ERKNS_10VideoFrameEiNS_9VideoTypeEiPh
+   fun:_ZN6webrtc15VideoX11Channel12DeliverFrameERKNS_10VideoFrameE
+   fun:_ZN6webrtc15VideoX11Channel11RenderFrameEjRNS_10VideoFrameE
+   fun:_ZN6webrtc19IncomingVideoStream26IncomingVideoStreamProcessEv
+   fun:_ZN6webrtc19IncomingVideoStream28IncomingVideoStreamThreadFunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_329_8
+   Memcheck:Unaddressable
+   fun:I422ToARGBRow_SSSE3
+   fun:I420ToARGB
+   fun:ConvertFromI420
+   fun:_ZN6webrtc15ConvertFromI420ERKNS_10VideoFrameEiNS_9VideoTypeEiPh
+   fun:_ZN6webrtc15VideoX11Channel12DeliverFrameERKNS_10VideoFrameE
+   fun:_ZN6webrtc15VideoX11Channel11RenderFrameEjRNS_10VideoFrameE
+   fun:_ZN6webrtc19IncomingVideoStream26IncomingVideoStreamProcessEv
+   fun:_ZN6webrtc19IncomingVideoStream28IncomingVideoStreamThreadFunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_898_1
+   Memcheck:Uninitialized
+   ...
+   fun:_ZN16FakeMediaProcess7ProcessEiN6webrtc15ProcessingTypesEPsiib
+   ...
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse17PlayThreadProcessEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse14PlayThreadFuncEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_898_2
+   Memcheck:Uninitialized
+   ...
+   fun:_ZN16FakeMediaProcess7ProcessEiN6webrtc15ProcessingTypesEPsiib
+   ...
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse16RecThreadProcessEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse13RecThreadFuncEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_332_1
+   Memcheck:Uninitialized
+   ...
+   fun:_ZN6webrtc11VoEBaseImpl16NeedMorePlayDataEjhhjPvRj
+   fun:_ZN6webrtc17AudioDeviceBuffer18RequestPlayoutDataEj
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse17PlayThreadProcessEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse14PlayThreadFuncEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_332_2
+   Memcheck:Unaddressable
+   fun:memcpy@@GLIBC_2.14
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse16ReadRecordedDataEPKvm
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse16RecThreadProcessEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse13RecThreadFuncEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_332_3
+   Memcheck:Uninitialized
+   fun:_ZN6webrtc11RTCPUtility21RTCPParseCommonHeaderEPKhS2_RNS0_16RTCPCommonHeaderE
+   ...
+   fun:_ZN6webrtc12RTCPReceiver10HandleSDESERNS_11RTCPUtility12RTCPParserV2E
+   fun:_ZN6webrtc12RTCPReceiver18IncomingRTCPPacketERNS_8RTCPHelp21RTCPPacketInformationEPNS_11RTCPUtility12RTCPParserV2E
+   fun:_ZN6webrtc17ModuleRtpRtcpImpl14IncomingPacketEPKht
+   fun:_ZN6webrtc3voe7Channel18IncomingRTCPPacketEPKaiPKct
+   fun:_ZN6webrtc16UdpTransportImpl20IncomingRTCPFunctionEPKaiPKNS_13SocketAddressE
+   fun:_ZN6webrtc16UdpTransportImpl20IncomingRTCPCallbackEPvPKaiPKNS_13SocketAddressE
+   fun:_ZN6webrtc14UdpSocketPosix11HasIncomingEv
+   fun:_ZN6webrtc25UdpSocketManagerPosixImpl7ProcessEv
+   fun:_ZN6webrtc25UdpSocketManagerPosixImpl3RunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_332_4
+   Memcheck:Uninitialized
+   ...
+   fun:_ZN6webrtc3voe10AudioLevel12ComputeLevelERKNS_10AudioFrameE
+   fun:_ZN6webrtc3voe11OutputMixer28DoOperationsOnCombinedSignalEv
+   fun:_ZN6webrtc11VoEBaseImpl16NeedMorePlayDataEjhhjPvRj
+   fun:_ZN6webrtc17AudioDeviceBuffer18RequestPlayoutDataEj
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse17PlayThreadProcessEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse14PlayThreadFuncEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_332_5
+   Memcheck:Uninitialized
+   fun:WebRtcSpl_UpBy2ShortToInt
+   fun:WebRtcSpl_Resample8khzTo22khz
+   fun:_ZN6webrtc9Resampler4PushEPKsiPsiRi
+   fun:_ZN6webrtc3voe16RemixAndResampleERKNS_10AudioFrameEPNS_9ResamplerEPS1_
+   fun:_ZN6webrtc3voe11OutputMixer13GetMixedAudioEiiPNS_10AudioFrameE
+   fun:_ZN6webrtc11VoEBaseImpl16NeedMorePlayDataEjhhjPvRj
+   fun:_ZN6webrtc17AudioDeviceBuffer18RequestPlayoutDataEj
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse17PlayThreadProcessEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse14PlayThreadFuncEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug 332_6
+   Memcheck:Param
+   socketcall.sendto(msg)
+   obj:*libpthread-*.so
+   fun:_ZN6webrtc14UdpSocketPosix6SendToEPKaiRKNS_13SocketAddressE
+   fun:_ZN6webrtc16UdpTransportImpl14SendRTCPPacketEiPKvi
+   fun:_ZN6webrtc3voe7Channel14SendRTCPPacketEiPKvi
+   ...
+   fun:_ZN6webrtc17ModuleRtpRtcpImpl14IncomingPacketEPKht
+   fun:_ZN6webrtc3voe7Channel17IncomingRTPPacketEPKaiPKct
+   fun:_ZN6webrtc16UdpTransportImpl19IncomingRTPFunctionEPKaiPKNS_13SocketAddressE
+   fun:_ZN6webrtc16UdpTransportImpl19IncomingRTPCallbackEPvPKaiPKNS_13SocketAddressE
+   fun:_ZN6webrtc14UdpSocketPosix11HasIncomingEv
+   fun:_ZN6webrtc25UdpSocketManagerPosixImpl7ProcessEv
+   fun:_ZN6webrtc25UdpSocketManagerPosixImpl3RunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+
+{
+   bug_332_7
+   Memcheck:Param
+   socketcall.sendto(msg)
+   obj:*libpthread-*.so
+   fun:_ZN6webrtc14UdpSocketPosix6SendToEPKaiRKNS_13SocketAddressE
+   fun:_ZN6webrtc16UdpTransportImpl10SendPacketEiPKvi
+   ...
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse16ReadRecordedDataEPKvm
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse16RecThreadProcessEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse13RecThreadFuncEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_332_8
+   Memcheck:Param
+   socketcall.sendto(msg)
+   obj:*libpthread-*.so
+   fun:_ZN6webrtc14UdpSocketPosix6SendToEPKaiRKNS_13SocketAddressE
+   fun:_ZN6webrtc16UdpTransportImpl14SendRTCPPacketEiPKvi
+   fun:_ZN6webrtc3voe7Channel14SendRTCPPacketEiPKvi
+   fun:_ZN6webrtc10RTCPSender13SendToNetworkEPKht
+   fun:_ZN6webrtc10RTCPSender8SendRTCPEjiPKtbm
+   fun:_ZN6webrtc17ModuleRtpRtcpImpl7ProcessEv
+   fun:_ZN6webrtc17ProcessThreadImpl7ProcessEv
+   fun:_ZN6webrtc17ProcessThreadImpl3RunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_332_9
+   Memcheck:Uninitialized
+   ...
+   fun:_ZN6webrtc17AudioDeviceBuffer19DeliverRecordedDataEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse19ProcessRecordedDataEPajj
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse16ReadRecordedDataEPKvm
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse16RecThreadProcessEv
+   fun:_ZN6webrtc21AudioDeviceLinuxPulse13RecThreadFuncEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_332_10
+   Memcheck:Uninitialized
+   ...
+   fun:_ZN6webrtc12RTCPReceiver18IncomingRTCPPacketERNS_8RTCPHelp21RTCPPacketInformationEPNS_11RTCPUtility12RTCPParserV2E
+   fun:_ZN6webrtc17ModuleRtpRtcpImpl14IncomingPacketEPKht
+   fun:_ZN6webrtc3voe7Channel18IncomingRTCPPacketEPKaiPKct
+   fun:_ZN6webrtc16UdpTransportImpl20IncomingRTCPFunctionEPKaiPKNS_13SocketAddressE
+   fun:_ZN6webrtc16UdpTransportImpl20IncomingRTCPCallbackEPvPKaiPKNS_13SocketAddressE
+   fun:_ZN6webrtc14UdpSocketPosix11HasIncomingEv
+   fun:_ZN6webrtc25UdpSocketManagerPosixImpl7ProcessEv
+   fun:_ZN6webrtc25UdpSocketManagerPosixImpl3RunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   bug_891
+   Memcheck:Unaddressable
+   fun:XShmPutImage
+   fun:_ZN6webrtc15VideoX11Channel12DeliverFrameEPhij
+   fun:_ZN6webrtc15VideoX11Channel11RenderFrameEjRNS_10VideoFrameE
+   fun:_ZN6webrtc19IncomingVideoStream26IncomingVideoStreamProcessEv
+   fun:_ZN6webrtc19IncomingVideoStream28IncomingVideoStreamThreadFunEPv
+   fun:_ZN6webrtc11ThreadPosix3RunEv
+   fun:StartThread
+}
+
+{
+   ignore_common_benevolent_trace_library_errors
+   Memcheck:Uninitialized
+   ...
+   fun:vsnprintf
+   fun:_ZN6webrtc5Trace3AddENS_10TraceLevelENS_11TraceModuleEiPKcz
+   ...
+}
+
+{
+   ignore_leak_when_alsa_hits_error
+   Memcheck:Leak
+   ...
+   fun:snd_device_name_hint
+   fun:_ZNK6webrtc20AudioDeviceLinuxALSA14GetDevicesInfoEibiPci
+   fun:_ZN6webrtc20AudioDeviceLinuxALSA16SetPlayoutDeviceEt
+   fun:_ZN6webrtc21AudioDeviceModuleImpl16SetPlayoutDeviceEt
+   fun:_ZN6webrtc11VoEBaseImpl4InitEPNS_17AudioDeviceModuleE
+   fun:_ZN11ViEAutoTest19ViEFileStandardTestEv
+   fun:_ZN12_GLOBAL__N_157ViEStandardIntegrationTest_RunsFileTestWithoutErrors_Test8TestBodyEv
+}

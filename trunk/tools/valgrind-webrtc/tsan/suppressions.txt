@@ -1,0 +1,33 @@
+# Copyright (c) 2012 The WebRTC project authors. All Rights Reserved.
+#
+# Use of this source code is governed by a BSD-style license
+# that can be found in the LICENSE file in the root of the source
+# tree. An additional intellectual property rights grant can be found
+# in the file PATENTS.  All contributing project authors may
+# be found in the AUTHORS file in the root of the source tree.
+
+# This file is used in addition to the one already maintained in Chrome.
+# It must exist for the Python wrapper script to work properly.
+
+{
+  bug_300
+  ThreadSanitizer:Race
+  fun:webrtc::TraceImpl::SetTraceCallbackImpl
+  fun:webrtc::Trace::SetTraceCallback
+  ...
+}
+
+# Known bugs we don't care about / problems in third parties
+{
+  bug_884 (Wider timezone filter than Chromium's suppressions)
+  ThreadSanitizer:Race
+  ...
+  fun:__tz*
+}
+{
+  don't care about issues in trace functions
+  ThreadSanitizer:Race
+  ...
+  fun:webrtc::Trace::Add
+  ...
+}
