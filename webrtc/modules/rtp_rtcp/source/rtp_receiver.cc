@@ -21,7 +21,6 @@
 #include "webrtc/modules/rtp_rtcp/source/rtp_rtcp_impl.h"
 #include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 #include "webrtc/system_wrappers/interface/trace.h"
-#include "webrtc/system_wrappers/interface/trace_event.h"
 
 namespace webrtc {
 
@@ -337,7 +336,6 @@ WebRtc_Word32 RTPReceiver::IncomingRTPPacket(
   WebRtcRTPHeader* rtp_header,
   const WebRtc_UWord8* packet,
   const WebRtc_UWord16 packet_length) {
-  TRACE_EVENT0("webrtc_rtp", "RTPRecv::Packet");
   // The rtp_header argument contains the parsed RTP header.
   int length = packet_length - rtp_header->header.paddingLength;
 
@@ -1142,10 +1140,6 @@ void RTPReceiver::ProcessBitrate() {
   CriticalSectionScoped cs(critical_section_rtp_receiver_);
 
   Bitrate::Process();
-  TRACE_COUNTER_ID1("webrtc_rtp",
-                    "RTPReceiverBitrate", ssrc_, BitrateLast());
-  TRACE_COUNTER_ID1("webrtc_rtp",
-                    "RTPReceiverPacketRate", ssrc_, PacketRate());
 }
 
 } // namespace webrtc

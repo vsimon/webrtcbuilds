@@ -13,8 +13,6 @@
 #include <string.h> //memcpy
 #include <cassert> //assert
 
-#include "trace_event.h"
-
 namespace webrtc {
 RTPSenderAudio::RTPSenderAudio(const WebRtc_Word32 id, Clock* clock,
                                RTPSenderInterface* rtpSender) :
@@ -473,9 +471,6 @@ WebRtc_Word32 RTPSenderAudio::SendAudio(
     }
     _lastPayloadType = payloadType;
   }   // end critical section
-  TRACE_EVENT_INSTANT2("webrtc_rtp", "Audio::Send",
-                       "timestamp", captureTimeStamp,
-                       "seqnum", _rtpSender->SequenceNumber());
   return _rtpSender->SendToNetwork(dataBuffer,
                                    payloadSize,
                                    static_cast<WebRtc_UWord16>(rtpHeaderLength),
@@ -614,10 +609,6 @@ RTPSenderAudio::SendTelephoneEventPacket(const bool ended,
         ModuleRTPUtility::AssignUWord16ToBuffer(dtmfbuffer+14, duration);
 
         _sendAudioCritsect->Leave();
-        TRACE_EVENT_INSTANT2("webrtc_rtp",
-                             "Audio::SendTelephoneEvent",
-                             "timestamp", dtmfTimeStamp,
-                             "seqnum", _rtpSender->SequenceNumber());
         retVal = _rtpSender->SendToNetwork(dtmfbuffer, 4, 12, -1,
                                            kAllowRetransmission);
         sendCount--;

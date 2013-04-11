@@ -10,7 +10,6 @@
 
 #include "video_coding.h"
 #include "trace.h"
-#include "trace_event.h"
 #include "generic_decoder.h"
 #include "internal_defines.h"
 #include "webrtc/system_wrappers/interface/clock.h"
@@ -166,11 +165,12 @@ WebRtc_Word32 VCMGenericDecoder::Decode(const VCMEncodedFrame& frame,
                  "Decoding timestamp %u", frame.TimeStamp());
 
     _nextFrameInfoIdx = (_nextFrameInfoIdx + 1) % kDecoderFrameMemoryLength;
-    int32_t ret = _decoder.Decode(frame.EncodedImage(),
-                                  frame.MissingFrame(),
-                                  frame.FragmentationHeader(),
-                                  frame.CodecSpecific(),
-                                  frame.RenderTimeMs());
+
+    WebRtc_Word32 ret = _decoder.Decode(frame.EncodedImage(),
+                                        frame.MissingFrame(),
+                                        frame.FragmentationHeader(),
+                                        frame.CodecSpecific(),
+                                        frame.RenderTimeMs());
 
     if (ret < WEBRTC_VIDEO_CODEC_OK)
     {

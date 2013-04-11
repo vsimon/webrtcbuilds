@@ -10,7 +10,6 @@
 
 #include "rtcp_sender.h"
 
-#include <algorithm>  // min
 #include <cassert>  // assert
 #include <cstdlib>  // rand
 #include <string.h>  // memcpy
@@ -19,48 +18,10 @@
 #include "modules/rtp_rtcp/source/rtp_rtcp_impl.h"
 #include "system_wrappers/interface/critical_section_wrapper.h"
 #include "system_wrappers/interface/trace.h"
-#include "system_wrappers/interface/trace_event.h"
 
 namespace webrtc {
 
 using RTCPUtility::RTCPCnameInformation;
-
-NACKStringBuilder::NACKStringBuilder() :
-    _stream(""), _count(0), _consecutive(false)
-{
-    // Empty.
-}
-
-void NACKStringBuilder::PushNACK(WebRtc_UWord16 nack)
-{
-    if (_count == 0)
-    {
-        _stream << nack;
-    } else if (nack == _prevNack + 1)
-    {
-        _consecutive = true;
-    } else
-    {
-        if (_consecutive)
-        {
-            _stream << "-" << _prevNack;
-            _consecutive = false;
-        }
-        _stream << "," << nack;
-    }
-    _count++;
-    _prevNack = nack;
-}
-
-std::string NACKStringBuilder::GetResult()
-{
-    if (_consecutive)
-    {
-        _stream << "-" << _prevNack;
-        _consecutive = false;
-    }
-    return _stream.str();
-}
 
 RTCPSender::RTCPSender(const WebRtc_Word32 id,
                        const bool audio,
@@ -118,10 +79,7 @@ RTCPSender::RTCPSender(const WebRtc_Word32 id,
     _appData(NULL),
     _appLength(0),
     _xrSendVoIPMetric(false),
-    _xrVoIPMetric(),
-    _nackCount(0),
-    _pliCount(0),
-    _fullIntraRequestCount(0)
+    _xrVoIPMetric()
 {
     memset(_CNAME, 0, sizeof(_CNAME));
     memset(_lastSendReport, 0, sizeof(_lastSendReport));
@@ -193,11 +151,6 @@ RTCPSender::Init()
     memset(_CNAME, 0, sizeof(_CNAME));
     memset(_lastSendReport, 0, sizeof(_lastSendReport));
     memset(_lastRTCPTime, 0, sizeof(_lastRTCPTime));
-
-    _nackCount = 0;
-    _pliCount = 0;
-    _fullIntraRequestCount = 0;
-
     return 0;
 }
 
@@ -1112,7 +1065,6 @@ RTCPSender::BuildREMB(WebRtc_UWord8* rtcpbuffer, WebRtc_UWord32& pos)
         ModuleRTPUtility::AssignUWord32ToBuffer(rtcpbuffer+pos, _rembSSRC[i]);
         pos += 4;
     }
-    TRACE_COUNTER_ID1("webrtc_rtp", "RTCPRembBitrate", _SSRC, _rembBitrate);
     return 0;
 }
 
@@ -1342,8 +1294,7 @@ WebRtc_Word32
 RTCPSender::BuildNACK(WebRtc_UWord8* rtcpbuffer,
                       WebRtc_UWord32& pos,
                       const WebRtc_Word32 nackSize,
-                      const WebRtc_UWord16* nackList,
-                      std::string* nackString)
+                      const WebRtc_UWord16* nackList)
 {
     // sanity
     if(pos + 16 >= IP_PACKET_SIZE)
@@ -1370,42 +1321,88 @@ RTCPSender::BuildNACK(WebRtc_UWord8* rtcpbuffer,
     ModuleRTPUtility::AssignUWord32ToBuffer(rtcpbuffer+pos, _remoteSSRC);
     pos += 4;
 
-    NACKStringBuilder stringBuilder;
-    // Build NACK bitmasks and write them to the RTCP message.
-    // The nack list should be sorted and not contain duplicates if one
-    // wants to build the smallest rtcp nack packet.
-    int numOfNackFields = 0;
-    int maxNackFields = std::min<int>(kRtcpMaxNackFields,
-                                      (IP_PACKET_SIZE - pos) / 4);
+    // add the list
     int i = 0;
-    while (i < nackSize && numOfNackFields < maxNackFields) {
-      stringBuilder.PushNACK(nackList[i]);
-      uint16_t nack = nackList[i++];
-      uint16_t bitmask = 0;
-      while (i < nackSize) {
-        int shift = static_cast<uint16_t>(nackList[i] - nack) - 1;
-        if (shift >= 0 && shift <= 15) {
-          stringBuilder.PushNACK(nackList[i]);
-          bitmask |= (1 << shift);
-          ++i;
-        } else {
-          break;
+    int numOfNackFields = 0;
+    while (nackSize > i && numOfNackFields < kRtcpMaxNackFields)
+    {
+        WebRtc_UWord16 nack = nackList[i];
+        // put dow our sequence number
+        ModuleRTPUtility::AssignUWord16ToBuffer(rtcpbuffer+pos, nack);
+        pos += 2;
+
+        i++;
+        numOfNackFields++;
+        if(nackSize > i)
+        {
+            bool moreThan16Away = (WebRtc_UWord16(nack+16) < nackList[i])?true: false;
+            if(!moreThan16Away)
+            {
+                // check for a wrap
+                if(WebRtc_UWord16(nack+16) > 0xff00 && nackList[i] < 0x0fff)
+                {
+                    // wrap
+                    moreThan16Away = true;
+                }
+            }
+            if(moreThan16Away)
+            {
+                // next is more than 16 away
+                rtcpbuffer[pos++]=(WebRtc_UWord8)0;
+                rtcpbuffer[pos++]=(WebRtc_UWord8)0;
+            } else
+            {
+                // build our bitmask
+                WebRtc_UWord16 bitmask = 0;
+
+                bool within16Away = (WebRtc_UWord16(nack+16) > nackList[i])?true: false;
+                if(within16Away)
+                {
+                   // check for a wrap
+                    if(WebRtc_UWord16(nack+16) > 0xff00 && nackList[i] < 0x0fff)
+                    {
+                        // wrap
+                        within16Away = false;
+                    }
+                }
+
+                while( nackSize > i && within16Away)
+                {
+                    WebRtc_Word16 shift = (nackList[i]-nack)-1;
+                    assert(!(shift > 15) && !(shift < 0));
+
+                    bitmask += (1<< shift);
+                    i++;
+                    if(nackSize > i)
+                    {
+                        within16Away = (WebRtc_UWord16(nack+16) > nackList[i])?true: false;
+                        if(within16Away)
+                        {
+                            // check for a wrap
+                            if(WebRtc_UWord16(nack+16) > 0xff00 && nackList[i] < 0x0fff)
+                            {
+                                // wrap
+                                within16Away = false;
+                            }
+                        }
+                    }
+                }
+                ModuleRTPUtility::AssignUWord16ToBuffer(rtcpbuffer+pos, bitmask);
+                pos += 2;
+            }
+            // sanity do we have room from one more 4 byte block?
+            if(pos + 4 >= IP_PACKET_SIZE)
+            {
+                return -2;
+            }
+        } else
+        {
+            // no more in the list
+            rtcpbuffer[pos++]=(WebRtc_UWord8)0;
+            rtcpbuffer[pos++]=(WebRtc_UWord8)0;
         }
-      }
-      // Write the sequence number and the bitmask to the packet.
-      assert(pos + 4 < IP_PACKET_SIZE);
-      ModuleRTPUtility::AssignUWord16ToBuffer(rtcpbuffer + pos, nack);
-      pos += 2;
-      ModuleRTPUtility::AssignUWord16ToBuffer(rtcpbuffer + pos, bitmask);
-      pos += 2;
-      numOfNackFields++;
     }
-    if (i != nackSize) {
-      WEBRTC_TRACE(kTraceWarning, kTraceRtpRtcp, _id,
-                   "Nack list to large for one packet.");
-    }
-    rtcpbuffer[nackSizePos] = static_cast<uint8_t>(2 + numOfNackFields);
-    *nackString = stringBuilder.GetResult();
+    rtcpbuffer[nackSizePos]=(WebRtc_UWord8)(2+numOfNackFields);
     return 0;
 }
 
@@ -1787,9 +1784,6 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
             {
                 break;  // out of buffer
             }
-            TRACE_EVENT_INSTANT0("webrtc_rtp", "RTCPSender::PLI");
-            _pliCount++;
-            TRACE_COUNTER_ID1("webrtc_rtp", "RTCP_PLICount", _SSRC, _pliCount);
         }
         if(rtcpPacketTypeFlags & kRtcpFir)
         {
@@ -1802,10 +1796,6 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
             {
                 break;  // out of buffer
             }
-            TRACE_EVENT_INSTANT0("webrtc_rtp", "RTCPSender::FIR");
-            _fullIntraRequestCount++;
-            TRACE_COUNTER_ID1("webrtc_rtp", "RTCP_FIRCount", _SSRC,
-                              _fullIntraRequestCount);
         }
         if(rtcpPacketTypeFlags & kRtcpSli)
         {
@@ -1847,7 +1837,6 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
             {
                 break;  // out of buffer
             }
-            TRACE_EVENT_INSTANT0("webrtc_rtp", "RTCPSender::REMB");
         }
         if(rtcpPacketTypeFlags & kRtcpBye)
         {
@@ -1899,9 +1888,7 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
         }
         if(rtcpPacketTypeFlags & kRtcpNack)
         {
-            std::string nackString;
-            buildVal = BuildNACK(rtcpbuffer, pos, nackSize, nackList,
-                                 &nackString);
+            buildVal = BuildNACK(rtcpbuffer, pos, nackSize, nackList);
             if(buildVal == -1)
             {
                 return -1; // error
@@ -1910,10 +1897,6 @@ RTCPSender::SendRTCP(const WebRtc_UWord32 packetTypeFlags,
             {
                 break;  // out of buffer
             }
-            TRACE_EVENT_INSTANT1("webrtc_rtp", "RTCPSender::NACK",
-                                 "nacks", TRACE_STR_COPY(nackString.c_str()));
-            _nackCount++;
-            TRACE_COUNTER_ID1("webrtc_rtp", "RTCP_NACKCount", _SSRC, _nackCount);
         }
         if(rtcpPacketTypeFlags & kRtcpXrVoipMetric)
         {

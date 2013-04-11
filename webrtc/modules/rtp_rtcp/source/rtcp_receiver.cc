@@ -14,7 +14,6 @@
 #include <cassert> //assert
 
 #include "trace.h"
-#include "trace_event.h"
 #include "critical_section_wrapper.h"
 #include "rtcp_utility.h"
 #include "rtp_rtcp_impl.h"
@@ -398,9 +397,8 @@ RTCPReceiver::HandleSenderReceiverReport(RTCPUtility::RTCPParserV2& rtcpParser,
 
     if (rtcpPacketType == RTCPUtility::kRtcpSrCode)
     {
-        TRACE_EVENT_INSTANT2("webrtc_rtp", "SR",
-                             "remote_ssrc", remoteSSRC,
-                             "ssrc", _SSRC);
+        WEBRTC_TRACE(kTraceDebug, kTraceRtpRtcp, _id,
+            "Received SR(%d). SSRC:0x%x, from SSRC:0x%x, to us %d.", _id, _SSRC, remoteSSRC, (_remoteSSRC == remoteSSRC)?1:0);
 
         if (_remoteSSRC == remoteSSRC) // have I received RTP packets from this party
         {
@@ -429,9 +427,8 @@ RTCPReceiver::HandleSenderReceiverReport(RTCPUtility::RTCPParserV2& rtcpParser,
         }
     } else
     {
-        TRACE_EVENT_INSTANT2("webrtc_rtp", "RR",
-                             "remote_ssrc", remoteSSRC,
-                             "ssrc", _SSRC);
+        WEBRTC_TRACE(kTraceDebug, kTraceRtpRtcp, _id,
+            "Received RR(%d). SSRC:0x%x, from SSRC:0x%x", _id, _SSRC, remoteSSRC);
 
         rtcpPacketInformation.rtcpPacketTypeFlags |= kRtcpRr;
     }
@@ -484,10 +481,6 @@ RTCPReceiver::HandleReportBlock(const RTCPUtility::RTCPPacket& rtcpPacket,
 
   _lastReceivedRrMs = _clock->TimeInMilliseconds();
   const RTCPPacketReportBlockItem& rb = rtcpPacket.ReportBlockItem;
-  TRACE_COUNTER_ID1("webrtc_rtp", "RRFractionLost", rb.SSRC, rb.FractionLost);
-  TRACE_COUNTER_ID1("webrtc_rtp", "RRCumulativeNumOfPacketLost",
-                    rb.SSRC, rb.CumulativeNumOfPacketsLost);
-  TRACE_COUNTER_ID1("webrtc_rtp", "RRJitter", rb.SSRC, rb.Jitter);
   reportBlock->remoteReceiveBlock.remoteSSRC = remoteSSRC;
   reportBlock->remoteReceiveBlock.sourceSSRC = rb.SSRC;
   reportBlock->remoteReceiveBlock.fractionLost = rb.FractionLost;
@@ -561,7 +554,9 @@ RTCPReceiver::HandleReportBlock(const RTCPUtility::RTCPPacket& rtcpPacket,
     reportBlock->numAverageCalcs++;
   }
 
-  TRACE_COUNTER_ID1("webrtc_rtp", "RR_RTT", rb.SSRC, RTT);
+  WEBRTC_TRACE(kTraceDebug, kTraceRtpRtcp, _id,
+               " -> Received report block(%d), from SSRC:0x%x, RTT:%d, loss:%d",
+               _id, remoteSSRC, RTT, rtcpPacket.ReportBlockItem.FractionLost);
 
   // rtcpPacketInformation
   rtcpPacketInformation.AddReportInfo(

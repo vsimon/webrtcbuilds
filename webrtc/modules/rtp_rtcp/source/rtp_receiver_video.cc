@@ -22,7 +22,6 @@
 #include "webrtc/modules/rtp_rtcp/source/rtp_utility.h"
 #include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 #include "webrtc/system_wrappers/interface/trace.h"
-#include "webrtc/system_wrappers/interface/trace_event.h"
 
 namespace webrtc {
 WebRtc_UWord32 BitRateBPS(WebRtc_UWord16 x) {
@@ -75,9 +74,6 @@ WebRtc_Word32 RTPReceiverVideo::ParseRtpPacket(
     const WebRtc_UWord16 packet_length,
     const WebRtc_Word64 timestamp_ms,
     const bool is_first_packet) {
-  TRACE_EVENT2("webrtc_rtp", "Video::ParseRtp",
-               "seqnum", rtp_header->header.sequenceNumber,
-               "timestamp", rtp_header->header.timestamp);
   const WebRtc_UWord8* payload_data =
       ModuleRTPUtility::GetPayloadData(rtp_header, packet);
   const WebRtc_UWord16 payload_data_length =
