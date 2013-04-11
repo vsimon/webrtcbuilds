@@ -119,19 +119,34 @@ def on_message(room, user, message):
     new_message.put()
     logging.info('Saved message for user ' + user)
 
-def make_media_constraints(hd_video):
-  constraints = { 'optional': [], 'mandatory': {} }
-  # Demo 16:9 video with media constraints.
-  if hd_video.lower() == 'true':
-    # Demo with WHD by setting size with 1280x720.
-    constraints['mandatory']['minHeight'] = 720
-    constraints['mandatory']['minWidth'] = 1280
-    # Disabled for now due to weird stretching behavior on Mac.
-    #else:
-    # Demo with WVGA by setting Aspect Ration;
-    #constraints['mandatory']['maxAspectRatio'] = 1.778
-    #constraints['mandatory']['minAspectRatio'] = 1.777
-  return constraints
+def make_media_constraints(media, min_re, max_re):
+  video_constraints = { 'optional': [], 'mandatory': {} }
+  media_constraints = { 'video':video_constraints, 'audio':True }
+
+  # Media: audio:audio only; video:video only; (default):both.
+  if media.lower() == 'audio':
+    media_constraints['video'] = False
+  elif media.lower() == 'video':
+    media_constraints['audio'] = False
+
+  if media.lower() != 'audio' :
+    if min_re:
+      min_sizes = min_re.split('x')
+      if len(min_sizes) == 2:
+        video_constraints['mandatory']['minWidth'] = min_sizes[0]
+        video_constraints['mandatory']['minHeight'] = min_sizes[1]
+      else:
+        logging.info('Ignored invalid min_re: ' + min_re);
+    if max_re:
+      max_sizes = max_re.split('x')
+      if len(max_sizes) == 2:
+        video_constraints['mandatory']['maxWidth'] = max_sizes[0]
+        video_constraints['mandatory']['maxHeight'] = max_sizes[1]
+      else:
+        logging.info('Ignored invalid max_re: ' + max_re);
+    media_constraints['video'] = video_constraints
+
+  return media_constraints
 
 def make_pc_constraints(compat):
   constraints = { 'optional': [] }
@@ -297,8 +312,13 @@ class MainPage(webapp2.RequestHandler):
     unittest = self.request.get('unittest')
     stun_server = self.request.get('ss')
     turn_server = self.request.get('ts')
+    min_re = self.request.get('minre')
+    max_re = self.request.get('maxre')
     hd_video = self.request.get('hd')
+    if hd_video.lower() == 'true':
+      min_re = '1280x720'
     ts_pwd = self.request.get('tp')
+    media = self.request.get('media')
     # set compat to true by default.
     compat = 'true'
     if self.request.get('compat'):
@@ -352,13 +372,13 @@ class MainPage(webapp2.RequestHandler):
         logging.info('Room ' + room_key + ' is full')
         return
 
-    room_link = base_url + '/?r=' + room_key
+    room_link = base_url + '?r=' + room_key
     room_link = append_url_arguments(self.request, room_link)
     token = create_channel(room, user, token_timeout)
     pc_config = make_pc_config(stun_server, turn_server, ts_pwd)
     pc_constraints = make_pc_constraints(compat)
     offer_constraints = make_offer_constraints(compat)
-    media_constraints = make_media_constraints(hd_video)
+    media_constraints = make_media_constraints(media, min_re, max_re)
     template_values = {'token': token,
                        'me': user,
                        'room_key': room_key,
