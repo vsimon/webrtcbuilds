@@ -10,6 +10,7 @@
 
 #include "video_coding.h"
 #include "trace.h"
+#include "trace_event.h"
 #include "generic_decoder.h"
 #include "internal_defines.h"
 #include "webrtc/system_wrappers/interface/clock.h"
@@ -63,6 +64,9 @@ WebRtc_Word32 VCMDecodedFrameCallback::Decoded(I420VideoFrame& decodedImage)
         _frame.SwapFrame(&decodedImage);
         _frame.set_render_time_ms(frameInfo->renderTimeMs);
         WebRtc_Word32 callbackReturn = _receiveCallback->FrameToRender(_frame);
+        TRACE_EVENT_INSTANT2("webrtc_vie", "VCMDecodedFrameCallback::Decoded",
+                             "timestamp", decodedImage.timestamp(),
+                             "render_time_ms", decodedImage.render_time_ms());
         if (callbackReturn < 0)
         {
             WEBRTC_TRACE(webrtc::kTraceDebug,
@@ -166,11 +170,14 @@ WebRtc_Word32 VCMGenericDecoder::Decode(const VCMEncodedFrame& frame,
 
     _nextFrameInfoIdx = (_nextFrameInfoIdx + 1) % kDecoderFrameMemoryLength;
 
-    WebRtc_Word32 ret = _decoder.Decode(frame.EncodedImage(),
-                                        frame.MissingFrame(),
-                                        frame.FragmentationHeader(),
-                                        frame.CodecSpecific(),
-                                        frame.RenderTimeMs());
+    TRACE_EVENT2("webrtc_vie", "VCMGenericDecoder::Decode",
+                 "timestamp", frame.TimeStamp(),
+                 "render_time_ms", frame.RenderTimeMs());
+    int32_t ret = _decoder.Decode(frame.EncodedImage(),
+                                  frame.MissingFrame(),
+                                  frame.FragmentationHeader(),
+                                  frame.CodecSpecific(),
+                                  frame.RenderTimeMs());
 
     if (ret < WEBRTC_VIDEO_CODEC_OK)
     {
