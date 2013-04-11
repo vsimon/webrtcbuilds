@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
+#include "webrtc/system_wrappers/interface/sleep.h"
 #include "webrtc/system_wrappers/interface/trace.h"
 #include "webrtc/test/channel_transport/udp_socket_posix.h"
 
@@ -34,8 +35,7 @@ UdpSocketManagerPosix::UdpSocketManagerPosix()
 {
 }
 
-bool UdpSocketManagerPosix::Init(WebRtc_Word32 id,
-                                 WebRtc_UWord8& numOfWorkThreads) {
+bool UdpSocketManagerPosix::Init(int32_t id, uint8_t& numOfWorkThreads) {
     CriticalSectionScoped cs(_critSect);
     if ((_id != -1) || (_numOfWorkThreads != 0)) {
         assert(_id != -1);
@@ -73,7 +73,7 @@ UdpSocketManagerPosix::~UdpSocketManagerPosix()
     delete _critSect;
 }
 
-WebRtc_Word32 UdpSocketManagerPosix::ChangeUniqueId(const WebRtc_Word32 id)
+int32_t UdpSocketManagerPosix::ChangeUniqueId(const int32_t id)
 {
     _id = id;
     return 0;
@@ -286,19 +286,13 @@ bool UdpSocketManagerPosixImpl::Process()
         if (num == SOCKET_ERROR)
         {
             // Timeout = 10 ms.
-            timespec t;
-            t.tv_sec = 0;
-            t.tv_nsec = 10000*1000;
-            nanosleep(&t, NULL);
+            SleepMs(10);
             return true;
         }
     }else
     {
         // Timeout = 10 ms.
-        timespec t;
-        t.tv_sec = 0;
-        t.tv_nsec = 10000*1000;
-        nanosleep(&t, NULL);
+        SleepMs(10);
         return true;
     }
 

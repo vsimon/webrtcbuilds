@@ -29,9 +29,6 @@ namespace webrtc {
 
 enum VCMNackMode {
   kNack,
-  // TODO(holmer): There is no longer a hybrid NACK mode. We should remove this
-  // and replace it with a jitter buffer API for setting allowing decode errors.
-  kNackHybrid,
   kNoNack
 };
 
@@ -161,6 +158,8 @@ class VCMJitterBuffer {
   // Returns a list of the sequence numbers currently missing.
   uint16_t* GetNackList(uint16_t* nack_list_size, bool* request_key_frame);
 
+  // Enable/disable decoding with errors.
+  void DecodeWithErrors(bool enable) {decode_with_errors_ = enable;}
   int64_t LastDecodedTimestamp() const;
 
  private:
@@ -168,10 +167,7 @@ class VCMJitterBuffer {
    public:
     bool operator() (const uint16_t& sequence_number1,
                      const uint16_t& sequence_number2) const {
-      if (sequence_number1 == sequence_number2)
-        return false;
-      return LatestSequenceNumber(sequence_number1, sequence_number2, NULL) ==
-          sequence_number2;
+      return IsNewerSequenceNumber(sequence_number2, sequence_number1);
     }
   };
   typedef std::set<uint16_t, SequenceNumberLessThan> SequenceNumberSet;
@@ -213,8 +209,8 @@ class VCMJitterBuffer {
   VCMFrameBufferEnum UpdateFrameState(VCMFrameBuffer* frame);
 
   // Finds the oldest complete frame, used for getting next frame to decode.
-  // Can return a decodable, incomplete frame if |enable_decodable| is true.
-  FrameList::iterator FindOldestCompleteContinuousFrame(bool enable_decodable);
+  // Can return a decodable, incomplete frame when enabled.
+  FrameList::iterator FindOldestCompleteContinuousFrame();
 
   void CleanUpOldOrEmptyFrames();
 
@@ -285,7 +281,7 @@ class VCMJitterBuffer {
   // Calculates network delays used for jitter calculations.
   VCMInterFrameDelay inter_frame_delay_;
   VCMJitterSample waiting_for_completion_;
-  WebRtc_UWord32 rtt_ms_;
+  uint32_t rtt_ms_;
 
   // NACK and retransmissions.
   VCMNackMode nack_mode_;
@@ -299,6 +295,7 @@ class VCMJitterBuffer {
   int max_packet_age_to_nack_;  // Measured in sequence numbers.
   bool waiting_for_key_frame_;
 
+  bool decode_with_errors_;
   DISALLOW_COPY_AND_ASSIGN(VCMJitterBuffer);
 };
 }  // namespace webrtc

@@ -209,6 +209,7 @@ int AudioProcessingImpl::set_sample_rate_hz(int rate) {
 }
 
 int AudioProcessingImpl::sample_rate_hz() const {
+  CriticalSectionScoped crit_scoped(crit_);
   return sample_rate_hz_;
 }
 
@@ -574,7 +575,7 @@ VoiceDetection* AudioProcessingImpl::voice_detection() const {
   return voice_detection_;
 }
 
-WebRtc_Word32 AudioProcessingImpl::ChangeUniqueId(const WebRtc_Word32 id) {
+int32_t AudioProcessingImpl::ChangeUniqueId(const int32_t id) {
   CriticalSectionScoped crit_scoped(crit_);
   id_ = id;
 

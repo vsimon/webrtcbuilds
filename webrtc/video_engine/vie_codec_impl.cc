@@ -49,7 +49,7 @@ int ViECodecImpl::Release() {
   // Decrease ref count.
   (*this)--;
 
-  WebRtc_Word32 ref_count = GetCount();
+  int32_t ref_count = GetCount();
   if (ref_count < 0) {
     WEBRTC_TRACE(kTraceWarning, kTraceVideo, shared_data_->instance_id(),
                  "ViECodec released too many times");
@@ -511,7 +511,7 @@ int ViECodecImpl::GetCodecTargetBitrate(const int video_channel,
     shared_data_->SetLastError(kViECodecInvalidChannelId);
     return -1;
   }
-  return vie_encoder->CodecTargetBitrate(static_cast<WebRtc_UWord32*>(bitrate));
+  return vie_encoder->CodecTargetBitrate(static_cast<uint32_t*>(bitrate));
 }
 
 unsigned int ViECodecImpl::GetDiscardedPackets(const int video_channel) const {
@@ -741,11 +741,9 @@ bool ViECodecImpl::CodecValid(const VideoCodec& video_codec) {
   } else if ((video_codec.codecType == kVideoCodecVP8 &&
               strncmp(video_codec.plName, "VP8", 4) == 0) ||
              (video_codec.codecType == kVideoCodecI420 &&
-              strncmp(video_codec.plName, "I420", 4) == 0) ||
-             (video_codec.codecType == kVideoCodecGeneric &&
-              strncmp(video_codec.plName, "GENERIC", 7) == 0)) {
+              strncmp(video_codec.plName, "I420", 4) == 0)) {
     // OK.
-  } else {
+  } else if (video_codec.codecType != kVideoCodecGeneric) {
     WEBRTC_TRACE(kTraceError, kTraceVideo, -1,
                  "Codec type doesn't match pl_name", video_codec.plType);
     return false;

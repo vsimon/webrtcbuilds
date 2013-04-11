@@ -225,12 +225,12 @@ int VP8EncoderImpl::InitEncode(const VideoCodec* inst,
   }
   config_->g_lag_in_frames = 0;  // 0- no frame lagging
 
-  // Determining number of threads based on the image size
-  if (codec_.width * codec_.height > 704 * 576 && number_of_cores > 1) {
-    // 2 threads when larger than 4CIF
-    config_->g_threads = 2;
+  if (codec_.width * codec_.height > 640 * 480 && number_of_cores >= 4) {
+    config_->g_threads = 4;  // 4 threads for qHD/HD.
+  } else if (codec_.width * codec_.height > 320 * 240 && number_of_cores >= 2) {
+    config_->g_threads = 2;  // 2 threads for HVGA/VGA.
   } else {
-    config_->g_threads = 1;
+    config_->g_threads = 1;  // 1 thread for QVGA.
   }
 
   // rate control settings
@@ -331,6 +331,8 @@ uint32_t VP8EncoderImpl::MaxIntraTarget(uint32_t optimalBuffersize) {
 int VP8EncoderImpl::Encode(const I420VideoFrame& input_image,
                            const CodecSpecificInfo* codec_specific_info,
                            const std::vector<VideoFrameType>* frame_types) {
+  TRACE_EVENT1("webrtc", "VP8::Encode", "timestamp", input_image.timestamp());
+
   if (!inited_) {
     return WEBRTC_VIDEO_CODEC_UNINITIALIZED;
   }
@@ -389,9 +391,6 @@ int VP8EncoderImpl::Encode(const I420VideoFrame& input_image,
     flags = rps_->EncodeFlags(picture_id_, sendRefresh,
                               input_image.timestamp());
   }
-
-  TRACE_EVENT1("video_coding", "VP8EncoderImpl::Encode",
-               "input_image_timestamp", input_image.timestamp());
 
   // TODO(holmer): Ideally the duration should be the timestamp diff of this
   // frame and the next frame to be encoded, which we don't have. Instead we

@@ -44,8 +44,9 @@ int VCMSessionInfo::LowSequenceNumber() const {
 int VCMSessionInfo::HighSequenceNumber() const {
   if (packets_.empty())
     return empty_seq_num_high_;
-  return LatestSequenceNumber(packets_.back().seqNum, empty_seq_num_high_,
-                              NULL);
+  if (empty_seq_num_high_ == -1)
+    return packets_.back().seqNum;
+  return LatestSequenceNumber(packets_.back().seqNum, empty_seq_num_high_);
 }
 
 int VCMSessionInfo::PictureId() const {
@@ -141,7 +142,7 @@ void VCMSessionInfo::ShiftSubsequentPackets(PacketIterator it,
   ++it;
   if (it == packets_.end())
     return;
-  uint8_t* first_packet_ptr = const_cast<WebRtc_UWord8*>((*it).dataPtr);
+  uint8_t* first_packet_ptr = const_cast<uint8_t*>((*it).dataPtr);
   int shift_length = 0;
   // Calculate the total move length and move the data pointers in advance.
   for (; it != packets_.end(); ++it) {
@@ -236,7 +237,7 @@ int VCMSessionInfo::BuildVP8FragmentationHeader(
   fragmentation->VerifyAndAllocateFragmentationHeader(kMaxVP8Partitions);
   fragmentation->fragmentationVectorSize = 0;
   memset(fragmentation->fragmentationLength, 0,
-         kMaxVP8Partitions * sizeof(WebRtc_UWord32));
+         kMaxVP8Partitions * sizeof(uint32_t));
   if (packets_.empty())
       return new_length;
   PacketIterator it = FindNextPartitionBeginning(packets_.begin(),
@@ -248,11 +249,11 @@ int VCMSessionInfo::BuildVP8FragmentationHeader(
     fragmentation->fragmentationOffset[partition_id] =
         (*it).dataPtr - frame_buffer;
     assert(fragmentation->fragmentationOffset[partition_id] <
-           static_cast<WebRtc_UWord32>(frame_buffer_length));
+           static_cast<uint32_t>(frame_buffer_length));
     fragmentation->fragmentationLength[partition_id] =
         (*partition_end).dataPtr + (*partition_end).sizeBytes - (*it).dataPtr;
     assert(fragmentation->fragmentationLength[partition_id] <=
-           static_cast<WebRtc_UWord32>(frame_buffer_length));
+           static_cast<uint32_t>(frame_buffer_length));
     new_length += fragmentation->fragmentationLength[partition_id];
     ++partition_end;
     it = FindNextPartitionBeginning(partition_end, &packets_not_decodable_);
@@ -319,7 +320,7 @@ bool VCMSessionInfo::InSequence(const PacketIterator& packet_it,
   // If the two iterators are pointing to the same packet they are considered
   // to be in sequence.
   return (packet_it == prev_packet_it ||
-      (static_cast<WebRtc_UWord16>((*prev_packet_it).seqNum + 1) ==
+      (static_cast<uint16_t>((*prev_packet_it).seqNum + 1) ==
           (*packet_it).seqNum));
 }
 
@@ -388,8 +389,7 @@ int VCMSessionInfo::InsertPacket(const VCMPacket& packet,
   // order and insert it. Loop over the list in reverse order.
   ReversePacketIterator rit = packets_.rbegin();
   for (; rit != packets_.rend(); ++rit)
-    if (LatestSequenceNumber((*rit).seqNum, packet.seqNum, NULL) ==
-        packet.seqNum)
+    if (LatestSequenceNumber(packet.seqNum, (*rit).seqNum) == packet.seqNum)
       break;
 
   // Check for duplicate packets.
@@ -412,11 +412,12 @@ void VCMSessionInfo::InformOfEmptyPacket(uint16_t seq_num) {
   // follow the data packets, therefore, we should only keep track of the high
   // and low sequence numbers and may assume that the packets in between are
   // empty packets belonging to the same frame (timestamp).
-  empty_seq_num_high_ = LatestSequenceNumber(seq_num, empty_seq_num_high_,
-                                             NULL);
-  if (empty_seq_num_low_ == -1 ||
-      LatestSequenceNumber(seq_num, empty_seq_num_low_, NULL) ==
-          empty_seq_num_low_)
+  if (empty_seq_num_high_ == -1)
+    empty_seq_num_high_ = seq_num;
+  else
+    empty_seq_num_high_ = LatestSequenceNumber(seq_num, empty_seq_num_high_);
+  if (empty_seq_num_low_ == -1 || IsNewerSequenceNumber(empty_seq_num_low_,
+                                                        seq_num))
     empty_seq_num_low_ = seq_num;
 }
 
