@@ -47,25 +47,24 @@ VideoCodingModuleImpl::VideoCodingModuleImpl(const WebRtc_Word32 id,
                                              Clock* clock,
                                              EventFactory* event_factory,
                                              bool owns_event_factory)
-:
-_id(id),
-clock_(clock),
-_receiveCritSect(CriticalSectionWrapper::CreateCriticalSection()),
-_receiverInited(false),
-_timing(clock_, id, 1),
-_dualTiming(clock_, id, 2, &_timing),
-_receiver(&_timing, clock_, event_factory, id, 1, true),
-_dualReceiver(&_dualTiming, clock_, event_factory, id, 2, false),
-_decodedFrameCallback(_timing, clock_),
-_dualDecodedFrameCallback(_dualTiming, clock_),
-_frameTypeCallback(NULL),
-_frameStorageCallback(NULL),
-_receiveStatsCallback(NULL),
-_packetRequestCallback(NULL),
-_decoder(NULL),
-_dualDecoder(NULL),
+    : _id(id),
+      clock_(clock),
+      _receiveCritSect(CriticalSectionWrapper::CreateCriticalSection()),
+      _receiverInited(false),
+      _timing(clock_, id, 1),
+      _dualTiming(clock_, id, 2, &_timing),
+      _receiver(&_timing, clock_, event_factory, id, 1, true),
+      _dualReceiver(&_dualTiming, clock_, event_factory, id, 2, false),
+      _decodedFrameCallback(_timing, clock_),
+      _dualDecodedFrameCallback(_dualTiming, clock_),
+      _frameTypeCallback(NULL),
+      _frameStorageCallback(NULL),
+      _receiveStatsCallback(NULL),
+      _packetRequestCallback(NULL),
+      _decoder(NULL),
+      _dualDecoder(NULL),
 #ifdef DEBUG_DECODER_BIT_STREAM
-_bitStreamBeforeDecoder(NULL),
+      _bitStreamBeforeDecoder(NULL),
 #endif
       _frameFromFile(),
       _keyRequestMode(kKeyOnError),
@@ -89,7 +88,7 @@ _bitStreamBeforeDecoder(NULL),
       frame_dropper_enabled_(true) {
   assert(clock_);
 #ifdef DEBUG_DECODER_BIT_STREAM
-    _bitStreamBeforeDecoder = fopen("decoderBitStream.bit", "wb");
+  _bitStreamBeforeDecoder = fopen("decoderBitStream.bit", "wb");
 #endif
 }
 

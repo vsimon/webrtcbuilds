@@ -122,7 +122,6 @@ typedef struct
   ViECapture* capture;
   ViEExternalCodec* externalCodec;
   VideoCallbackAndroid* callback;
-
 } VideoEngineData;
 
 // Global variables
@@ -589,7 +588,6 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_CreateCh
     if (voiceChannel >= 0) {
       vieData.base->ConnectAudioChannel(channel, voiceChannel);
     }
-
     return channel;
   }
   else {
@@ -617,6 +615,8 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_SetLocal
   else {
     return -1;
   }
+
+  return -1;
 }
 
 /*
@@ -1264,7 +1264,6 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1Cre
   }
 
   jint channel = voeData.base->CreateChannel();
-
   return channel;
 }
 
@@ -1319,8 +1318,8 @@ JNIEXPORT jint JNICALL Java_org_webrtc_videoengineapp_ViEAndroidJavaAPI_VoE_1Set
                         "Could not get UTF string");
     return -1;
   }
+
   jint retVal = voeData.base->SetSendDestination(channel, port, ipaddrNative);
-  env->ReleaseStringUTFChars(ipaddr, ipaddrNative);
   return retVal;
 }
 
