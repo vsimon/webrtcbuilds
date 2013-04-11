@@ -47,7 +47,7 @@ int ViEBaseImpl::Release() {
                "ViEBase::Release()");
   (*this)--;  // Decrease ref count.
 
-  WebRtc_Word32 ref_count = GetCount();
+  int32_t ref_count = GetCount();
   if (ref_count < 0) {
     WEBRTC_TRACE(kTraceWarning, kTraceVideo, shared_data_.instance_id(),
                  "ViEBase release too many times");
@@ -262,7 +262,7 @@ int ViEBaseImpl::StartSend(const int video_channel) {
 
   // Pause and trigger a key frame.
   vie_encoder->Pause();
-  WebRtc_Word32 error = vie_channel->StartSend();
+  int32_t error = vie_channel->StartSend();
   if (error != 0) {
     vie_encoder->Restart();
     WEBRTC_TRACE(kTraceError, kTraceVideo,
@@ -295,7 +295,7 @@ int ViEBaseImpl::StopSend(const int video_channel) {
     return -1;
   }
 
-  WebRtc_Word32 error = vie_channel->StopSend();
+  int32_t error = vie_channel->StopSend();
   if (error != 0) {
     WEBRTC_TRACE(kTraceError, kTraceVideo,
                  ViEId(shared_data_.instance_id(), video_channel),
@@ -364,7 +364,7 @@ int ViEBaseImpl::GetVersion(char version[1024]) {
 
   // Add WebRTC Version.
   std::stringstream version_stream;
-  version_stream << "VideoEngine 3.28.0" << std::endl;
+  version_stream << "VideoEngine 3.29.0" << std::endl;
 
   // Add build info.
   version_stream << "Build: svn:" << WEBRTC_SVNREVISION << " " << BUILDINFO

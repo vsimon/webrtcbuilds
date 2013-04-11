@@ -12,6 +12,7 @@
 #include "generic_encoder.h"
 #include "media_optimization.h"
 #include "../../../../engine_configurations.h"
+#include "trace_event.h"
 
 namespace webrtc {
 
@@ -46,7 +47,7 @@ VCMGenericEncoder::InitEncode(const VideoCodec* settings,
                               int32_t numberOfCores,
                               uint32_t maxPayloadSize)
 {
-    _bitRate = settings->startBitrate;
+    _bitRate = settings->startBitrate * 1000;
     _frameRate = settings->maxFramerate;
     _codecType = settings->codecType;
     if (_VCMencodedFrameCallback != NULL)
@@ -177,6 +178,8 @@ VCMEncodedFrameCallback::Encoded(
     const CodecSpecificInfo* codecSpecificInfo,
     const RTPFragmentationHeader* fragmentationHeader)
 {
+    TRACE_EVENT2("webrtc", "VCM::Encoded", "timestamp", encodedImage._timeStamp,
+                 "length", encodedImage._length);
     FrameType frameType = VCMEncodedFrame::ConvertFrameType(encodedImage._frameType);
 
     uint32_t encodedBytes = 0;
