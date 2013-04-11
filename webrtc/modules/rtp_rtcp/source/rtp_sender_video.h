@@ -92,6 +92,7 @@ protected:
     virtual WebRtc_Word32 SendVideoPacket(WebRtc_UWord8* dataBuffer,
                                           const WebRtc_UWord16 payloadLength,
                                           const WebRtc_UWord16 rtpHeaderLength,
+                                          const uint32_t capture_timestamp,
                                           int64_t capture_time_ms,
                                           StorageType storage,
                                           bool protect);

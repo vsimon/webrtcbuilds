@@ -23,6 +23,7 @@
 #include "system_wrappers/interface/logging.h"
 #include "system_wrappers/interface/tick_util.h"
 #include "system_wrappers/interface/trace.h"
+#include "system_wrappers/interface/trace_event.h"
 #include "video_engine/include/vie_codec.h"
 #include "video_engine/include/vie_image_process.h"
 #include "video_engine/vie_defines.h"
@@ -475,6 +476,9 @@ void ViEEncoder::DeliverFrame(int id,
                    ViEId(engine_id_, channel_id_),
                    "%s: Dropping frame %llu after a key fame", __FUNCTION__,
                    video_frame->timestamp());
+      TRACE_EVENT_INSTANT1("webrtc", "VE::EncoderDropFrame",
+                           "timestamp", video_frame->timestamp());
+
       drop_next_frame_ = false;
       return;
     }
@@ -485,6 +489,11 @@ void ViEEncoder::DeliverFrame(int id,
   const WebRtc_UWord32 time_stamp =
       kMsToRtpTimestamp *
       static_cast<WebRtc_UWord32>(video_frame->render_time_ms());
+
+  TRACE_EVENT2("webrtc", "VE::DeliverFrame",
+               "timestamp", time_stamp,
+               "render_time", video_frame->render_time_ms());
+
   video_frame->set_timestamp(time_stamp);
   {
     CriticalSectionScoped cs(callback_cs_.get());
@@ -734,6 +743,9 @@ WebRtc_Word32 ViEEncoder::SendData(
       // Paused, don't send this packet.
       return 0;
     }
+    TRACE_EVENT2("webrtc", "VE::SendData",
+                 "timestamp", time_stamp,
+                 "capture_time_ms", capture_time_ms);
     if (channels_dropping_delta_frames_ &&
         frame_type == webrtc::kVideoFrameKey) {
       WEBRTC_TRACE(webrtc::kTraceStream, webrtc::kTraceVideo,

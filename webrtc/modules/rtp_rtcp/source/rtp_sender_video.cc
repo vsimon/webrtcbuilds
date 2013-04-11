@@ -12,6 +12,7 @@
 
 #include "critical_section_wrapper.h"
 #include "trace.h"
+#include "trace_event.h"
 
 #include "rtp_utility.h"
 
@@ -113,6 +114,7 @@ WebRtc_Word32
 RTPSenderVideo::SendVideoPacket(WebRtc_UWord8* data_buffer,
                                 const WebRtc_UWord16 payload_length,
                                 const WebRtc_UWord16 rtp_header_length,
+                                const uint32_t capture_timestamp,
                                 int64_t capture_time_ms,
                                 StorageType storage,
                                 bool protect) {
@@ -125,6 +127,9 @@ RTPSenderVideo::SendVideoPacket(WebRtc_UWord8* data_buffer,
                                                          payload_length,
                                                          rtp_header_length,
                                                          _payloadTypeRED);
+    TRACE_EVENT_INSTANT2("webrtc_rtp", "Video::PacketRed",
+                         "timestamp", capture_timestamp,
+                         "seqnum", _rtpSender.SequenceNumber());
     // Sending the media packet with RED header.
     int packet_success = _rtpSender.SendToNetwork(
         red_packet->data(),
@@ -159,6 +164,9 @@ RTPSenderVideo::SendVideoPacket(WebRtc_UWord8* data_buffer,
       if (_retransmissionSettings & kRetransmitFECPackets) {
         storage = kAllowRetransmission;
       }
+      TRACE_EVENT_INSTANT2("webrtc_rtp", "Video::PacketFec",
+                           "timestamp", capture_timestamp,
+                           "seqnum", _rtpSender.SequenceNumber());
       // Sending FEC packet with RED header.
       int packet_success = _rtpSender.SendToNetwork(
           red_packet->data(),
@@ -179,6 +187,9 @@ RTPSenderVideo::SendVideoPacket(WebRtc_UWord8* data_buffer,
     _fecOverheadRate.Update(fec_overhead_sent);
     return ret;
   }
+  TRACE_EVENT_INSTANT2("webrtc_rtp", "Video::PacketNormal",
+                       "timestamp", capture_timestamp,
+                       "seqnum", _rtpSender.SequenceNumber());
   int ret = _rtpSender.SendToNetwork(data_buffer,
                                      payload_length,
                                      rtp_header_length,
@@ -205,6 +216,9 @@ RTPSenderVideo::SendRTPIntraRequest()
 
     ModuleRTPUtility::AssignUWord32ToBuffer(data+4, _rtpSender.SSRC());
 
+    TRACE_EVENT_INSTANT1("webrtc_rtp",
+                         "Video::IntraRequest",
+                         "seqnum", _rtpSender.SequenceNumber());
     return _rtpSender.SendToNetwork(data, 0, length, -1, kAllowRetransmission);
 }
 
@@ -363,7 +377,8 @@ int32_t RTPSenderVideo::SendGeneric(const FrameType frame_type,
     payload += payload_length;
 
     if (SendVideoPacket(buffer, payload_length + 1, rtp_header_length,
-                        capture_time_ms, kAllowRetransmission, true)) {
+                        capture_timestamp, capture_time_ms,
+                        kAllowRetransmission, true)) {
       return -1;
     }
   }
@@ -452,7 +467,8 @@ RTPSenderVideo::SendVP8(const FrameType frameType,
         _rtpSender.BuildRTPheader(dataBuffer, payloadType, last,
             captureTimeStamp);
         if (-1 == SendVideoPacket(dataBuffer, payloadBytesInPacket,
-            rtpHeaderLength, capture_time_ms, storage, protect))
+                                  rtpHeaderLength, captureTimeStamp,
+                                  capture_time_ms, storage, protect))
         {
           WEBRTC_TRACE(kTraceError, kTraceRtpRtcp, _id,
                        "RTPSenderVideo::SendVP8 failed to send packet number"
@@ -465,6 +481,12 @@ RTPSenderVideo::SendVP8(const FrameType frameType,
 void RTPSenderVideo::ProcessBitrate() {
   _videoBitrate.Process();
   _fecOverheadRate.Process();
+  TRACE_COUNTER_ID1("webrtc_rtp", "VideoSendBitrate",
+                    _rtpSender.SSRC(),
+                    _videoBitrate.BitrateLast());
+  TRACE_COUNTER_ID1("webrtc_rtp", "VideoFecOverheadRate",
+                    _rtpSender.SSRC(),
+                    _fecOverheadRate.BitrateLast());
 }
 
 WebRtc_UWord32 RTPSenderVideo::VideoBitrateSent() const {

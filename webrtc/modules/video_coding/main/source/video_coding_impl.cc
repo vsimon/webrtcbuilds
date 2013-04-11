@@ -17,6 +17,7 @@
 #include "trace.h"
 #include "video_codec_interface.h"
 #include "webrtc/system_wrappers/interface/clock.h"
+#include "webrtc/system_wrappers/interface/trace_event.h"
 
 namespace webrtc
 {
@@ -863,7 +864,8 @@ VideoCodingModuleImpl::RegisterPacketRequestCallback(
 WebRtc_Word32
 VideoCodingModuleImpl::Decode(WebRtc_UWord16 maxWaitTimeMs)
 {
-    WebRtc_Word64 nextRenderTimeMs;
+    TRACE_EVENT1("webrtc", "VCM::Decode", "max_wait", maxWaitTimeMs);
+    int64_t nextRenderTimeMs;
     {
         CriticalSectionScoped cs(_receiveCritSect);
         if (!_receiverInited)
@@ -954,6 +956,7 @@ WebRtc_Word32
 VideoCodingModuleImpl::RequestSliceLossIndication(
     const WebRtc_UWord64 pictureID) const
 {
+    TRACE_EVENT1("webrtc", "RequestSLI", "picture_id", pictureID);
     if (_frameTypeCallback != NULL)
     {
         const WebRtc_Word32 ret =
@@ -980,6 +983,7 @@ VideoCodingModuleImpl::RequestSliceLossIndication(
 WebRtc_Word32
 VideoCodingModuleImpl::RequestKeyFrame()
 {
+    TRACE_EVENT0("webrtc", "RequestKeyFrame");
     if (_frameTypeCallback != NULL)
     {
         const WebRtc_Word32 ret = _frameTypeCallback->RequestKeyFrame();
@@ -1062,6 +1066,9 @@ VideoCodingModuleImpl::DecodeDualFrame(WebRtc_UWord16 maxWaitTimeMs)
 WebRtc_Word32
 VideoCodingModuleImpl::Decode(const VCMEncodedFrame& frame)
 {
+    TRACE_EVENT2("webrtc", "Decode",
+                 "timestamp", frame.TimeStamp(),
+                 "type", frame.FrameType());
     // Change decoder if payload type has changed
     const bool renderTimingBefore = _codecDataBase.SupportsRenderScheduling();
     _decoder = _codecDataBase.GetDecoder(frame.PayloadType(),
@@ -1208,6 +1215,9 @@ VideoCodingModuleImpl::IncomingPacket(const WebRtc_UWord8* incomingPayload,
                                     WebRtc_UWord32 payloadLength,
                                     const WebRtcRTPHeader& rtpInfo)
 {
+    TRACE_EVENT2("webrtc", "VCM::Packet",
+                 "seqnum", rtpInfo.header.sequenceNumber,
+                 "type", rtpInfo.frameType);
     if (incomingPayload == NULL) {
       // The jitter buffer doesn't handle non-zero payload lengths for packets
       // without payload.
