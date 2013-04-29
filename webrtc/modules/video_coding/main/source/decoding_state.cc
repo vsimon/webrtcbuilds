@@ -72,6 +72,16 @@ void VCMDecodingState::SetState(const VCMFrameBuffer* frame) {
   in_initial_state_ = false;
 }
 
+void VCMDecodingState::CopyFrom(const VCMDecodingState& state) {
+  sequence_num_ = state.sequence_num_;
+  time_stamp_ = state.time_stamp_;
+  picture_id_ = state.picture_id_;
+  temporal_id_ = state.temporal_id_;
+  tl0_pic_id_ = state.tl0_pic_id_;
+  full_sync_ = state.full_sync_;
+  in_initial_state_ = state.in_initial_state_;
+}
+
 void VCMDecodingState::SetStateOneBack(const VCMFrameBuffer* frame) {
   assert(frame != NULL && frame->GetHighSeqNum() >= 0);
   sequence_num_ = static_cast<uint16_t>(frame->GetHighSeqNum()) - 1u;
@@ -149,8 +159,11 @@ bool VCMDecodingState::ContinuousFrame(const VCMFrameBuffer* frame) const {
   // Return true when in initial state.
   // Note that when a method is not applicable it will return false.
   assert(frame != NULL);
-  if (in_initial_state_)
-    return true;
+  if (in_initial_state_) {
+    // Always start with a key frame.
+    if (frame->FrameType() == kVideoFrameKey) return true;
+    return false;
+  }
 
   if (!ContinuousLayer(frame->TemporalId(), frame->Tl0PicId())) {
     // Base layers are not continuous or temporal layers are inactive.

@@ -14,7 +14,7 @@ vars = {
 
   # External resources like video and audio files used for testing purposes.
   # Downloaded on demand when needed.
-  "webrtc_resources_revision": "15",
+  "webrtc_resources_revision": "16",
 }
 
 # NOTE: Prefer revision numbers to tags for svn deps. Use http rather than
@@ -55,7 +55,7 @@ deps = {
     Var("chromium_trunk") + "/deps/third_party/libvpx@192165",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@618",
+    (Var("googlecode_url") % "libyuv") + "/trunk@680",
 
   "third_party/opus":
     Var("chromium_trunk") + "/src/third_party/opus@185405",

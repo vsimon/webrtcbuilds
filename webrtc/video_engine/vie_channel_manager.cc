@@ -241,8 +241,7 @@ int ViEChannelManager::DeleteChannel(int channel_id) {
     group = FindGroup(channel_id);
     group->GetCallStats()->DeregisterStatsObserver(
         vie_channel->GetStatsObserver());
-    group->SetChannelRembStatus(channel_id, false, false, vie_channel,
-                                vie_encoder);
+    group->SetChannelRembStatus(channel_id, false, false, vie_channel);
 
     // Remove the feedback if we're owning the encoder.
     if (vie_encoder->channel_id() == channel_id) {
@@ -364,11 +363,8 @@ bool ViEChannelManager::SetRembStatus(int channel_id, bool sender,
   }
   ViEChannel* channel = ViEChannelPtr(channel_id);
   assert(channel);
-  ViEEncoder* encoder = ViEEncoderPtr(channel_id);
-  assert(encoder);
 
-  return group->SetChannelRembStatus(channel_id, sender, receiver, channel,
-                                     encoder);
+  return group->SetChannelRembStatus(channel_id, sender, receiver, channel);
 }
 
 bool ViEChannelManager::SetBandwidthEstimationMode(

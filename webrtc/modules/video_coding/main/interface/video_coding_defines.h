@@ -38,7 +38,7 @@ namespace webrtc {
 
 #define VCM_RED_PAYLOAD_TYPE        96
 #define VCM_ULPFEC_PAYLOAD_TYPE     97
-#define VCM_VP8_PAYLOAD_TYPE       120
+#define VCM_VP8_PAYLOAD_TYPE       100
 #define VCM_I420_PAYLOAD_TYPE      124
 
 enum VCMVideoProtection {
@@ -179,6 +179,17 @@ class VCMQMSettingsCallback {
 
  protected:
   virtual ~VCMQMSettingsCallback() {
+  }
+};
+
+// Callback class used for telling the user about the size (in time) of the
+// render buffer, that is the size in time of the complete continuous frames.
+class VCMRenderBufferSizeCallback {
+ public:
+  virtual void RenderBufferSizeMs(int buffer_size_ms) = 0;
+
+ protected:
+  virtual ~VCMRenderBufferSizeCallback() {
   }
 };
 
