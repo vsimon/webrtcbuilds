@@ -63,6 +63,9 @@
     # which can be easily parsed for offline processing.
     'enable_data_logging%': 0,
 
+    # Enables the use of protocol buffers for debug recordings.
+    'enable_protobuf%': 1,
+
     # Disable these to not build components which can be externally provided.
     'build_libjpeg%': 1,
     'build_libyuv%': 1,
@@ -96,9 +99,6 @@
 
         'include_tests%': 0,
 
-        # Disable the use of protocol buffers in production code.
-        'enable_protobuf%': 0,
-
         'enable_tracing%': 0,
 
         'enable_android_opensl%': 0,
@@ -107,7 +107,6 @@
         'include_internal_audio_device%': 1,
         'include_internal_video_capture%': 1,
         'include_internal_video_render%': 1,
-        'enable_protobuf%': 1,
         'enable_tracing%': 1,
         'include_tests%': 1,
 
@@ -259,24 +258,16 @@
         'defines': [
           'WEBRTC_MAC',
           'WEBRTC_IOS',
-          'WEBRTC_THREAD_RR',
-          'WEBRTC_CLOCK_TYPE_REALTIME',
         ],
       }],
       ['OS=="linux"', {
         'defines': [
           'WEBRTC_LINUX',
-          'WEBRTC_THREAD_RR',
-          # TODO(andrew): can we select this automatically?
-          # Define this if the Linux system does not support CLOCK_MONOTONIC.
-          #'WEBRTC_CLOCK_TYPE_REALTIME',
         ],
       }],
       ['OS=="mac"', {
         'defines': [
           'WEBRTC_MAC',
-          'WEBRTC_THREAD_RR',
-          'WEBRTC_CLOCK_TYPE_REALTIME',
         ],
       }],
       ['OS=="win"', {
@@ -297,12 +288,6 @@
         'defines': [
           'WEBRTC_LINUX',
           'WEBRTC_ANDROID',
-          # TODO(leozwang): Investigate CLOCK_REALTIME and CLOCK_MONOTONIC
-          # support on Android. Keep WEBRTC_CLOCK_TYPE_REALTIME for now,
-          # remove it after I verify that CLOCK_MONOTONIC is fully functional
-          # with condition and event functions in system_wrappers.
-          'WEBRTC_CLOCK_TYPE_REALTIME',
-          'WEBRTC_THREAD_RR',
          ],
          'conditions': [
            ['enable_android_opensl==1', {

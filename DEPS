@@ -55,7 +55,7 @@ deps = {
     Var("chromium_trunk") + "/deps/third_party/libvpx@192165",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@680",
+    (Var("googlecode_url") % "libyuv") + "/trunk@682",
 
   "third_party/opus":
     Var("chromium_trunk") + "/src/third_party/opus@185405",
@@ -77,6 +77,9 @@ deps = {
 
   "tools/gyp":
     From("chromium_deps", "src/tools/gyp"),
+
+  "tools/protoc_wrapper":
+    Var("chromium_trunk") + "/src/tools/protoc_wrapper@" + Var("chromium_revision"),
 
   "tools/python":
     Var("chromium_trunk") + "/src/tools/python@" + Var("chromium_revision"),
