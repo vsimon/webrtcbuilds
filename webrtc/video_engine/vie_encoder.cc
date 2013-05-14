@@ -101,6 +101,7 @@ class ViEPacedSenderCallback : public PacedSender::Callback {
 ViEEncoder::ViEEncoder(int32_t engine_id,
                        int32_t channel_id,
                        uint32_t number_of_cores,
+                       const Config& config,
                        ProcessThread& module_process_thread,
                        BitrateController* bitrate_controller)
   : engine_id_(engine_id),
@@ -925,6 +926,7 @@ void ViEEncoder::OnReceivedIntraFrameRequest(uint32_t ssrc) {
   // Key frame request from remote side, signal to VCM.
   WEBRTC_TRACE(webrtc::kTraceStateInfo, webrtc::kTraceVideo,
                ViEId(engine_id_, channel_id_), "%s", __FUNCTION__);
+  TRACE_EVENT0("webrtc", "OnKeyFrameRequest");
 
   int idx = 0;
   {

@@ -59,7 +59,8 @@ int ViEBaseImpl::Release() {
   return ref_count;
 }
 
-ViEBaseImpl::ViEBaseImpl() {
+ViEBaseImpl::ViEBaseImpl(const Config& config)
+    : shared_data_(config) {
   WEBRTC_TRACE(kTraceMemory, kTraceVideo, shared_data_.instance_id(),
                "ViEBaseImpl::ViEBaseImpl() Ctor");
 }
@@ -364,7 +365,7 @@ int ViEBaseImpl::GetVersion(char version[1024]) {
 
   // Add WebRTC Version.
   std::stringstream version_stream;
-  version_stream << "VideoEngine 3.30.0" << std::endl;
+  version_stream << "VideoEngine 3.31.0" << std::endl;
 
   // Add build info.
   version_stream << "Build: svn:" << WEBRTC_SVNREVISION << " " << BUILDINFO

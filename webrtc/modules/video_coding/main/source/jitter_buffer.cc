@@ -981,6 +981,8 @@ bool VCMJitterBuffer::HandleTooOldPackets(uint16_t latest_sequence_number) {
 
 void VCMJitterBuffer::DropPacketsFromNackList(
     uint16_t last_decoded_sequence_number) {
+ TRACE_EVENT_INSTANT1("webrtc", "JB::DropPacketsFromNackList",
+                      "seqnum", last_decoded_sequence_number);
   // Erase all sequence numbers from the NACK list which we won't need any
   // longer.
   missing_sequence_numbers_.erase(missing_sequence_numbers_.begin(),
@@ -998,15 +1000,10 @@ FrameList::iterator VCMJitterBuffer::FindLastContinuousAndComplete(
   // Search for a complete and continuous sequence (starting from the last
   // decoded state or current frame if in initial state).
   VCMDecodingState previous_state;
-  if (last_decoded_state_.in_initial_state()) {
-    previous_state.SetState(*start_it);
-  } else {
-    previous_state.CopyFrom(last_decoded_state_);
-  }
-  bool continuous_complete = true;
+  previous_state.SetState(*start_it);
   FrameList::iterator previous_it = start_it;
   ++start_it;
-  while (start_it != frame_list_.end() && continuous_complete) {
+  while (start_it != frame_list_.end()) {
     start_it = FindOldestCompleteContinuousFrame(start_it, &previous_state);
     if (start_it == frame_list_.end())
       break;
