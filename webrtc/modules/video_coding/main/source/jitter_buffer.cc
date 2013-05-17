@@ -371,7 +371,7 @@ bool VCMJitterBuffer::CompleteSequenceWithNextFrame() {
     // Frame not ready to be decoded.
     return true;
   }
-  if (!oldest_frame->Complete()) {
+  if (oldest_frame->GetState() != kStateComplete) {
     return false;
   }
 
@@ -508,42 +508,41 @@ VCMEncodedFrame* VCMJitterBuffer::ExtractAndSetDecode(uint32_t timestamp) {
   }
   // We got the frame.
   VCMFrameBuffer* frame = *it;
-
-  // Frame pulled out from jitter buffer,
-  // update the jitter estimate with what we currently know.
+  frame_list_.erase(it);
+  if (frame_list_.empty()) {
+    TRACE_EVENT_INSTANT1("webrtc", "JB::FrameListEmptied",
+                         "type", "ExtractAndSetDecode");
+  }
+  // Frame pulled out from jitter buffer, update the jitter estimate.
   const bool retransmitted = (frame->GetNackCount() > 0);
   if (retransmitted) {
     jitter_estimate_.FrameNacked();
   } else if (frame->Length() > 0) {
     // Ignore retransmitted and empty frames.
-    // Update with the previous incomplete frame first
     if (waiting_for_completion_.latest_packet_time >= 0) {
       UpdateJitterEstimate(waiting_for_completion_, true);
     }
-    // Then wait for this one to get complete
-    waiting_for_completion_.frame_size = frame->Length();
-    waiting_for_completion_.latest_packet_time =
-        frame->LatestPacketTimeMs();
-    waiting_for_completion_.timestamp = frame->TimeStamp();
+    if (frame->GetState() == kStateComplete) {
+      UpdateJitterEstimate(*frame, false);
+    } else {
+      // Wait for this one to get complete.
+      waiting_for_completion_.frame_size = frame->Length();
+      waiting_for_completion_.latest_packet_time =
+          frame->LatestPacketTimeMs();
+      waiting_for_completion_.timestamp = frame->TimeStamp();
+    }
   }
-  frame_list_.erase(frame_list_.begin());
-  if (frame_list_.empty()) {
-    TRACE_EVENT_INSTANT1("webrtc", "JB::FrameListEmptied",
-                         "type", "MaybeGetIncompleteFrameForDecoding");
-  }
-
   // Look for previous frame loss.
   VerifyAndSetPreviousFrameLost(frame);
 
   // The state must be changed to decoding before cleaning up zero sized
   // frames to avoid empty frames being cleaned up and then given to the
-  // decoder.
-  // Set as decoding. Propagates the missing_frame bit.
+  // decoder. Propagates the missing_frame bit.
   frame->SetState(kStateDecoding);
 
   num_not_decodable_packets_ += frame->NotDecodablePackets();
 
-  // We have a frame - update decoded state with frame info.
+  // We have a frame - update the last decoded state and nack list.
   last_decoded_state_.SetState(frame);
   DropPacketsFromNackList(last_decoded_state_.sequence_num());
   return frame;
@@ -845,6 +844,9 @@ uint16_t VCMJitterBuffer::EstimatedLowSequenceNumber(
   assert(frame.GetLowSeqNum() >= 0);
   if (frame.HaveFirstPacket())
     return frame.GetLowSeqNum();
+
+  // This estimate is not accurate if more than one packet with lower sequence
+  // number is lost.
   return frame.GetLowSeqNum() - 1;
 }
 
@@ -882,6 +884,9 @@ uint16_t* VCMJitterBuffer::GetNackList(uint16_t* nack_list_size,
     if (non_continuous_incomplete_duration > 90 * max_incomplete_time_ms_) {
       TRACE_EVENT_INSTANT1("webrtc", "JB::NonContinuousOrIncompleteDuration",
                            "duration", non_continuous_incomplete_duration);
+      LOG_F(LS_INFO) << "Too long non-decodable duration: " <<
+          non_continuous_incomplete_duration << " > " <<
+          90 * max_incomplete_time_ms_;
       FrameList::reverse_iterator rit = find_if(frame_list_.rbegin(),
                                                 frame_list_.rend(),
                                                 KeyFrameCriteria());
@@ -893,6 +898,8 @@ uint16_t* VCMJitterBuffer::GetNackList(uint16_t* nack_list_size,
       } else {
         // Skip to the last key frame. If it's incomplete we will start
         // NACKing it.
+        // Note that the estimated low sequence number is correct for VP8
+        // streams because only the first packet of a key frame is marked.
         last_decoded_state_.Reset();
         DropPacketsFromNackList(EstimatedLowSequenceNumber(**rit));
       }
@@ -1127,6 +1134,8 @@ bool VCMJitterBuffer::RecycleFramesUntilKeyFrame() {
     if (it != frame_list_.end() && (*it)->FrameType() == kVideoFrameKey) {
       // Reset last decoded state to make sure the next frame decoded is a key
       // frame, and start NACKing from here.
+      // Note that the estimated low sequence number is correct for VP8
+      // streams because only the first packet of a key frame is marked.
       last_decoded_state_.Reset();
       DropPacketsFromNackList(EstimatedLowSequenceNumber(**it));
       return true;
