@@ -8,27 +8,27 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "video_engine/vie_channel.h"
+#include "webrtc/video_engine/vie_channel.h"
 
 #include <algorithm>
 #include <vector>
 
-#include "common_video/libyuv/include/webrtc_libyuv.h"
-#include "modules/pacing/include/paced_sender.h"
-#include "modules/rtp_rtcp/interface/rtp_rtcp.h"
-#include "modules/utility/interface/process_thread.h"
-#include "modules/video_coding/main/interface/video_coding.h"
-#include "modules/video_processing/main/interface/video_processing.h"
+#include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
+#include "webrtc/modules/pacing/include/paced_sender.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp.h"
+#include "webrtc/modules/utility/interface/process_thread.h"
+#include "webrtc/modules/video_coding/main/interface/video_coding.h"
+#include "webrtc/modules/video_processing/main/interface/video_processing.h"
 #include "webrtc/modules/video_render/include/video_render_defines.h"
-#include "system_wrappers/interface/critical_section_wrapper.h"
-#include "system_wrappers/interface/thread_wrapper.h"
-#include "system_wrappers/interface/trace.h"
-#include "video_engine/call_stats.h"
-#include "video_engine/include/vie_codec.h"
-#include "video_engine/include/vie_errors.h"
-#include "video_engine/include/vie_image_process.h"
-#include "video_engine/include/vie_rtp_rtcp.h"
-#include "video_engine/vie_defines.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
+#include "webrtc/system_wrappers/interface/thread_wrapper.h"
+#include "webrtc/system_wrappers/interface/trace.h"
+#include "webrtc/video_engine/call_stats.h"
+#include "webrtc/video_engine/include/vie_codec.h"
+#include "webrtc/video_engine/include/vie_errors.h"
+#include "webrtc/video_engine/include/vie_image_process.h"
+#include "webrtc/video_engine/include/vie_rtp_rtcp.h"
+#include "webrtc/video_engine/vie_defines.h"
 
 namespace webrtc {
 
@@ -90,6 +90,7 @@ ViEChannel::ViEChannel(int32_t channel_id,
       bandwidth_observer_(bandwidth_observer),
       rtp_packet_timeout_(false),
       send_timestamp_extension_id_(kInvalidRtpExtensionId),
+      absolute_send_time_extension_id_(kInvalidRtpExtensionId),
       using_packet_spread_(false),
       external_transport_(NULL),
       decoder_reset_(true),
@@ -369,6 +370,21 @@ int32_t ViEChannel::SetSendCodec(const VideoCodec& video_codec,
       } else {
         rtp_rtcp->DeregisterSendRtpHeaderExtension(
             kRtpExtensionTransmissionTimeOffset);
+      }
+      if (absolute_send_time_extension_id_ != kInvalidRtpExtensionId) {
+        // Deregister in case the extension was previously enabled.
+        rtp_rtcp->DeregisterSendRtpHeaderExtension(
+            kRtpExtensionAbsoluteSendTime);
+        if (rtp_rtcp->RegisterSendRtpHeaderExtension(
+            kRtpExtensionAbsoluteSendTime,
+            absolute_send_time_extension_id_) != 0) {
+          WEBRTC_TRACE(kTraceError, kTraceVideo, ViEId(engine_id_, channel_id_),
+                       "%s: could not register absolute send time extension",
+                       __FUNCTION__);
+        }
+      } else {
+        rtp_rtcp->DeregisterSendRtpHeaderExtension(
+            kRtpExtensionAbsoluteSendTime);
       }
     }
     // |RegisterSimulcastRtpRtcpModules| resets all old weak pointers and old
@@ -862,6 +878,47 @@ int ViEChannel::SetReceiveTimestampOffsetStatus(bool enable, int id) {
   } else {
     return rtp_rtcp_->DeregisterReceiveRtpHeaderExtension(
         kRtpExtensionTransmissionTimeOffset);
+  }
+}
+
+int ViEChannel::SetSendAbsoluteSendTimeStatus(bool enable, int id) {
+  CriticalSectionScoped cs(rtp_rtcp_cs_.get());
+  int error = 0;
+  if (enable) {
+    // Enable the extension, but disable possible old id to avoid errors.
+    absolute_send_time_extension_id_ = id;
+    rtp_rtcp_->DeregisterSendRtpHeaderExtension(
+        kRtpExtensionAbsoluteSendTime);
+    error = rtp_rtcp_->RegisterSendRtpHeaderExtension(
+        kRtpExtensionAbsoluteSendTime, id);
+    for (std::list<RtpRtcp*>::iterator it = simulcast_rtp_rtcp_.begin();
+         it != simulcast_rtp_rtcp_.end(); it++) {
+      (*it)->DeregisterSendRtpHeaderExtension(
+          kRtpExtensionAbsoluteSendTime);
+      error |= (*it)->RegisterSendRtpHeaderExtension(
+          kRtpExtensionAbsoluteSendTime, id);
+    }
+  } else {
+    // Disable the extension.
+    absolute_send_time_extension_id_ = kInvalidRtpExtensionId;
+    rtp_rtcp_->DeregisterSendRtpHeaderExtension(
+        kRtpExtensionAbsoluteSendTime);
+    for (std::list<RtpRtcp*>::iterator it = simulcast_rtp_rtcp_.begin();
+         it != simulcast_rtp_rtcp_.end(); it++) {
+      (*it)->DeregisterSendRtpHeaderExtension(
+          kRtpExtensionAbsoluteSendTime);
+    }
+  }
+  return error;
+}
+
+int ViEChannel::SetReceiveAbsoluteSendTimeStatus(bool enable, int id) {
+  if (enable) {
+    return rtp_rtcp_->RegisterReceiveRtpHeaderExtension(
+        kRtpExtensionAbsoluteSendTime, id);
+  } else {
+    return rtp_rtcp_->DeregisterReceiveRtpHeaderExtension(
+        kRtpExtensionAbsoluteSendTime);
   }
 }
 

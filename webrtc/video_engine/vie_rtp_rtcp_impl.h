@@ -11,10 +11,10 @@
 #ifndef WEBRTC_VIDEO_ENGINE_VIE_RTP_RTCP_IMPL_H_
 #define WEBRTC_VIDEO_ENGINE_VIE_RTP_RTCP_IMPL_H_
 
-#include "modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
-#include "typedefs.h"  // NOLINT
-#include "video_engine/include/vie_rtp_rtcp.h"
-#include "video_engine/vie_ref_count.h"
+#include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp_defines.h"
+#include "webrtc/typedefs.h"
+#include "webrtc/video_engine/include/vie_rtp_rtcp.h"
+#include "webrtc/video_engine/vie_ref_count.h"
 
 namespace webrtc {
 
@@ -82,6 +82,12 @@ class ViERTP_RTCPImpl
   virtual int SetReceiveTimestampOffsetStatus(int video_channel,
                                               bool enable,
                                               int id);
+  virtual int SetSendAbsoluteSendTimeStatus(int video_channel,
+                                            bool enable,
+                                            int id);
+  virtual int SetReceiveAbsoluteSendTimeStatus(int video_channel,
+                                               bool enable,
+                                               int id);
   virtual int SetTransmissionSmoothingStatus(int video_channel, bool enable);
   virtual int GetReceivedRTCPStatistics(const int video_channel,
                                         uint16_t& fraction_lost,

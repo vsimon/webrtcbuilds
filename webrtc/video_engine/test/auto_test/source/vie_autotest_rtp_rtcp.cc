@@ -10,14 +10,14 @@
 
 #include <iostream>
 
-#include "engine_configurations.h"
-#include "video_engine/test/libvietest/include/tb_capture_device.h"
-#include "video_engine/test/libvietest/include/tb_external_transport.h"
-#include "video_engine/test/libvietest/include/tb_interfaces.h"
-#include "video_engine/test/libvietest/include/tb_video_channel.h"
-#include "test/testsupport/fileutils.h"
-#include "video_engine/test/auto_test/interface/vie_autotest.h"
-#include "video_engine/test/auto_test/interface/vie_autotest_defines.h"
+#include "webrtc/engine_configurations.h"
+#include "webrtc/test/testsupport/fileutils.h"
+#include "webrtc/video_engine/test/auto_test/interface/vie_autotest.h"
+#include "webrtc/video_engine/test/auto_test/interface/vie_autotest_defines.h"
+#include "webrtc/video_engine/test/libvietest/include/tb_capture_device.h"
+#include "webrtc/video_engine/test/libvietest/include/tb_external_transport.h"
+#include "webrtc/video_engine/test/libvietest/include/tb_interfaces.h"
+#include "webrtc/video_engine/test/libvietest/include/tb_video_channel.h"
 
 class ViERtpObserver: public webrtc::ViERTPObserver
 {
@@ -718,7 +718,7 @@ void ViEAutoTest::ViERtpRtcpAPITest()
       EXPECT_EQ(0, ViE.rtp_rtcp->SetNACKStatus(tbChannel.videoChannel, true));
     }
 
-    // Timsetamp offset extension.
+    // Timestamp offset extension.
     // Valid range is 1 to 14 inclusive.
     EXPECT_EQ(-1, ViE.rtp_rtcp->SetSendTimestampOffsetStatus(
         tbChannel.videoChannel, true, 0));
@@ -753,6 +753,42 @@ void ViEAutoTest::ViERtpRtcpAPITest()
               tbChannel.videoChannel, false, 3));
     EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiveTimestampOffsetStatus(
             tbChannel.videoChannel, false, 3));
+
+    // Absolute send time extension.
+    // Valid range is 1 to 14 inclusive.
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetSendAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 0));
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetSendAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 15));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetSendAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetSendAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetSendAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, false, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetSendAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetSendAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, false, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetSendAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, false, 3));
+
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetReceiveAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 0));
+    EXPECT_EQ(-1, ViE.rtp_rtcp->SetReceiveAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 15));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiveAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiveAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiveAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, false, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiveAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, true, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiveAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, false, 3));
+    EXPECT_EQ(0, ViE.rtp_rtcp->SetReceiveAbsoluteSendTimeStatus(
+        tbChannel.videoChannel, false, 3));
 
     // Transmission smoothening.
     const int invalid_channel_id = 17;
