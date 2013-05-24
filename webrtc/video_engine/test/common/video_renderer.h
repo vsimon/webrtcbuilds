@@ -17,8 +17,12 @@ namespace test {
 
 class VideoRenderer : public newapi::VideoRenderer {
  public:
-  static VideoRenderer* Create(const char* window_title);
+  static VideoRenderer* Create(const char* window_title,
+                               size_t width,
+                               size_t height);
   virtual ~VideoRenderer() {}
+ protected:
+  VideoRenderer() {}
 };
 }  // test
 }  // webrtc
