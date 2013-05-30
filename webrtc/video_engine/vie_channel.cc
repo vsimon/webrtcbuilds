@@ -873,13 +873,7 @@ int ViEChannel::SetSendTimestampOffsetStatus(bool enable, int id) {
 }
 
 int ViEChannel::SetReceiveTimestampOffsetStatus(bool enable, int id) {
-  if (enable) {
-    return rtp_rtcp_->RegisterReceiveRtpHeaderExtension(
-        kRtpExtensionTransmissionTimeOffset, id);
-  } else {
-    return rtp_rtcp_->DeregisterReceiveRtpHeaderExtension(
-        kRtpExtensionTransmissionTimeOffset);
-  }
+  return vie_receiver_.SetReceiveTimestampOffsetStatus(enable, id) ? 0 : -1;
 }
 
 int ViEChannel::SetSendAbsoluteSendTimeStatus(bool enable, int id) {
@@ -914,19 +908,8 @@ int ViEChannel::SetSendAbsoluteSendTimeStatus(bool enable, int id) {
 }
 
 int ViEChannel::SetReceiveAbsoluteSendTimeStatus(bool enable, int id) {
-  if (enable) {
-    if (rtp_rtcp_->RegisterReceiveRtpHeaderExtension(
-        kRtpExtensionAbsoluteSendTime, id) != 0) {
-      return -1;
-    }
-  } else {
-    if (rtp_rtcp_->DeregisterReceiveRtpHeaderExtension(
-        kRtpExtensionAbsoluteSendTime) != 0) {
-      return -1;
-    }
-  }
   receive_absolute_send_time_enabled_ = enable;
-  return 0;
+  return vie_receiver_.SetReceiveAbsoluteSendTimeStatus(enable, id) ? 0 : -1;
 }
 
 bool ViEChannel::GetReceiveAbsoluteSendTimeStatus() const {
@@ -973,9 +956,6 @@ int32_t ViEChannel::SetSSRC(const uint32_t SSRC,
     return rtp_rtcp_->SetSSRC(SSRC);
   }
   CriticalSectionScoped cs(rtp_rtcp_cs_.get());
-  if (rtp_rtcp_->SetSSRC(SSRC) != 0) {
-    return -1;
-  }
   if (simulcast_idx > simulcast_rtp_rtcp_.size()) {
       return -1;
   }
@@ -985,11 +965,11 @@ int32_t ViEChannel::SetSSRC(const uint32_t SSRC,
       return -1;
     }
   }
-  RtpRtcp* rtp_rtcp = *it;
+  RtpRtcp* rtp_rtcp_module = *it;
   if (usage == kViEStreamTypeRtx) {
-    return rtp_rtcp->SetRTXSendStatus(kRtxRetransmitted, true, SSRC);
+    return rtp_rtcp_module->SetRTXSendStatus(kRtxRetransmitted, true, SSRC);
   }
-  return 0;
+  return rtp_rtcp_module->SetSSRC(SSRC);
 }
 
 int32_t ViEChannel::SetRemoteSSRCType(const StreamType usage,
