@@ -968,7 +968,9 @@ uint16_t* VCMJitterBuffer::GetNackList(uint16_t* nack_list_size,
         NextFrame()->FrameType() == kVideoFrameKey &&
         NextFrame()->HaveFirstPacket();
     if (!first_frame_is_key) {
-      LOG_F(LS_INFO) << "First frame is not key; Recycling.";
+      if (have_non_empty_frame) {
+        LOG_F(LS_INFO) << "First frame is not key; Recycling.";
+      }
       bool have_non_empty_frame = decodable_frames_.end() != find_if(
           decodable_frames_.begin(), decodable_frames_.end(),
           HasNonEmptyState);
