@@ -10,11 +10,14 @@ vars = {
   # If you do not know, use the full path while defining your new deps entry.
   "googlecode_url": "http://%s.googlecode.com/svn",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
-  "chromium_revision": "199267",
+  "chromium_revision": "203806",
 
   # External resources like video and audio files used for testing purposes.
   # Downloaded on demand when needed.
   "webrtc_resources_revision": "16",
+
+  # A small subset of WebKit is needed for the Android Python test framework.
+  "webkit_trunk": "http://src.chromium.org/blink/trunk",
 }
 
 # NOTE: Prefer revision numbers to tags for svn deps. Use http rather than
@@ -55,7 +58,7 @@ deps = {
     Var("chromium_trunk") + "/deps/third_party/libvpx@196669",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@711",
+    (Var("googlecode_url") % "libyuv") + "/trunk@717",
 
   "third_party/opus":
     Var("chromium_trunk") + "/src/third_party/opus@185405",
@@ -115,6 +118,9 @@ deps_os = {
 
     "third_party/android_testrunner":
       Var("chromium_trunk") + "/src/third_party/android_testrunner@" + Var("chromium_revision"),
+
+    "third_party/WebKit/Tools/Scripts":
+      Var("webkit_trunk") + "/Tools/Scripts@151677",
   },
 }
 
