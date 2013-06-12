@@ -30,8 +30,15 @@ TEST_F(DISABLED_ON_MAC(ViEExtendedIntegrationTest),
   tests_->ViECaptureExtendedTest();
 }
 
+// Flaky on Windows: http://code.google.com/p/webrtc/issues/detail?id=1925
+// (in addition to being disabled on Mac due to webrtc:1268).
+#if defined(_WIN32)
+#define MAYBE_RunsCodecTestWithoutErrors DISABLED_RunsCodecTestWithoutErrors
+#else
+#define MAYBE_RunsCodecTestWithoutErrors RunsCodecTestWithoutErrors
+#endif
 TEST_F(DISABLED_ON_MAC(ViEExtendedIntegrationTest),
-       RunsCodecTestWithoutErrors) {
+       MAYBE_RunsCodecTestWithoutErrors) {
   tests_->ViECodecExtendedTest();
 }
 
