@@ -82,8 +82,7 @@ int ViECodecImpl::NumberOfCodecs() const {
 int ViECodecImpl::GetCodec(const unsigned char list_number,
                            VideoCodec& video_codec) const {
   WEBRTC_TRACE(kTraceApiCall, kTraceVideo, ViEId(shared_data_->instance_id()),
-               "%s(list_number: %d, codec_type: %d)", __FUNCTION__,
-               list_number, video_codec.codecType);
+               "%s(list_number: %d)", __FUNCTION__, list_number);
   if (list_number == VideoCodingModule::NumberOfCodecs()) {
     memset(&video_codec, 0, sizeof(VideoCodec));
     strcpy(video_codec.plName, "red");
@@ -689,6 +688,31 @@ int ViECodecImpl::WaitForFirstKeyFrame(const int video_channel,
     return -1;
   }
   return 0;
+}
+
+int ViECodecImpl::StartDebugRecording(int video_channel,
+                                      const char* file_name_utf8) {
+  ViEChannelManagerScoped cs(*(shared_data_->channel_manager()));
+  ViEEncoder* vie_encoder = cs.Encoder(video_channel);
+  if (!vie_encoder) {
+    WEBRTC_TRACE(kTraceError, kTraceVideo,
+                 ViEId(shared_data_->instance_id(), video_channel),
+                 "%s: No encoder %d", __FUNCTION__, video_channel);
+    return -1;
+  }
+  return vie_encoder->StartDebugRecording(file_name_utf8);
+}
+
+int ViECodecImpl::StopDebugRecording(int video_channel) {
+  ViEChannelManagerScoped cs(*(shared_data_->channel_manager()));
+  ViEEncoder* vie_encoder = cs.Encoder(video_channel);
+  if (!vie_encoder) {
+    WEBRTC_TRACE(kTraceError, kTraceVideo,
+                 ViEId(shared_data_->instance_id(), video_channel),
+                 "%s: No encoder %d", __FUNCTION__, video_channel);
+    return -1;
+  }
+  return vie_encoder->StopDebugRecording();
 }
 
 bool ViECodecImpl::CodecValid(const VideoCodec& video_codec) {

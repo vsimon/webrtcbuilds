@@ -1,3 +1,4 @@
+*.DS_Store
 *.Makefile
 *.host.mk
 *.ncb
@@ -25,7 +26,6 @@
 *~
 .*.sw?
 .sw?
-.DS_Store
 .cproject
 .gdb_history
 .gdbinit
@@ -66,6 +66,8 @@
 /third_party/winsdk_samples/src
 /third_party/yasm
 /third_party/WebKit/Tools/Scripts
+/tools/android
+/tools/android-dummy-test
 /tools/clang
 /tools/grit
 /tools/gritsettings

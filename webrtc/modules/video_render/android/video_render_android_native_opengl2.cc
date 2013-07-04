@@ -419,7 +419,9 @@ void JNICALL AndroidNativeOpenGl2Channel::DrawNativeStatic(
 }
 
 void AndroidNativeOpenGl2Channel::DrawNative() {
+  _renderCritSect.Enter();
   _openGLRenderer.Render(_bufferToRender);
+  _renderCritSect.Leave();
 }
 
 /*
@@ -445,4 +447,4 @@ jint AndroidNativeOpenGl2Channel::CreateOpenGLNative(
   return _openGLRenderer.Setup(width, height);
 }
 
-}  //namespace webrtc
+}  // namespace webrtc

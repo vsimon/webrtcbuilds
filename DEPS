@@ -12,10 +12,6 @@ vars = {
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
   "chromium_revision": "203806",
 
-  # External resources like video and audio files used for testing purposes.
-  # Downloaded on demand when needed.
-  "webrtc_resources_revision": "16",
-
   # A small subset of WebKit is needed for the Android Python test framework.
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
 }
@@ -55,7 +51,7 @@ deps = {
     From("chromium_deps", "src/third_party/libjpeg_turbo"),
 
   "third_party/libvpx":
-    Var("chromium_trunk") + "/deps/third_party/libvpx@196669",
+    Var("chromium_trunk") + "/deps/third_party/libvpx@207593",
 
   "third_party/libyuv":
     (Var("googlecode_url") % "libyuv") + "/trunk@723",
@@ -113,6 +109,14 @@ deps_os = {
       From("chromium_deps", "src/third_party/gold"),
   },
   "android": {
+    # Precompiled tools needed for Android test execution. Needed since we can't
+    # compile them from source in WebRTC since they depend on Chromium's base.
+    "tools/android":
+      (Var("googlecode_url") % "webrtc") + "/deps/tools/android@4235",
+
+    "tools/android-dummy-test":
+      (Var("googlecode_url") % "webrtc") + "/deps/tools/android-dummy-test@4244",
+
     "third_party/android_tools":
       From("chromium_deps", "src/third_party/android_tools"),
 
@@ -154,7 +158,7 @@ hooks = [
     # If a newer version or no current download exists, it will download
     # the resources and extract them.
     "pattern": ".",
-    "action": ["python", Var("root_dir") + "/tools/resources/update.py"],
+    "action": ["python", Var("root_dir") + "/webrtc/tools/update.py"],
   },
   {
     # A change to a .gyp, .gypi, or to GYP itself should run the generator.

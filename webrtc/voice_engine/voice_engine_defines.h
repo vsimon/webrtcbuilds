@@ -123,7 +123,7 @@ enum { kVoiceEngineMinRtpExtensionId = 1 };
 // Max 4-bit ID for RTP extension
 enum { kVoiceEngineMaxRtpExtensionId = 14 };
 
-} // namespace webrtc
+}  // namespace webrtc
 
 // TODO(ajm): we shouldn't be using the precompiler for this.
 // Use enums or bools as appropriate.
@@ -218,7 +218,7 @@ inline int VoEChannelId(int moduleId)
     return (int) (moduleId & 0xffff);
 }
 
-} // namespace webrtc
+}  // namespace webrtc
 
 // ----------------------------------------------------------------------------
 //  Platform settings
@@ -315,8 +315,6 @@ inline int VoEChannelId(int moduleId)
   // Always excluded for Android builds
   #undef WEBRTC_CODEC_ISAC
   #undef WEBRTC_VOE_EXTERNAL_REC_AND_PLAYOUT
-  #undef WEBRTC_CONFERENCING
-  #undef WEBRTC_TYPING_DETECTION
 
   #define ANDROID_NOT_SUPPORTED(stat) NOT_SUPPORTED(stat)
 

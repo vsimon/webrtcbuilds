@@ -22,7 +22,6 @@
 #include "webrtc/video_engine/include/vie_network.h"
 #include "webrtc/video_engine/include/vie_rtp_rtcp.h"
 #include "webrtc/video_engine/vie_defines.h"
-#include "webrtc/video_engine/vie_file_recorder.h"
 #include "webrtc/video_engine/vie_frame_provider_base.h"
 #include "webrtc/video_engine/vie_receiver.h"
 #include "webrtc/video_engine/vie_sender.h"
@@ -202,11 +201,6 @@ class ViEChannel
                                          const uint32_t name,
                                          const uint16_t length,
                                          const uint8_t* data);
-  virtual void OnSendReportReceived(const int32_t id,
-                                    const uint32_t senderSSRC,
-                                    uint32_t ntp_secs,
-                                    uint32_t ntp_frac,
-                                    uint32_t timestamp);
   // Implements RtpFeedback.
   virtual int32_t OnInitializeDecoder(
       const int32_t id,
@@ -327,9 +321,6 @@ class ViEChannel
 
   int32_t RegisterEffectFilter(ViEEffectFilter* effect_filter);
 
-  ViEFileRecorder& GetIncomingFileRecorder();
-  void ReleaseIncomingFileRecorder();
-
  protected:
   static bool ChannelDecodeThreadFunction(void* obj);
   bool ChannelDecodeProcess();
@@ -399,8 +390,6 @@ class ViEChannel
 
   ViEEffectFilter* effect_filter_;
   bool color_enhancement_;
-
-  ViEFileRecorder file_recorder_;
 
   // User set MTU, -1 if not set.
   uint16_t mtu_;
