@@ -46,6 +46,26 @@
 
 namespace webrtc {
 
+RtpData* NullObjectRtpData() {
+  static NullRtpData null_rtp_data;
+  return &null_rtp_data;
+}
+
+RtpFeedback* NullObjectRtpFeedback() {
+  static NullRtpFeedback null_rtp_feedback;
+  return &null_rtp_feedback;
+}
+
+RtpAudioFeedback* NullObjectRtpAudioFeedback() {
+  static NullRtpAudioFeedback null_rtp_audio_feedback;
+  return &null_rtp_audio_feedback;
+}
+
+ReceiveStatistics* NullObjectReceiveStatistics() {
+  static NullReceiveStatistics null_receive_statistics;
+  return &null_receive_statistics;
+}
+
 namespace ModuleRTPUtility {
 
 enum {
@@ -188,9 +208,9 @@ void RTPPayload::SetType(RtpVideoCodecTypes videoType) {
   type = videoType;
 
   switch (type) {
-    case kRtpGenericVideo:
+    case kRtpVideoGeneric:
       break;
-    case kRtpVp8Video: {
+    case kRtpVideoVp8: {
       info.VP8.nonReferenceFrame = false;
       info.VP8.beginningOfPartition = false;
       info.VP8.partitionID = 0;
@@ -567,9 +587,9 @@ bool RTPPayloadParser::Parse(RTPPayload& parsedPacket) const {
   parsedPacket.SetType(_videoType);
 
   switch (_videoType) {
-    case kRtpGenericVideo:
+    case kRtpVideoGeneric:
       return ParseGeneric(parsedPacket);
-    case kRtpVp8Video:
+    case kRtpVideoVp8:
       return ParseVP8(parsedPacket);
     default:
       return false;

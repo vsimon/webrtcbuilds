@@ -141,6 +141,11 @@ RTCPReceiver::SetRemoteSSRC( const uint32_t ssrc)
     return 0;
 }
 
+uint32_t RTCPReceiver::RemoteSSRC() const {
+  CriticalSectionScoped lock(_criticalSectionRTCPReceiver);
+  return _remoteSSRC;
+}
+
 void RTCPReceiver::RegisterRtcpObservers(
     RtcpIntraFrameObserver* intra_frame_callback,
     RtcpBandwidthObserver* bandwidth_callback,
@@ -183,7 +188,7 @@ int32_t RTCPReceiver::ResetRTT(const uint32_t remoteSSRC) {
   return 0;
 }
 
-int32_t RTCPReceiver::RTT(const uint32_t remoteSSRC,
+int32_t RTCPReceiver::RTT(uint32_t remoteSSRC,
                           uint16_t* RTT,
                           uint16_t* avgRTT,
                           uint16_t* minRTT,
@@ -401,7 +406,6 @@ RTCPReceiver::HandleSenderReceiverReport(RTCPUtility::RTCPParserV2& rtcpParser,
         TRACE_EVENT_INSTANT2("webrtc_rtp", "SR",
                              "remote_ssrc", remoteSSRC,
                              "ssrc", _SSRC);
-
         if (_remoteSSRC == remoteSSRC) // have I received RTP packets from this party
         {
             // only signal that we have received a SR when we accept one
@@ -484,10 +488,6 @@ RTCPReceiver::HandleReportBlock(const RTCPUtility::RTCPPacket& rtcpPacket,
 
   _lastReceivedRrMs = _clock->TimeInMilliseconds();
   const RTCPPacketReportBlockItem& rb = rtcpPacket.ReportBlockItem;
-  TRACE_COUNTER_ID1("webrtc_rtp", "RRFractionLost", rb.SSRC, rb.FractionLost);
-  TRACE_COUNTER_ID1("webrtc_rtp", "RRCumulativeNumOfPacketLost",
-                    rb.SSRC, rb.CumulativeNumOfPacketsLost);
-  TRACE_COUNTER_ID1("webrtc_rtp", "RRJitter", rb.SSRC, rb.Jitter);
   reportBlock->remoteReceiveBlock.remoteSSRC = remoteSSRC;
   reportBlock->remoteReceiveBlock.sourceSSRC = rb.SSRC;
   reportBlock->remoteReceiveBlock.fractionLost = rb.FractionLost;
@@ -1408,45 +1408,6 @@ int32_t RTCPReceiver::TMMBRReceived(const uint32_t size,
     }
   }
   return num;
-}
-
-int32_t
-RTCPReceiver::SetPacketTimeout(const uint32_t timeoutMS)
-{
-    CriticalSectionScoped lock(_criticalSectionRTCPReceiver);
-    _packetTimeOutMS = timeoutMS;
-    return 0;
-}
-
-void RTCPReceiver::PacketTimeout()
-{
-    if(_packetTimeOutMS == 0)
-    {
-        // not configured
-        return;
-    }
-
-    bool packetTimeOut = false;
-    {
-        CriticalSectionScoped lock(_criticalSectionRTCPReceiver);
-        if(_lastReceived == 0)
-        {
-            // not active
-            return;
-        }
-
-        int64_t now = _clock->TimeInMilliseconds();
-        if(now - _lastReceived > _packetTimeOutMS)
-        {
-            packetTimeOut = true;
-            _lastReceived = 0;  // only one callback
-        }
-    }
-    CriticalSectionScoped lock(_criticalSectionFeedbacks);
-    if(packetTimeOut && _cbRtcpFeedback)
-    {
-        _cbRtcpFeedback->OnRTCPPacketTimeout(_id);
-    }
 }
 
 }  // namespace webrtc

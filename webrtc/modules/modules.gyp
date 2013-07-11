@@ -87,6 +87,7 @@
             'webrtc_utility',
             'webrtc_video_coding',
             '<@(neteq_dependencies)',
+            '<(rbe_components_path)/remote_bitrate_estimator_components.gyp:rbe_components_unittests',
             '<(DEPTH)/testing/gmock.gyp:gmock',
             '<(DEPTH)/testing/gtest.gyp:gtest',
             '<(webrtc_root)/common_audio/common_audio.gyp:common_audio',
@@ -163,17 +164,14 @@
             'pacing/paced_sender_unittest.cc',
             'remote_bitrate_estimator/include/mock/mock_remote_bitrate_observer.h',
             'remote_bitrate_estimator/bitrate_estimator_unittest.cc',
-            'remote_bitrate_estimator/remote_bitrate_estimator_single_stream_unittest.cc',
-            'remote_bitrate_estimator/remote_bitrate_estimator_unittest_helper.cc',
-            'remote_bitrate_estimator/remote_bitrate_estimator_unittest_helper.h',
             'remote_bitrate_estimator/rtp_to_ntp_unittest.cc',
             'rtp_rtcp/source/mock/mock_rtp_payload_strategy.h',
-            'rtp_rtcp/source/mock/mock_rtp_receiver_video.h',
             'rtp_rtcp/source/fec_test_helper.cc',
             'rtp_rtcp/source/fec_test_helper.h',
             'rtp_rtcp/source/nack_rtx_unittest.cc',
             'rtp_rtcp/source/producer_fec_unittest.cc',
             'rtp_rtcp/source/receiver_fec_unittest.cc',
+            'rtp_rtcp/source/receive_statistics_unittest.cc',
             'rtp_rtcp/source/rtcp_format_remb_unittest.cc',
             'rtp_rtcp/source/rtcp_sender_unittest.cc',
             'rtp_rtcp/source/rtcp_receiver_unittest.cc',
@@ -310,7 +308,7 @@
       'conditions': [
         # TODO(henrike): remove build_with_chromium==1 when the bots are using
         # Chromium's buildbots.
-        ['OS=="build_with_chromium==1 and android" and gtest_target_type=="shared_library"', {
+        ['build_with_chromium==1 and OS=="android" and gtest_target_type=="shared_library"', {
           'targets': [
             {
               'target_name': 'modules_unittests_apk_target',

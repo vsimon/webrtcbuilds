@@ -350,7 +350,7 @@ int32_t RTPSender::SendOutgoingData(
       return 0;
     }
   }
-  RtpVideoCodecTypes video_type = kRtpGenericVideo;
+  RtpVideoCodecTypes video_type = kRtpVideoGeneric;
   if (CheckPayloadType(payload_type, &video_type) != 0) {
     WEBRTC_TRACE(kTraceError, kTraceRtpRtcp, id_,
                  "%s invalid argument failed to find payload_type:%d",
@@ -358,22 +358,17 @@ int32_t RTPSender::SendOutgoingData(
     return -1;
   }
 
-  if (frame_type == kVideoFrameKey) {
-    TRACE_EVENT_INSTANT1("webrtc_rtp", "SendKeyFrame",
-                         "timestamp", capture_timestamp);
-  } else {
-    TRACE_EVENT_INSTANT2("webrtc_rtp", "SendFrame",
-                         "timestamp", capture_timestamp,
-                         "frame_type", FrameTypeToString(frame_type));
-  }
-
   if (audio_configured_) {
+    TRACE_EVENT_ASYNC_STEP1("webrtc", "Audio", capture_timestamp,
+                            "Send", "type", FrameTypeToString(frame_type));
     assert(frame_type == kAudioFrameSpeech || frame_type == kAudioFrameCN ||
            frame_type == kFrameEmpty);
 
     return audio_->SendAudio(frame_type, payload_type, capture_timestamp,
                              payload_data, payload_size, fragmentation);
   } else {
+    TRACE_EVENT_ASYNC_STEP1("webrtc", "Video", capture_time_ms,
+                            "Send", "type", FrameTypeToString(frame_type));
     assert(frame_type != kAudioFrameSpeech && frame_type != kAudioFrameCN);
 
     if (frame_type == kFrameEmpty) {
@@ -1183,7 +1178,7 @@ void RTPSender::SetSendingStatus(const bool enabled) {
       }
       frequency_hz = frequency;
     } else {
-      frequency_hz = kDefaultVideoFrequency;
+      frequency_hz = kVideoPayloadTypeFrequency;
     }
     uint32_t RTPtime = ModuleRTPUtility::GetCurrentRTP(clock_, frequency_hz);
 
