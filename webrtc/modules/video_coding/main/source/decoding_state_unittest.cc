@@ -10,12 +10,12 @@
 
 #include <string.h>
 
-#include "modules/video_coding/main/source/decoding_state.h"
-#include "modules/video_coding/main/source/frame_buffer.h"
-#include "gtest/gtest.h"
-#include "modules/video_coding/main/source/jitter_buffer_common.h"
-#include "modules/interface/module_common_types.h"
-#include "modules/video_coding/main/source/packet.h"
+#include "testing/gtest/include/gtest/gtest.h"
+#include "webrtc/modules/interface/module_common_types.h"
+#include "webrtc/modules/video_coding/main/source/decoding_state.h"
+#include "webrtc/modules/video_coding/main/source/frame_buffer.h"
+#include "webrtc/modules/video_coding/main/source/jitter_buffer_common.h"
+#include "webrtc/modules/video_coding/main/source/packet.h"
 
 namespace webrtc {
 
@@ -37,7 +37,7 @@ TEST(TestDecodingState, FrameContinuity) {
   packet->timestamp = 1;
   packet->seqNum = 0xffff;
   packet->frameType = kVideoFrameDelta;
-  packet->codecSpecificHeader.codec = kRtpVideoVp8;
+  packet->codecSpecificHeader.codec = kRTPVideoVP8;
   packet->codecSpecificHeader.codecHeader.VP8.pictureId = 0x007F;
   frame.InsertPacket(*packet, 0, false, 0);
   // Always start with a key frame.
@@ -208,7 +208,7 @@ TEST(TestDecodingState, MultiLayerBehavior) {
   VCMFrameBuffer frame;
   VCMPacket* packet = new VCMPacket();
   packet->frameType = kVideoFrameDelta;
-  packet->codecSpecificHeader.codec = kRtpVideoVp8;
+  packet->codecSpecificHeader.codec = kRTPVideoVP8;
   packet->timestamp = 0;
   packet->seqNum = 0;
   packet->codecSpecificHeader.codecHeader.VP8.tl0PicIdx = 0;
@@ -361,7 +361,7 @@ TEST(TestDecodingState, DiscontinuousPicIdContinuousSeqNum) {
   VCMPacket packet;
   frame.Reset();
   packet.frameType = kVideoFrameKey;
-  packet.codecSpecificHeader.codec = kRtpVideoVp8;
+  packet.codecSpecificHeader.codec = kRTPVideoVP8;
   packet.timestamp = 0;
   packet.seqNum = 0;
   packet.codecSpecificHeader.codecHeader.VP8.tl0PicIdx = 0;

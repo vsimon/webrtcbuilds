@@ -10,10 +10,10 @@
 
 #include <string.h>
 
-#include "gtest/gtest.h"
-#include "modules/interface/module_common_types.h"
-#include "modules/video_coding/main/source/packet.h"
-#include "modules/video_coding/main/source/session_info.h"
+#include "testing/gtest/include/gtest/gtest.h"
+#include "webrtc/modules/interface/module_common_types.h"
+#include "webrtc/modules/video_coding/main/source/packet.h"
+#include "webrtc/modules/video_coding/main/source/session_info.h"
 
 namespace webrtc {
 
@@ -66,7 +66,7 @@ class TestVP8Partitions : public TestSessionInfo {
     TestSessionInfo::SetUp();
     vp8_header_ = &packet_header_.type.Video.codecHeader.VP8;
     packet_header_.frameType = kVideoFrameDelta;
-    packet_header_.type.Video.codec = kRtpVideoVp8;
+    packet_header_.type.Video.codec = kRTPVideoVP8;
     vp8_header_->InitRTPVideoHeaderVP8();
     fragmentation_.VerifyAndAllocateFragmentationHeader(kMaxVP8Partitions);
   }

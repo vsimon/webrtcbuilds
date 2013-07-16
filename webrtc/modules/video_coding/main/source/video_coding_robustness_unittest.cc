@@ -11,8 +11,8 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "webrtc/modules/video_coding/codecs/interface/mock/mock_video_codec_interface.h"
-#include "webrtc/modules/video_coding/main/interface/video_coding.h"
 #include "webrtc/modules/video_coding/main/interface/mock/mock_vcm_callbacks.h"
+#include "webrtc/modules/video_coding/main/interface/video_coding.h"
 #include "webrtc/modules/video_coding/main/test/test_util.h"
 #include "webrtc/system_wrappers/interface/clock.h"
 
@@ -67,7 +67,7 @@ class VCMRobustnessTest : public ::testing::Test {
     rtp_info.header.sequenceNumber = seq_no;
     rtp_info.header.markerBit = marker_bit;
     rtp_info.header.payloadType = video_codec_.plType;
-    rtp_info.type.Video.codec = kRtpVideoVp8;
+    rtp_info.type.Video.codec = kRTPVideoVP8;
     rtp_info.type.Video.codecHeader.VP8.InitRTPVideoHeaderVP8();
     rtp_info.type.Video.isFirstPacket = first;
 

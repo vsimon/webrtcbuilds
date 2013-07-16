@@ -20,8 +20,6 @@
 #include "webrtc/modules/remote_bitrate_estimator/include/mock/mock_remote_bitrate_observer.h"
 #include "webrtc/modules/remote_bitrate_estimator/include/remote_bitrate_estimator.h"
 #include "webrtc/modules/rtp_rtcp/interface/rtp_header_parser.h"
-#include "webrtc/modules/rtp_rtcp/interface/rtp_payload_registry.h"
-#include "webrtc/modules/rtp_rtcp/interface/rtp_receiver.h"
 #include "webrtc/modules/rtp_rtcp/source/rtcp_receiver.h"
 #include "webrtc/modules/rtp_rtcp/source/rtcp_sender.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_receiver_video.h"
@@ -219,7 +217,7 @@ void CreateRtpPacket(const bool marker_bit, const uint8_t payload,
 }
 
 class TestTransport : public Transport,
-                      public NullRtpData {
+                      public RtpData {
  public:
   TestTransport()
       : rtcp_receiver_(NULL) {
@@ -279,28 +277,23 @@ class RtcpSenderTest : public ::testing::Test {
   RtcpSenderTest()
       : over_use_detector_options_(),
         system_clock_(Clock::GetRealTimeClock()),
-        rtp_payload_registry_(new RTPPayloadRegistry(
-            0, RTPPayloadStrategy::CreateStrategy(false))),
         remote_bitrate_observer_(),
         remote_bitrate_estimator_(
             RemoteBitrateEstimatorFactory().Create(
                 &remote_bitrate_observer_,
-                system_clock_)),
-        receive_statistics_(ReceiveStatistics::Create(system_clock_)) {
+                system_clock_)) {
     test_transport_ = new TestTransport();
 
     RtpRtcp::Configuration configuration;
     configuration.id = 0;
     configuration.audio = false;
     configuration.clock = system_clock_;
+    configuration.incoming_data = test_transport_;
     configuration.outgoing_transport = test_transport_;
     configuration.remote_bitrate_estimator = remote_bitrate_estimator_.get();
 
     rtp_rtcp_impl_ = new ModuleRtpRtcpImpl(configuration);
-    rtp_receiver_.reset(RtpReceiver::CreateVideoReceiver(
-        0, system_clock_, test_transport_, NULL, rtp_payload_registry_.get()));
-    rtcp_sender_ = new RTCPSender(0, false, system_clock_, rtp_rtcp_impl_,
-                                  receive_statistics_.get());
+    rtcp_sender_ = new RTCPSender(0, false, system_clock_, rtp_rtcp_impl_);
     rtcp_receiver_ = new RTCPReceiver(0, system_clock_, rtp_rtcp_impl_);
     test_transport_->SetRTCPReceiver(rtcp_receiver_);
     // Initialize
@@ -322,15 +315,12 @@ class RtcpSenderTest : public ::testing::Test {
 
   OverUseDetectorOptions over_use_detector_options_;
   Clock* system_clock_;
-  scoped_ptr<RTPPayloadRegistry> rtp_payload_registry_;
-  scoped_ptr<RtpReceiver> rtp_receiver_;
   ModuleRtpRtcpImpl* rtp_rtcp_impl_;
   RTCPSender* rtcp_sender_;
   RTCPReceiver* rtcp_receiver_;
   TestTransport* test_transport_;
   MockRemoteBitrateObserver remote_bitrate_observer_;
   scoped_ptr<RemoteBitrateEstimator> remote_bitrate_estimator_;
-  scoped_ptr<ReceiveStatistics> receive_statistics_;
 
   enum {kMaxPacketLength = 1500};
   uint8_t packet_[kMaxPacketLength];
@@ -362,22 +352,14 @@ TEST_F(RtcpSenderTest, TestCompound) {
   strncpy(codec_inst.plName, "VP8", webrtc::kPayloadNameSize - 1);
   codec_inst.codecType = webrtc::kVideoCodecVP8;
   codec_inst.plType = payload;
-  EXPECT_EQ(0, rtp_receiver_->RegisterReceivePayload(codec_inst.plName,
-                                                     codec_inst.plType,
-                                                     90000,
-                                                     0,
-                                                     codec_inst.maxBitrate));
+  EXPECT_EQ(0, rtp_rtcp_impl_->RegisterReceivePayload(codec_inst));
 
   // Make sure RTP packet has been received.
   scoped_ptr<RtpHeaderParser> parser(RtpHeaderParser::Create());
   RTPHeader header;
   EXPECT_TRUE(parser->Parse(packet_, packet_length, &header));
-  PayloadUnion payload_specific;
-  EXPECT_TRUE(rtp_payload_registry_->GetPayloadSpecifics(header.payloadType,
-                                                        &payload_specific));
-  receive_statistics_->IncomingPacket(header, packet_length, false, true);
-  EXPECT_TRUE(rtp_receiver_->IncomingRtpPacket(&header, packet_, packet_length,
-                                               payload_specific, true));
+  EXPECT_EQ(0, rtp_rtcp_impl_->IncomingRtpPacket(packet_, packet_length,
+                                                 header));
 
   EXPECT_EQ(0, rtcp_sender_->SetIJStatus(true));
   EXPECT_EQ(0, rtcp_sender_->SetRTCPStatus(kRtcpCompound));
