@@ -51,7 +51,7 @@ deps = {
     From("chromium_deps", "src/third_party/libjpeg_turbo"),
 
   "third_party/libvpx":
-    Var("chromium_trunk") + "/deps/third_party/libvpx@207593",
+    Var("chromium_trunk") + "/deps/third_party/libvpx@211873",
 
   "third_party/libyuv":
     (Var("googlecode_url") % "libyuv") + "/trunk@723",
@@ -112,7 +112,7 @@ deps_os = {
     # Precompiled tools needed for Android test execution. Needed since we can't
     # compile them from source in WebRTC since they depend on Chromium's base.
     "tools/android":
-      (Var("googlecode_url") % "webrtc") + "/deps/tools/android@4235",
+      (Var("googlecode_url") % "webrtc") + "/deps/tools/android@4258",
 
     "tools/android-dummy-test":
       (Var("googlecode_url") % "webrtc") + "/deps/tools/android-dummy-test@4244",

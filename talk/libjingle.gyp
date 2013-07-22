@@ -80,10 +80,11 @@
             {
               'variables': {
                 'java_src_dir': 'app/webrtc/java/src',
-                'webrtc_modules_dir': '<(DEPTH)/third_party/webrtc/modules',
+                'webrtc_modules_dir': '<(webrtc_root)/modules',
                 'peerconnection_java_files': [
                   'app/webrtc/java/src/org/webrtc/AudioSource.java',
                   'app/webrtc/java/src/org/webrtc/AudioTrack.java',
+                  'app/webrtc/java/src/org/webrtc/DataChannel.java',
                   'app/webrtc/java/src/org/webrtc/IceCandidate.java',
                   'app/webrtc/java/src/org/webrtc/MediaConstraints.java',
                   'app/webrtc/java/src/org/webrtc/MediaSource.java',
@@ -104,13 +105,13 @@
                 # included here, or better yet, build a proper .jar in webrtc
                 # and include it here.
                 'android_java_files': [
-                  '<(webrtc_modules_dir)/audio_device/android/org/webrtc/voiceengine/WebRTCAudioDevice.java',
-                  '<(webrtc_modules_dir)/video_capture/android/java/org/webrtc/videoengine/CaptureCapabilityAndroid.java',
-                  '<(webrtc_modules_dir)/video_capture/android/java/org/webrtc/videoengine/VideoCaptureAndroid.java',
-                  '<(webrtc_modules_dir)/video_capture/android/java/org/webrtc/videoengine/VideoCaptureDeviceInfoAndroid.java',
-                  '<(webrtc_modules_dir)/video_render/android/java/org/webrtc/videoengine/ViEAndroidGLES20.java',
-                  '<(webrtc_modules_dir)/video_render/android/java/org/webrtc/videoengine/ViERenderer.java',
-                  '<(webrtc_modules_dir)/video_render/android/java/org/webrtc/videoengine/ViESurfaceRenderer.java',
+                  '<(webrtc_modules_dir)/audio_device/android/java/src/org/webrtc/voiceengine/WebRTCAudioDevice.java',
+                  '<(webrtc_modules_dir)/video_capture/android/java/src/org/webrtc/videoengine/CaptureCapabilityAndroid.java',
+                  '<(webrtc_modules_dir)/video_capture/android/java/src/org/webrtc/videoengine/VideoCaptureAndroid.java',
+                  '<(webrtc_modules_dir)/video_capture/android/java/src/org/webrtc/videoengine/VideoCaptureDeviceInfoAndroid.java',
+                  '<(webrtc_modules_dir)/video_render/android/java/src/org/webrtc/videoengine/ViEAndroidGLES20.java',
+                  '<(webrtc_modules_dir)/video_render/android/java/src/org/webrtc/videoengine/ViERenderer.java',
+                  '<(webrtc_modules_dir)/video_render/android/java/src/org/webrtc/videoengine/ViESurfaceRenderer.java',
                 ],
               },
               'action_name': 'create_jar',
@@ -590,15 +591,7 @@
         }],
         ['OS=="mac"', {
           'conditions': [
-            [ 'libjingle_objc != 1', {
-              'sources': [
-                'base/macasyncsocket.cc',
-                'base/macasyncsocket.h',
-                'base/maccocoasocketserver.h',
-                'base/maccocoasocketserver.mm',
-                'base/macsocketserver.cc',
-                'base/macsocketserver.h',
-              ],
+            ['libjingle_objc != 1', {
               'link_settings' :{
                 'xcode_settings': {
                   'OTHER_LDFLAGS': [
@@ -606,15 +599,17 @@
                   ],
                 },
               },
-            }, {
-              'defines': [
-                'CARBON_DEPRECATED=YES',
-              ],
             }],
           ],
           'sources': [
+            'base/macasyncsocket.cc',
+            'base/macasyncsocket.h',
+            'base/maccocoasocketserver.h',
+            'base/maccocoasocketserver.mm',
             'base/macconversion.cc',
             'base/macconversion.h',
+            'base/macsocketserver.cc',
+            'base/macsocketserver.h',
             'base/macutils.cc',
             'base/macutils.h',
             'base/macwindowpicker.cc',
@@ -774,11 +769,11 @@
       'type': 'static_library',
       'dependencies': [
         '<(DEPTH)/third_party/libyuv/libyuv.gyp:libyuv',
-        '<(DEPTH)/third_party/webrtc/modules/modules.gyp:video_capture_module',
-        '<(DEPTH)/third_party/webrtc/modules/modules.gyp:video_render_module',
-        '<(DEPTH)/third_party/webrtc/video_engine/video_engine.gyp:video_engine_core',
-        '<(DEPTH)/third_party/webrtc/voice_engine/voice_engine.gyp:voice_engine',
-        '<(DEPTH)/third_party/webrtc/system_wrappers/source/system_wrappers.gyp:system_wrappers',
+        '<(webrtc_root)/modules/modules.gyp:video_capture_module',
+        '<(webrtc_root)/modules/modules.gyp:video_render_module',
+        '<(webrtc_root)/video_engine/video_engine.gyp:video_engine_core',
+        '<(webrtc_root)/voice_engine/voice_engine.gyp:voice_engine',
+        '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
         'libjingle',
         'libjingle_sound',
       ],
@@ -967,11 +962,11 @@
         'libjingle_media',
       ],
       'include_dirs': [
-        '<(DEPTH)/third_party/gtest/include',
+        '<(DEPTH)/testing/gtest/include',
       ],
       'direct_dependent_settings': {
         'include_dirs': [
-          '<(DEPTH)/third_party/gtest/include',
+          '<(DEPTH)/testing/gtest/include',
         ],
       },
       'defines': [

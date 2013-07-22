@@ -8,25 +8,26 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
-#include "video_render_impl.h"
-#include "engine_configurations.h"
-#include "critical_section_wrapper.h"
-#include "video_render_defines.h"
-#include "trace.h"
-#include "incoming_video_stream.h"
+#include "webrtc/engine_configurations.h"
 #include "webrtc/modules/video_render/i_video_render.h"
+#include "webrtc/modules/video_render/include/video_render_defines.h"
+#include "webrtc/modules/video_render/incoming_video_stream.h"
+#include "webrtc/modules/video_render/video_render_impl.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
+#include "webrtc/system_wrappers/interface/trace.h"
 
 #include <cassert>
 
 #ifdef WEBRTC_INCLUDE_INTERNAL_VIDEO_RENDER
 
 #if defined (_WIN32)
-#include "windows/video_render_windows_impl.h"
+#include "webrtc/modules/video_render/windows/video_render_windows_impl.h"
 #define STANDARD_RENDERING kRenderWindows
 
 // WEBRTC_IOS should go before WEBRTC_MAC because WEBRTC_MAC
 // gets defined if WEBRTC_IOS is defined
-#elif defined(WEBRTC_IOS)
+#elif defined(WEBRTC_IOS) && 0
+// TODO(sjlee): land https://webrtc-codereview.appspot.com/1641004/
 #if defined(IPHONE_GLES_RENDERING)
 #define STANDARD_RENDERING kRenderiPhone
 #include "iPhone/video_render_iphone_impl.h"
@@ -35,20 +36,20 @@
 #elif defined(WEBRTC_MAC)
 #if defined(COCOA_RENDERING)
 #define STANDARD_RENDERING kRenderCocoa
-#include "mac/video_render_mac_cocoa_impl.h"
+#include "webrtc/modules/video_render/mac/video_render_mac_cocoa_impl.h"
 #elif defined(CARBON_RENDERING)
 #define STANDARD_RENDERING kRenderCarbon
-#include "mac/video_render_mac_carbon_impl.h"
+#include "webrtc/modules/video_render/mac/video_render_mac_carbon_impl.h"
 #endif
 
 #elif defined(WEBRTC_ANDROID)
-#include "android/video_render_android_impl.h"
-#include "android/video_render_android_surface_view.h"
-#include "android/video_render_android_native_opengl2.h"
-#define STANDARD_RENDERING	kRenderAndroid
+#include "webrtc/modules/video_render/android/video_render_android_impl.h"
+#include "webrtc/modules/video_render/android/video_render_android_native_opengl2.h"
+#include "webrtc/modules/video_render/android/video_render_android_surface_view.h"
+#define STANDARD_RENDERING kRenderAndroid
 
 #elif defined(WEBRTC_LINUX)
-#include "linux/video_render_linux_impl.h"
+#include "webrtc/modules/video_render/linux/video_render_linux_impl.h"
 #define STANDARD_RENDERING kRenderX11
 
 #else
@@ -58,7 +59,7 @@
 #endif  // WEBRTC_INCLUDE_INTERNAL_VIDEO_RENDER
 
 // For external rendering
-#include "external/video_render_external_impl.h"
+#include "webrtc/modules/video_render/external/video_render_external_impl.h"
 #ifndef STANDARD_RENDERING
 #define STANDARD_RENDERING kRenderExternal
 #endif  // STANDARD_RENDERING
@@ -116,7 +117,8 @@ ModuleVideoRenderImpl::ModuleVideoRenderImpl(
         }
         break;
 
-#elif defined(WEBRTC_IOS)
+#elif defined(WEBRTC_IOS) && 0
+        // TODO(sjlee): land https://webrtc-codereview.appspot.com/1641004/
         case kRenderiPhone:
         {
             VideoRenderIPhoneImpl* ptrRenderer = new VideoRenderIPhoneImpl(_id, videoRenderType, window, _fullScreen);
@@ -276,7 +278,8 @@ ModuleVideoRenderImpl::~ModuleVideoRenderImpl()
             break;
 #endif
 
-#elif defined(WEBRTC_IOS)
+#elif defined(WEBRTC_IOS) && 0
+            // TODO(sjlee): land https://webrtc-codereview.appspot.com/1641004/
             case kRenderiPhone:
             break;
 
@@ -354,6 +357,7 @@ int32_t ModuleVideoRenderImpl::ChangeWindow(void* window)
     _ptrRenderer = NULL;
     delete _ptrRenderer;
 
+#if 0  // TODO(sjlee): land https://webrtc-codereview.appspot.com/1641004/
     VideoRenderIPhoneImpl* ptrRenderer;
     ptrRenderer = new VideoRenderIPhoneImpl(_id, kRenderiPhone, window, _fullScreen);
     if (!ptrRenderer)
@@ -362,7 +366,9 @@ int32_t ModuleVideoRenderImpl::ChangeWindow(void* window)
     }
     _ptrRenderer = reinterpret_cast<IVideoRender*>(ptrRenderer);
     return _ptrRenderer->ChangeWindow(window);
-
+#else
+    return -1;
+#endif
 #elif defined(WEBRTC_MAC)
 
     _ptrRenderer = NULL;

@@ -11,9 +11,9 @@
 #ifndef WEBRTC_MODULES_INTERFACE_VIDEO_CODING_DEFINES_H_
 #define WEBRTC_MODULES_INTERFACE_VIDEO_CODING_DEFINES_H_
 
-#include "typedefs.h"
-#include "common_video/interface/i420_video_frame.h"
-#include "modules/interface/module_common_types.h"
+#include "webrtc/common_video/interface/i420_video_frame.h"
+#include "webrtc/modules/interface/module_common_types.h"
+#include "webrtc/typedefs.h"
 
 namespace webrtc {
 
@@ -119,7 +119,7 @@ class VCMSendStatisticsCallback {
 // Callback class used for informing the user of the incoming bit rate and frame rate.
 class VCMReceiveStatisticsCallback {
  public:
-  virtual int32_t OnReceiveStatisticsUpdate(const uint32_t bitRate,
+  virtual int32_t ReceiveStatistics(const uint32_t bitRate,
                                           const uint32_t frameRate) = 0;
 
  protected:
