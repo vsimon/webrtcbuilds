@@ -806,6 +806,13 @@
    ...
 }
 {
+   bug_1972_64
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN7cricket7UDPPort16CreateConnectionERKNS_9CandidateENS_13PortInterface15CandidateOriginE
+   ...
+}
+{
    bug_1976_1
    Memcheck:Leak
    fun:_Zna*
@@ -987,5 +994,33 @@
    Memcheck:Leak
    fun:_Znw*
    fun:_ZN15PubSubTasksTestC1Ev
+}
+# failures which can't be reproduced locally
+{
+   bug_2153_1
+   Memcheck:Leak
+   fun:calloc
+   ...
+   fun:_ZN6webrtc26AudioMixerManagerLinuxALSA11OpenSpeakerEPc
+   fun:_ZN6webrtc20AudioDeviceLinuxALSA11InitSpeakerEv
+   ...
+}
+{
+   bug_2153_2
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN7sigslot7signal0INS_15single_threadedEE7connectIN9talk_base13IdTimeoutTaskEEEvPT_MS6_FvvE
+   fun:_ZN9talk_base13IdTimeoutTaskC1EPNS_10TaskParentE
+   fun:_ZN9talk_base9HappyTaskC1EPNS_10TaskParentE
+   fun:_ZN9talk_base41unstarted_task_test_DoNotDeleteTask2_Test8TestBodyEv
+}
+{
+   bug_2153_3
+   Memcheck:Leak
+   fun:calloc
+   obj:*
+   fun:_ZN6webrtc26AudioMixerManagerLinuxALSA14OpenMicrophoneEPc
+   fun:_ZN6webrtc20AudioDeviceLinuxALSA14InitMicrophoneEv
+   ...
 }
 

@@ -121,7 +121,6 @@
         'base/filelock_unittest.cc',
         'base/fileutils_unittest.cc',
         'base/helpers_unittest.cc',
-        'base/host_unittest.cc',
         'base/httpbase_unittest.cc',
         'base/httpcommon_unittest.cc',
         'base/httpserver_unittest.cc',
@@ -376,6 +375,7 @@
       ],
       # TODO(ronghuawu): Reenable below unit tests that require gmock.
       'sources': [
+        'app/webrtc/datachannel_unittest.cc',
         'app/webrtc/dtmfsender_unittest.cc',
         'app/webrtc/jsepsessiondescription_unittest.cc',
         'app/webrtc/localaudiosource_unittest.cc',
@@ -402,7 +402,7 @@
     },  # target libjingle_peerconnection_unittest
   ],
   'conditions': [
-    ['OS=="linux"', {
+    ['OS=="linux" or OS=="android"', {
       'targets': [
         {
           'target_name': 'libjingle_peerconnection_test_jar',
@@ -426,7 +426,7 @@
                 '<(PRODUCT_DIR)/libjingle_peerconnection_test.jar',
               ],
               'action': [
-                'build/build_jar.sh', '/usr', '<@(_outputs)',
+                'build/build_jar.sh', '<(java_home)', '<@(_outputs)',
                 '<(INTERMEDIATE_DIR)',
                 '<(java_src_dir):<(PRODUCT_DIR)/libjingle_peerconnection.jar:<(DEPTH)/third_party/junit/junit-4.11.jar',
                 '<@(java_files)'

@@ -300,8 +300,6 @@
         'base/gunit_prod.h',
         'base/helpers.cc',
         'base/helpers.h',
-        'base/host.cc',
-        'base/host.h',
         'base/httpbase.cc',
         'base/httpbase.h',
         'base/httpclient.cc',
@@ -574,7 +572,6 @@
               '-lcrypto',
               '-ldl',
               '-lrt',
-              '-lssl',
               '-lXext',
               '-lX11',
               '-lXcomposite',
@@ -650,7 +647,7 @@
             ],
           },
           'defines': [
-	    'SSL_USE_NSS',
+            'SSL_USE_NSS',
           ],
         }],
         ['OS=="win"', {
