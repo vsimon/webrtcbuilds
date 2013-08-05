@@ -11,7 +11,8 @@
 #ifndef WEBRTC_MODULES_AUDIO_CODING_NETEQ4_INTERFACE_NETEQ_H_
 #define WEBRTC_MODULES_AUDIO_CODING_NETEQ4_INTERFACE_NETEQ_H_
 
-#include <cstring>  // Provide access to size_t.
+#include <string.h>  // Provide access to size_t.
+
 #include <vector>
 
 #include "webrtc/modules/audio_coding/neteq4/interface/audio_decoder.h"
@@ -215,6 +216,12 @@ class NetEq {
 
   // Flushes both the packet buffer and the sync buffer.
   virtual void FlushBuffers() = 0;
+
+  // Current usage of packet-buffer and it's limits.
+  virtual void PacketBufferStatistics(int* current_num_packets,
+                                      int* max_num_packets,
+                                      int* current_memory_size_bytes,
+                                      int* max_memory_size_bytes) const = 0;
 
  protected:
   NetEq() {}

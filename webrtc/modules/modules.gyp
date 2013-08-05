@@ -259,7 +259,7 @@
         },
         {
           'target_name': 'modules_integrationtests',
-          'type': 'executable',
+          'type': '<(gtest_target_type)',
           'dependencies': [
             'audio_coding_module',
             'rtp_rtcp',
@@ -303,6 +303,15 @@
             'video_coding/codecs/test/videoprocessor_integrationtest.cc',
             'video_coding/codecs/vp8/test/vp8_impl_unittest.cc',
           ],
+          'conditions': [
+            # TODO(henrike): remove build_with_chromium==1 when the bots are
+            # using Chromium's buildbots.
+            ['build_with_chromium==1 and OS=="android" and gtest_target_type=="shared_library"', {
+              'dependencies': [
+                '<(DEPTH)/testing/android/native_test.gyp:native_test_native_code',
+              ],
+            }],
+          ],
         },
       ],
       'conditions': [
@@ -316,10 +325,17 @@
               'dependencies': [
                 '<(apk_tests_path):modules_unittests_apk',
               ],
-            }
+            },
+            {
+              'target_name': 'modules_integrationtests_apk_target',
+              'type': 'none',
+              'dependencies': [
+                '<(apk_tests_path):modules_integrationtests_apk',
+              ],
+            },
           ],
         }],
-      ]
+      ],
     }], # include_tests
   ], # conditions
 }

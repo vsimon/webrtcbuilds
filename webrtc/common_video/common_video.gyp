@@ -54,6 +54,7 @@
       ],
       'sources': [
         'interface/i420_video_frame.h',
+        'interface/texture_video_frame.h',
         'i420_video_frame.cc',
         'jpeg/include/jpeg.h',
         'jpeg/data_manager.cc',
@@ -65,6 +66,7 @@
         'libyuv/scaler.cc',
         'plane.h',
         'plane.cc',
+        'texture_video_frame.cc'
       ],
       # Silence jpeg struct padding warnings.
       'msvs_disabled_warnings': [ 4324, ],
@@ -75,7 +77,7 @@
       'targets': [
         {
           'target_name': 'common_video_unittests',
-          'type': 'executable',
+          'type': '<(gtest_target_type)',
           'dependencies': [
              'common_video',
              '<(DEPTH)/testing/gtest.gyp:gtest',
@@ -88,13 +90,38 @@
             'libyuv/libyuv_unittest.cc',
             'libyuv/scaler_unittest.cc',
             'plane_unittest.cc',
+            'texture_video_frame_unittest.cc'
           ],
           # Disable warnings to enable Win64 build, issue 1323.
           'msvs_disabled_warnings': [
             4267,  # size_t to int truncation.
           ],
+          'conditions': [
+            # TODO(henrike): remove build_with_chromium==1 when the bots are
+            # using Chromium's buildbots.
+            ['build_with_chromium==1 and OS=="android" and gtest_target_type=="shared_library"', {
+              'dependencies': [
+                '<(DEPTH)/testing/android/native_test.gyp:native_test_native_code',
+              ],
+            }],
+          ],
         },
       ],  # targets
+      'conditions': [
+        # TODO(henrike): remove build_with_chromium==1 when the bots are using
+        # Chromium's buildbots.
+        ['build_with_chromium==1 and OS=="android" and gtest_target_type=="shared_library"', {
+          'targets': [
+            {
+              'target_name': 'common_video_unittests_apk_target',
+              'type': 'none',
+              'dependencies': [
+                '<(apk_tests_path):common_video_unittests_apk',
+              ],
+            },
+          ],
+        }],
+      ],
     }],  # include_tests
   ],
 }
