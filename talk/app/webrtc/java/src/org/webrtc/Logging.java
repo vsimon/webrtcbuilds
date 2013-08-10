@@ -1,6 +1,6 @@
 /*
  * libjingle
- * Copyright 2011, Google Inc.
+ * Copyright 2013, Google Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,42 +25,56 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TALK_BASE_PACKETSOCKETFACTORY_H_
-#define TALK_BASE_PACKETSOCKETFACTORY_H_
+package org.webrtc;
 
-#include "talk/base/proxyinfo.h"
+import java.util.EnumSet;
 
-namespace talk_base {
+/** Java wrapper for WebRTC & libjingle logging. */
+public class Logging {
+  static {
+    System.loadLibrary("jingle_peerconnection_so");
+  }
 
-class AsyncPacketSocket;
+  // Keep in sync with webrtc/common_types.h:TraceLevel.
+  public enum TraceLevel {
+    TRACE_NONE(0x0000),
+    TRACE_STATEINFO(0x0001),
+    TRACE_WARNING(0x0002),
+    TRACE_ERROR(0x0004),
+    TRACE_CRITICAL(0x0008),
+    TRACE_APICALL(0x0010),
+    TRACE_DEFAULT(0x00ff),
+    TRACE_MODULECALL(0x0020),
+    TRACE_MEMORY(0x0100),
+    TRACE_TIMER(0x0200),
+    TRACE_STREAM(0x0400),
+    TRACE_DEBUG(0x0800),
+    TRACE_INFO(0x1000),
+    TRACE_TERSEINFO(0x2000),
+    TRACE_ALL(0xffff);
 
-class PacketSocketFactory {
- public:
-  enum Options {
-    OPT_SSLTCP = 0x01,  // Pseudo-TLS.
-    OPT_TLS = 0x02,
-    OPT_STUN = 0x04,
+    public final int level;
+    TraceLevel(int level) {
+      this.level = level;
+    }
   };
 
-  PacketSocketFactory() { }
-  virtual ~PacketSocketFactory() { }
+  // Keep in sync with talk/base/logging.h:LoggingSeverity.
+  public enum Severity {
+    LS_SENSITIVE, LS_VERBOSE, LS_INFO, LS_WARNING, LS_ERROR,
+  };
 
-  virtual AsyncPacketSocket* CreateUdpSocket(
-      const SocketAddress& address, int min_port, int max_port) = 0;
-  virtual AsyncPacketSocket* CreateServerTcpSocket(
-      const SocketAddress& local_address, int min_port, int max_port,
-      int opts) = 0;
 
-  // TODO: |proxy_info| and |user_agent| should be set
-  // per-factory and not when socket is created.
-  virtual AsyncPacketSocket* CreateClientTcpSocket(
-      const SocketAddress& local_address, const SocketAddress& remote_address,
-      const ProxyInfo& proxy_info, const std::string& user_agent, int opts) = 0;
+  // Enable tracing to |path| at |levels| and |severity|.
+  public static void enableTracing(
+      String path, EnumSet<TraceLevel> levels, Severity severity) {
+    int nativeLevel = 0;
+    for (TraceLevel level : levels) {
+      nativeLevel |= level.level;
+    }
+    nativeEnableTracing(path, nativeLevel, severity.ordinal());
+  }
 
- private:
-  DISALLOW_EVIL_CONSTRUCTORS(PacketSocketFactory);
-};
-
-}  // namespace talk_base
-
-#endif  // TALK_BASE_PACKETSOCKETFACTORY_H_
+  private static native void nativeEnableTracing(
+      String path, int nativeLevels, int nativeSeverity);
+}
