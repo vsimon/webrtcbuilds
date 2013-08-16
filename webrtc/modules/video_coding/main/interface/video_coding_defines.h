@@ -98,6 +98,8 @@ class VCMReceiveCallback {
       const uint64_t pictureId) {
     return -1;
   }
+  // Called when the current receive codec changes.
+  virtual void IncomingCodecChanged(const VideoCodec& codec) {}
 
  protected:
   virtual ~VCMReceiveCallback() {
@@ -119,8 +121,8 @@ class VCMSendStatisticsCallback {
 // Callback class used for informing the user of the incoming bit rate and frame rate.
 class VCMReceiveStatisticsCallback {
  public:
-  virtual int32_t ReceiveStatistics(const uint32_t bitRate,
-                                          const uint32_t frameRate) = 0;
+  virtual int32_t OnReceiveStatisticsUpdate(const uint32_t bitRate,
+                                            const uint32_t frameRate) = 0;
 
  protected:
   virtual ~VCMReceiveStatisticsCallback() {

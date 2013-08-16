@@ -85,7 +85,6 @@ NetEqImpl::NetEqImpl(int fs,
       current_cng_rtp_payload_type_(0xFF),  // Invalid RTP payload type.
       ssrc_(0),
       first_packet_(true),
-      dtmf_enabled_(true),
       error_code_(0),
       decoder_error_code_(0),
       crit_sect_(CriticalSectionWrapper::CreateCriticalSection()) {
@@ -245,12 +244,6 @@ bool NetEqImpl::SetExtraDelay(int extra_delay_ms) {
     return true;
   }
   return false;
-}
-
-int NetEqImpl::EnableDtmf() {
-  CriticalSectionScoped lock(crit_sect_);
-  dtmf_enabled_ = true;
-  return kOK;
 }
 
 void NetEqImpl::SetPlayoutMode(NetEqPlayoutMode mode) {
@@ -448,24 +441,22 @@ int NetEqImpl::InsertPacketInternal(const WebRtcRTPHeader& rtp_header,
     assert(current_packet);
     assert(current_packet->payload);
     if (decoder_database_->IsDtmf(current_packet->header.payloadType)) {
-      if (dtmf_enabled_) {
-        DtmfEvent event;
-        int ret = DtmfBuffer::ParseEvent(
-            current_packet->header.timestamp,
-            current_packet->payload,
-            current_packet->payload_length,
-            &event);
-        if (ret != DtmfBuffer::kOK) {
-          LOG_FERR2(LS_WARNING, ParseEvent, ret,
-                    current_packet->payload_length);
-          PacketBuffer::DeleteAllPackets(&packet_list);
-          return kDtmfParsingError;
-        }
-        if (dtmf_buffer_->InsertEvent(event) != DtmfBuffer::kOK) {
-          LOG_FERR0(LS_WARNING, InsertEvent);
-          PacketBuffer::DeleteAllPackets(&packet_list);
-          return kDtmfInsertError;
-        }
+      DtmfEvent event;
+      int ret = DtmfBuffer::ParseEvent(
+          current_packet->header.timestamp,
+          current_packet->payload,
+          current_packet->payload_length,
+          &event);
+      if (ret != DtmfBuffer::kOK) {
+        LOG_FERR2(LS_WARNING, ParseEvent, ret,
+                  current_packet->payload_length);
+        PacketBuffer::DeleteAllPackets(&packet_list);
+        return kDtmfParsingError;
+      }
+      if (dtmf_buffer_->InsertEvent(event) != DtmfBuffer::kOK) {
+        LOG_FERR0(LS_WARNING, InsertEvent);
+        PacketBuffer::DeleteAllPackets(&packet_list);
+        return kDtmfInsertError;
       }
       // TODO(hlundin): Let the destructor of Packet handle the payload.
       delete [] current_packet->payload;
@@ -517,11 +508,13 @@ int NetEqImpl::InsertPacketInternal(const WebRtcRTPHeader& rtp_header,
     // Reset DSP timestamp etc. if packet buffer flushed.
     new_codec_ = true;
     LOG_F(LS_WARNING) << "Packet buffer flushed";
+  } else if (ret == PacketBuffer::kOversizePacket) {
+    LOG_F(LS_WARNING) << "Packet larger than packet buffer";
+    return kOversizePacket;
   } else if (ret != PacketBuffer::kOK) {
     LOG_FERR1(LS_WARNING, InsertPacketList, packet_list.size());
     PacketBuffer::DeleteAllPackets(&packet_list);
-    assert(false);
-    // TODO(hlundin): Take care of error codes.
+    return kOtherError;
   }
   if (current_rtp_payload_type_ != 0xFF) {
     const DecoderDatabase::DecoderInfo* dec_info =
@@ -697,10 +690,9 @@ int NetEqImpl::GetAudioInternal(size_t max_length, int16_t* output,
       samples_from_sync << " samples";
   if (samples_from_sync != output_size_samples_) {
     LOG_F(LS_ERROR) << "samples_from_sync != output_size_samples_";
-    assert(false);
+    // TODO(minyue): treatment of under-run, filling zeros
     memset(output, 0, num_output_samples * sizeof(int16_t));
     *samples_per_channel = output_size_samples_;
-    last_mode_ = kModeError;
     return kSampleUnderrun;
   }
   *samples_per_channel = output_size_samples_;

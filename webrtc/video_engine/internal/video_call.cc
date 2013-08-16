@@ -21,9 +21,18 @@
 #include "webrtc/video_engine/include/vie_rtp_rtcp.h"
 #include "webrtc/video_engine/internal/video_receive_stream.h"
 #include "webrtc/video_engine/internal/video_send_stream.h"
-#include "webrtc/video_engine/new_include/video_engine.h"
 
 namespace webrtc {
+
+namespace newapi {
+VideoCall* VideoCall::Create(const newapi::VideoCall::Config& config) {
+  webrtc::VideoEngine* video_engine = webrtc::VideoEngine::Create();
+  assert(video_engine != NULL);
+
+  return new internal::VideoCall(video_engine, config);
+}
+}  // namespace newapi
+
 namespace internal {
 
 VideoCall::VideoCall(webrtc::VideoEngine* video_engine,
@@ -44,8 +53,9 @@ VideoCall::VideoCall(webrtc::VideoEngine* video_engine,
 }
 
 VideoCall::~VideoCall() {
-  rtp_rtcp_->Release();
   codec_->Release();
+  rtp_rtcp_->Release();
+  webrtc::VideoEngine::Delete(video_engine_);
 }
 
 newapi::PacketReceiver* VideoCall::Receiver() { return this; }
