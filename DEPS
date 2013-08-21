@@ -9,6 +9,7 @@ vars = {
   # Use this googlecode_url variable only if there is an internal mirror for it.
   # If you do not know, use the full path while defining your new deps entry.
   "googlecode_url": "http://%s.googlecode.com/svn",
+  "sourceforge_url": "http://svn.code.sf.net/p/%(repo)s/code",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
   "chromium_revision": "217707",
 
@@ -41,6 +42,8 @@ deps = {
   "third_party/expat":
     Var("chromium_trunk") + "/src/third_party/expat@" + Var("chromium_revision"),
 
+  # When rolling gflags, also update deps/third_party/webrtc/webrtc.DEPS/DEPS
+  # in Chromium's repo.
   "third_party/gflags/src":
     (Var("googlecode_url") % "gflags") + "/trunk/src@84",
 
@@ -51,7 +54,7 @@ deps = {
     Var("chromium_trunk") + "/src/third_party/jsoncpp@" + Var("chromium_revision"),
 
   "third_party/jsoncpp/source":
-    "http://jsoncpp.svn.sourceforge.net/svnroot/jsoncpp/trunk/jsoncpp@248",
+    (Var("sourceforge_url") % {"repo": "jsoncpp"}) + "/trunk/jsoncpp@248",
 
   "third_party/junit/":
     (Var("googlecode_url") % "webrtc") + "/deps/third_party/junit@3367",

@@ -32,6 +32,9 @@
         'common/mac/video_renderer_mac.h',
         'common/mac/video_renderer_mac.mm',
         'common/null_platform_renderer.cc',
+        'common/null_transport.cc',
+        'common/null_transport.h',
+        'common/rtp_rtcp_observer.h',
         'common/run_tests.cc',
         'common/run_tests.h',
         'common/run_loop.cc',
@@ -126,7 +129,7 @@
       ],
     },
     {
-      'target_name': 'video_full_stack',
+      'target_name': 'video_full_stack_tests',
       'type': 'executable',
       'sources': [
         'full_stack.cc',
@@ -143,6 +146,7 @@
       'type': 'executable',
       'sources': [
         'engine_tests.cc',
+        'send_stream_tests.cc',
         'test_main.cc',
       ],
       'dependencies': [

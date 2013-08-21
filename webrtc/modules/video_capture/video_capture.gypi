@@ -126,6 +126,15 @@
                 'ios/video_capture_ios_objc.h',
                 'ios/video_capture_ios_objc.mm',
               ],
+              'all_dependent_settings': {
+                'xcode_settings': {
+                  'OTHER_LDFLAGS': [
+                    '-framework AVFoundation',
+                    '-framework CoreMedia',
+                    '-framework CoreVideo',
+                  ],
+                },
+              },
             }],  # ios
           ], # conditions
         }],  # include_internal_video_capture
@@ -136,7 +145,7 @@
     ['include_tests==1', {
       'targets': [
         {
-          'target_name': 'video_capture_integrationtests',
+          'target_name': 'video_capture_tests',
           'type': 'executable',
           'dependencies': [
             'video_capture_module',
