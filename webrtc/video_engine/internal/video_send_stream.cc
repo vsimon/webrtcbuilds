@@ -10,12 +10,15 @@
 
 #include "webrtc/video_engine/internal/video_send_stream.h"
 
+#include <string.h>
+
 #include <vector>
 
 #include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
 #include "webrtc/video_engine/include/vie_base.h"
 #include "webrtc/video_engine/include/vie_capture.h"
 #include "webrtc/video_engine/include/vie_codec.h"
+#include "webrtc/video_engine/include/vie_external_codec.h"
 #include "webrtc/video_engine/include/vie_network.h"
 #include "webrtc/video_engine/include/vie_rtp_rtcp.h"
 #include "webrtc/video_engine/new_include/video_send_stream.h"
@@ -77,7 +80,7 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
                                  bool overuse_detection,
                                  webrtc::VideoEngine* video_engine,
                                  const newapi::VideoSendStream::Config& config)
-    : transport_(transport), config_(config) {
+    : transport_(transport), config_(config), external_codec_(NULL) {
 
   if (config_.codec.numberOfSimulcastStreams > 0) {
     assert(config_.rtp.ssrcs.size() == config_.codec.numberOfSimulcastStreams);
@@ -92,9 +95,24 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
   rtp_rtcp_ = ViERTP_RTCP::GetInterface(video_engine);
   assert(rtp_rtcp_ != NULL);
 
-  assert(config_.rtp.ssrcs.size() == 1);
-  rtp_rtcp_->SetLocalSSRC(channel_, config_.rtp.ssrcs[0]);
+  if (config_.rtp.ssrcs.size() == 1) {
+    rtp_rtcp_->SetLocalSSRC(channel_, config_.rtp.ssrcs[0]);
+  } else {
+    for (size_t i = 0; i < config_.rtp.ssrcs.size(); ++i) {
+      rtp_rtcp_->SetLocalSSRC(channel_, config_.rtp.ssrcs[i],
+                              kViEStreamTypeNormal, i);
+    }
+  }
   rtp_rtcp_->SetNACKStatus(channel_, config_.rtp.nack.rtp_history_ms > 0);
+  rtp_rtcp_->SetTransmissionSmoothingStatus(channel_, config_.pacing);
+  rtp_rtcp_->SetSendTimestampOffsetStatus(channel_, true, 1);
+
+  char rtcp_cname[ViERTP_RTCP::KMaxRTCPCNameLength];
+  assert(config_.rtp.c_name.length() < ViERTP_RTCP::KMaxRTCPCNameLength);
+  strncpy(rtcp_cname, config_.rtp.c_name.c_str(), sizeof(rtcp_cname) - 1);
+  rtcp_cname[sizeof(rtcp_cname) - 1] = '\0';
+
+  rtp_rtcp_->SetRTCPCName(channel_, rtcp_cname);
 
   capture_ = ViECapture::GetInterface(video_engine);
   capture_->AllocateExternalCaptureDevice(capture_id_, external_capture_);
@@ -104,6 +122,15 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
   assert(network_ != NULL);
 
   network_->RegisterSendTransport(channel_, *this);
+
+  if (config.encoder) {
+    external_codec_ = ViEExternalCodec::GetInterface(video_engine);
+    if (external_codec_->RegisterExternalSendCodec(
+        channel_, config.codec.plType, config.encoder,
+        config.internal_source) != 0) {
+      abort();
+    }
+  }
 
   codec_ = ViECodec::GetInterface(video_engine);
   if (codec_->SetSendCodec(channel_, config_.codec) != 0) {
@@ -126,9 +153,16 @@ VideoSendStream::~VideoSendStream() {
   capture_->DisconnectCaptureDevice(channel_);
   capture_->ReleaseCaptureDevice(capture_id_);
 
+  if (external_codec_) {
+    external_codec_->DeRegisterExternalSendCodec(channel_,
+                                                 config_.codec.plType);
+  }
+
   video_engine_base_->Release();
   capture_->Release();
   codec_->Release();
+  if (external_codec_)
+    external_codec_->Release();
   network_->Release();
   rtp_rtcp_->Release();
 }
@@ -199,7 +233,7 @@ int VideoSendStream::SendPacket(int /*channel*/,
   assert(length >= 0);
   bool success = transport_->SendRTP(static_cast<const uint8_t*>(packet),
                                      static_cast<size_t>(length));
-  return success ? 0 : -1;
+  return success ? length : -1;
 }
 
 int VideoSendStream::SendRTCPPacket(int /*channel*/,
@@ -208,7 +242,7 @@ int VideoSendStream::SendRTCPPacket(int /*channel*/,
   assert(length >= 0);
   bool success = transport_->SendRTCP(static_cast<const uint8_t*>(packet),
                                       static_cast<size_t>(length));
-  return success ? 0 : -1;
+  return success ? length : -1;
 }
 
 bool VideoSendStream::DeliverRtcp(const uint8_t* packet, size_t length) {

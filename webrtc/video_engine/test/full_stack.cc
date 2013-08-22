@@ -262,7 +262,7 @@ class VideoAnalyzer : public newapi::PacketReceiver,
   scoped_ptr<EventWrapper> trigger_;
 };
 
-TEST_P(FullStackTest, NoPacketLoss) {
+TEST_P(FullStackTest, DISABLED_NoPacketLoss) {
   FullStackTestParams params = GetParam();
 
   scoped_ptr<test::VideoRenderer> local_preview(test::VideoRenderer::Create(
@@ -304,18 +304,15 @@ TEST_P(FullStackTest, NoPacketLoss) {
 
   Clock* test_clock = Clock::GetRealTimeClock();
 
-  scoped_ptr<test::YuvFileFrameGenerator> file_frame_generator(
-      test::YuvFileFrameGenerator::Create(
-          test::ResourcePath(params.clip.name, "yuv").c_str(),
-          params.clip.width,
-          params.clip.height,
-          test_clock));
-  ASSERT_TRUE(file_frame_generator.get() != NULL);
-
   scoped_ptr<test::FrameGeneratorCapturer> file_capturer(
       test::FrameGeneratorCapturer::Create(
-          &analyzer, file_frame_generator.get(), params.clip.fps));
-  ASSERT_TRUE(file_capturer.get() != NULL);
+          &analyzer,
+          test::YuvFileFrameGenerator::Create(
+              test::ResourcePath(params.clip.name, "yuv").c_str(),
+              params.clip.width,
+              params.clip.height,
+              test_clock),
+          params.clip.fps));
 
   newapi::VideoReceiveStream::Config receive_config =
       call->GetDefaultReceiveConfig();
