@@ -442,7 +442,6 @@
   fun:talk_base::Thread::Send
   fun:FakeAudioCaptureModule::UpdateProcessing
   fun:FakeAudioCaptureModule::StopPlayout
-  fun:webrtc::VoEBaseImpl::StopPlayout
   ...
 }
 {
@@ -471,6 +470,23 @@
   fun:FakeAudioCaptureModule::UpdateProcessing
   fun:FakeAudioCaptureModule::StopRecording
   fun:webrtc::VoEBaseImpl::StopSend
+  ...
+}
+{
+  bug_1205_47
+  ThreadSanitizer:Race
+  fun:cricket::WebRtcDecoderObserver::IncomingRate
+  fun:webrtc::ViEChannel::OnReceiveStatisticsUpdate
+  fun:webrtc::VideoCodingModuleImpl::Process
+  fun:webrtc::ProcessThreadImpl::Process
+  fun:webrtc::ProcessThreadImpl::Run
+  fun:webrtc::ThreadPosix::Run
+  fun:StartThread
+}
+{
+  bug_1205_48
+  ThreadSanitizer:Race
+  fun:webrtc::Bitrate::BitrateLast
   ...
 }
 {
