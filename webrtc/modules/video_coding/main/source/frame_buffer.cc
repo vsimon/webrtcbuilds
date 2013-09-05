@@ -86,7 +86,7 @@ VCMFrameBuffer::InsertPacket(const VCMPacket& packet,
                              int64_t timeInMs,
                              VCMDecodeErrorMode decode_error_mode,
                              const FrameData& frame_data) {
-    // is this packet part of this frame
+    // Is this packet part of this frame?
     if (TimeStamp() && (TimeStamp() != packet.timestamp)) {
         return kTimeStampError;
     }
@@ -209,14 +209,6 @@ VCMFrameBuffer::Reset() {
     VCMEncodedFrame::Reset();
 }
 
-void
-VCMFrameBuffer::SetNotDecodableIfIncomplete() {
-  if (_state == kStateDecodable) {
-    _state = kStateIncomplete;
-    _sessionInfo.SetNotDecodableIfIncomplete();
-  }
-}
-
 // Set state of frame
 void
 VCMFrameBuffer::SetState(VCMFrameBufferStateEnum state) {
@@ -249,31 +241,6 @@ VCMFrameBuffer::SetState(VCMFrameBufferStateEnum state) {
         break;
     }
     _state = state;
-}
-
-int32_t
-VCMFrameBuffer::ExtractFromStorage(const EncodedVideoData& frameFromStorage) {
-    _frameType = ConvertFrameType(frameFromStorage.frameType);
-    _timeStamp = frameFromStorage.timeStamp;
-    _payloadType = frameFromStorage.payloadType;
-    _encodedWidth = frameFromStorage.encodedWidth;
-    _encodedHeight = frameFromStorage.encodedHeight;
-    _missingFrame = frameFromStorage.missingFrame;
-    _completeFrame = frameFromStorage.completeFrame;
-    _renderTimeMs = frameFromStorage.renderTimeMs;
-    _codec = frameFromStorage.codec;
-    const uint8_t *prevBuffer = _buffer;
-    if (VerifyAndAllocate(frameFromStorage.payloadSize) < 0) {
-        return VCM_MEMORY;
-    }
-    _sessionInfo.UpdateDataPointers(prevBuffer, _buffer);
-    memcpy(_buffer, frameFromStorage.payloadData, frameFromStorage.payloadSize);
-    _length = frameFromStorage.payloadSize;
-    return VCM_OK;
-}
-
-int VCMFrameBuffer::NotDecodablePackets() const {
-  return _sessionInfo.packets_not_decodable();
 }
 
 // Set counted status (as counted by JB or not)

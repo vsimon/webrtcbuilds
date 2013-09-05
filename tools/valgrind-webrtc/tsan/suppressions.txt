@@ -16,6 +16,29 @@
   fun:webrtc::Trace::SetTraceCallback
   ...
 }
+{
+  BUG_2349
+  ThreadSanitizer:Race
+  fun:webrtc::RTPSender::SendToNetwork
+  fun:webrtc::RTPSenderVideo::SendVideoPacket
+  fun:webrtc::RTPSenderVideo::SendVP8
+  fun:webrtc::RTPSenderVideo::SendVideo
+  fun:webrtc::RTPSender::SendOutgoingData
+  fun:webrtc::ModuleRtpRtcpImpl::SendOutgoingData
+  fun:webrtc::ModuleRtpRtcpImpl::SendOutgoingData
+  fun:webrtc::ViEEncoder::SendData
+  fun:webrtc::VCMEncodedFrameCallback::Encoded
+  fun:webrtc::test::FakeEncoder::Encode
+  fun:webrtc::VCMGenericEncoder::Encode
+  fun:webrtc::VideoCodingModuleImpl::AddVideoFrame
+  fun:webrtc::ViEEncoder::DeliverFrame
+  fun:webrtc::ViEFrameProviderBase::DeliverFrame
+  fun:webrtc::ViECapturer::DeliverI420Frame
+  fun:webrtc::ViECapturer::ViECaptureProcess
+  fun:webrtc::ViECapturer::ViECaptureThreadFunction
+  fun:webrtc::ThreadPosix::Run
+  fun:StartThread
+}
 
 # Known bugs we don't care about / problems in third parties
 {
@@ -25,11 +48,27 @@
   fun:__tz*
 }
 {
-  don't care about issues in trace functions
+  Don't care about issues in trace functions
   ThreadSanitizer:Race
   ...
   fun:webrtc::Trace::Add
   ...
+}
+{
+  More not caring about issues in trace functions
+  ThreadSanitizer:Race
+  ...
+  fun:webrtc::Trace::set_level_filter
+  ...
+}
+{
+  Test posix socket HasIncoming
+  ThreadSanitizer:Race
+  fun:webrtc::test::UdpSocketPosix::HasIncoming
+  fun:webrtc::test::UdpSocketManagerPosixImpl::Process
+  fun:webrtc::test::UdpSocketManagerPosixImpl::Run
+  fun:webrtc::ThreadPosix::Run
+  fun:webrtc::StartThread
 }
 
 #-----------------------------------------------------------------------

@@ -175,10 +175,8 @@ class VCMJitterBuffer {
   // Returns a list of the sequence numbers currently missing.
   uint16_t* GetNackList(uint16_t* nack_list_size, bool* request_key_frame);
 
-  // Set decode error mode. Setting kNoErrors will have immediate effect.
-  // Setting kWithErrors and kSelectiveErrors will take full effect once the
-  // existing incomplete frames leave the JB or have a packet added (as that
-  // would cause their state to be reevlauated).
+  // Set decode error mode - Should not be changed in the middle of the
+  // session. Changes will not influence frames already in the buffer.
   void SetDecodeErrorMode(VCMDecodeErrorMode error_mode);
   int64_t LastDecodedTimestamp() const;
   VCMDecodeErrorMode decode_error_mode() const {return decode_error_mode_;}
@@ -299,7 +297,6 @@ class VCMJitterBuffer {
   bool first_packet_since_reset_;
 
   // Statistics.
-  int num_not_decodable_packets_;
   // Frame counter for each type (key, delta, golden, key-delta).
   unsigned int receive_statistics_[4];
   // Latest calculated frame rates of incoming stream.
