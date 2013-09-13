@@ -24,15 +24,9 @@
 #error iSAC and iSACFX codecs cannot be enabled at the same time
 #endif
 
-#ifdef WIN32
-// OS-dependent case-insensitive string comparison
-#define STR_CASE_CMP(x, y) ::_stricmp(x, y)
-#else
-// OS-dependent case-insensitive string comparison
-#define STR_CASE_CMP(x, y) ::strcasecmp(x, y)
-#endif
-
 namespace webrtc {
+
+namespace acm1 {
 
 // 60 ms is the maximum block size we support. An extra 20 ms is considered
 // for safety if process() method is not called when it should be, i.e. we
@@ -111,6 +105,8 @@ struct WebRtcACMAudioBuff {
   uint32_t last_timestamp;
   uint32_t last_in_timestamp;
 };
+
+}  // namespace acm1
 
 }  // namespace webrtc
 

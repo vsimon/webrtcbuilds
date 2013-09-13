@@ -10,6 +10,7 @@
 
 #include "webrtc/voice_engine/channel.h"
 
+#include "webrtc/common.h"
 #include "webrtc/modules/audio_device/include/audio_device.h"
 #include "webrtc/modules/audio_processing/include/audio_processing.h"
 #include "webrtc/modules/rtp_rtcp/interface/receive_statistics.h"
@@ -653,6 +654,21 @@ Channel::OnReceivedPayloadData(const uint8_t* payloadData,
     return 0;
 }
 
+bool Channel::OnRecoveredPacket(const uint8_t* rtp_packet,
+                                int rtp_packet_length) {
+  RTPHeader header;
+  if (!rtp_header_parser_->Parse(rtp_packet, rtp_packet_length, &header)) {
+    WEBRTC_TRACE(kTraceDebug, webrtc::kTraceVoice, _channelId,
+                 "IncomingPacket invalid RTP header");
+    return false;
+  }
+  header.payload_type_frequency =
+      rtp_payload_registry_->GetPayloadTypeFrequency(header.payloadType);
+  if (header.payload_type_frequency < 0)
+    return false;
+  return ReceivePacket(rtp_packet, rtp_packet_length, header, false);
+}
+
 int32_t Channel::GetAudioFrame(int32_t id, AudioFrame& audioFrame)
 {
     WEBRTC_TRACE(kTraceStream, kTraceVoice, VoEId(_instanceId,_channelId),
@@ -801,13 +817,14 @@ Channel::NeededFrequency(int32_t id)
 int32_t
 Channel::CreateChannel(Channel*& channel,
                        int32_t channelId,
-                       uint32_t instanceId)
+                       uint32_t instanceId,
+                       const Config& config)
 {
     WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(instanceId,channelId),
                  "Channel::CreateChannel(channelId=%d, instanceId=%d)",
         channelId, instanceId);
 
-    channel = new Channel(channelId, instanceId);
+    channel = new Channel(channelId, instanceId, config);
     if (channel == NULL)
     {
         WEBRTC_TRACE(kTraceMemory, kTraceVoice,
@@ -885,7 +902,8 @@ Channel::RecordFileEnded(int32_t id)
 }
 
 Channel::Channel(int32_t channelId,
-                 uint32_t instanceId) :
+                 uint32_t instanceId,
+                 const Config& config) :
     _fileCritSect(*CriticalSectionWrapper::CreateCriticalSection()),
     _callbackCritSect(*CriticalSectionWrapper::CreateCriticalSection()),
     _instanceId(instanceId),
@@ -900,7 +918,7 @@ Channel::Channel(int32_t channelId,
         VoEModuleId(instanceId, channelId), Clock::GetRealTimeClock(), this,
         this, this, rtp_payload_registry_.get())),
     telephone_event_handler_(rtp_receiver_->GetTelephoneEventHandler()),
-    _audioCodingModule(*AudioCodingModule::Create(
+    _audioCodingModule(*config.Get<AudioCodingModuleFactory>().Create(
         VoEModuleId(instanceId, channelId))),
     _rtpDumpIn(*RtpDump::CreateRtpDump()),
     _rtpDumpOut(*RtpDump::CreateRtpDump()),
@@ -989,7 +1007,8 @@ Channel::Channel(int32_t channelId,
     _RxVadDetection(false),
     _rxApmIsEnabled(false),
     _rxAgcIsEnabled(false),
-    _rxNsIsEnabled(false)
+    _rxNsIsEnabled(false),
+    restored_packet_in_use_(false)
 {
     WEBRTC_TRACE(kTraceMemory, kTraceVoice, VoEId(_instanceId,_channelId),
                  "Channel::Channel() - ctor");
@@ -2190,60 +2209,94 @@ int32_t Channel::ReceivedRTPPacket(const int8_t* data, int32_t length) {
                  VoEId(_instanceId,_channelId),
                  "Channel::SendPacket() RTP dump to input file failed");
   }
+  const uint8_t* received_packet = reinterpret_cast<const uint8_t*>(data);
   RTPHeader header;
-  if (!rtp_header_parser_->Parse(reinterpret_cast<const uint8_t*>(data),
-                                 static_cast<uint16_t>(length), &header)) {
-    WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVideo,
-                 VoEId(_instanceId,_channelId),
-                 "IncomingPacket invalid RTP header");
+  if (!rtp_header_parser_->Parse(received_packet, length, &header)) {
+    WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVoice, _channelId,
+                 "Incoming packet: invalid RTP header");
     return -1;
   }
   header.payload_type_frequency =
       rtp_payload_registry_->GetPayloadTypeFrequency(header.payloadType);
-  if (header.payload_type_frequency < 0) {
+  if (header.payload_type_frequency < 0)
     return -1;
+  rtp_receive_statistics_->IncomingPacket(header, length,
+                                          IsPacketRetransmitted(header));
+  rtp_payload_registry_->SetIncomingPayloadType(header);
+  return ReceivePacket(received_packet, length, header,
+                       IsPacketInOrder(header)) ? 0 : -1;
+}
+
+bool Channel::ReceivePacket(const uint8_t* packet,
+                            int packet_length,
+                            const RTPHeader& header,
+                            bool in_order) {
+  if (rtp_payload_registry_->IsEncapsulated(header)) {
+    return HandleEncapsulation(packet, packet_length, header);
   }
-  bool retransmitted = IsPacketRetransmitted(header);
-  bool in_order = rtp_receiver_->InOrderPacket(header.sequenceNumber);
-  rtp_receive_statistics_->IncomingPacket(header, static_cast<uint16_t>(length),
-                                          retransmitted, in_order);
+  const uint8_t* payload = packet + header.headerLength;
+  int payload_length = packet_length - header.headerLength;
+  assert(payload_length >= 0);
   PayloadUnion payload_specific;
   if (!rtp_payload_registry_->GetPayloadSpecifics(header.payloadType,
-                                                 &payload_specific)) {
-    return -1;
+                                                  &payload_specific)) {
+    return false;
   }
-  // Deliver RTP packet to RTP/RTCP module for parsing
-  // The packet will be pushed back to the channel thru the
-  // OnReceivedPayloadData callback so we don't push it to the ACM here
-  if (!rtp_receiver_->IncomingRtpPacket(&header,
-                                        reinterpret_cast<const uint8_t*>(data),
-                                        static_cast<uint16_t>(length),
-                                        payload_specific, in_order)) {
-    _engineStatisticsPtr->SetLastError(
-        VE_SOCKET_TRANSPORT_MODULE_ERROR, kTraceWarning,
-        "Channel::IncomingRTPPacket() RTP packet is invalid");
+  return rtp_receiver_->IncomingRtpPacket(header, payload, payload_length,
+                                          payload_specific, in_order);
+}
+
+bool Channel::HandleEncapsulation(const uint8_t* packet,
+                                  int packet_length,
+                                  const RTPHeader& header) {
+  if (!rtp_payload_registry_->IsRtx(header))
+    return false;
+
+  // Remove the RTX header and parse the original RTP header.
+  if (packet_length < header.headerLength)
+    return false;
+  if (packet_length > kVoiceEngineMaxIpPacketSizeBytes)
+    return false;
+  if (restored_packet_in_use_) {
+    WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVoice, _channelId,
+                 "Multiple RTX headers detected, dropping packet");
+    return false;
   }
-  return 0;
+  uint8_t* restored_packet_ptr = restored_packet_;
+  if (!rtp_payload_registry_->RestoreOriginalPacket(
+      &restored_packet_ptr, packet, &packet_length, rtp_receiver_->SSRC(),
+      header)) {
+    WEBRTC_TRACE(webrtc::kTraceDebug, webrtc::kTraceVoice, _channelId,
+                 "Incoming RTX packet: invalid RTP header");
+    return false;
+  }
+  restored_packet_in_use_ = true;
+  bool ret = OnRecoveredPacket(restored_packet_ptr, packet_length);
+  restored_packet_in_use_ = false;
+  return ret;
+}
+
+bool Channel::IsPacketInOrder(const RTPHeader& header) const {
+  StreamStatistician* statistician =
+      rtp_receive_statistics_->GetStatistician(header.ssrc);
+  if (!statistician)
+    return false;
+  return statistician->IsPacketInOrder(header.sequenceNumber);
 }
 
 bool Channel::IsPacketRetransmitted(const RTPHeader& header) const {
-  bool rtx_enabled = false;
-  uint32_t rtx_ssrc = 0;
-  int rtx_payload_type = 0;
-  rtp_receiver_->RTXStatus(&rtx_enabled, &rtx_ssrc, &rtx_payload_type);
-  if (!rtx_enabled) {
-    // Check if this is a retransmission.
-    StreamStatistician::Statistics stats;
-    StreamStatistician* statistician =
-        rtp_receive_statistics_->GetStatistician(header.ssrc);
-    if (statistician && statistician->GetStatistics(&stats, false)) {
-      uint16_t min_rtt = 0;
-      _rtpRtcpModule->RTT(rtp_receiver_->SSRC(), NULL, NULL, &min_rtt, NULL);
-      return rtp_receiver_->RetransmitOfOldPacket(header, stats.jitter,
-                                                  min_rtt);
-    }
-  }
-  return false;
+  // Retransmissions are handled separately if RTX is enabled.
+  if (rtp_payload_registry_->RtxEnabled())
+    return false;
+  StreamStatistician* statistician =
+      rtp_receive_statistics_->GetStatistician(header.ssrc);
+  if (!statistician)
+    return false;
+  // Check if this is a retransmission.
+  uint16_t min_rtt = 0;
+  _rtpRtcpModule->RTT(rtp_receiver_->SSRC(), NULL, NULL, &min_rtt, NULL);
+  return !IsPacketInOrder(header) &&
+      statistician->IsRetransmitOfOldPacket(header, min_rtt);
 }
 
 int32_t Channel::ReceivedRTCPPacket(const int8_t* data, int32_t length) {
@@ -4182,8 +4235,8 @@ Channel::GetFECStatus(bool& enabled, int& redPayloadtype)
 void Channel::SetNACKStatus(bool enable, int maxNumberOfPackets) {
   // None of these functions can fail.
   _rtpRtcpModule->SetStorePacketsStatus(enable, maxNumberOfPackets);
-  rtp_receiver_->SetNACKStatus(enable ? kNackRtcp : kNackOff,
-      maxNumberOfPackets);
+  rtp_receive_statistics_->SetMaxReorderingThreshold(maxNumberOfPackets);
+  rtp_receiver_->SetNACKStatus(enable ? kNackRtcp : kNackOff);
   if (enable)
     _audioCodingModule.EnableNack(maxNumberOfPackets);
   else

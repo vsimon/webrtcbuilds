@@ -76,7 +76,6 @@ class ACMVQMonCallback {
 class AudioCodingModule: public Module {
  protected:
   AudioCodingModule() {}
-  virtual ~AudioCodingModule() {}
 
  public:
   ///////////////////////////////////////////////////////////////////////////
@@ -88,7 +87,9 @@ class AudioCodingModule: public Module {
   //
   static AudioCodingModule* Create(const int32_t id);
   static AudioCodingModule* Create(const int32_t id, Clock* clock);
+  virtual ~AudioCodingModule() {};
 
+  // TODO(ajm): Deprecated. Remove all calls to this unneeded method.
   static void Destroy(AudioCodingModule* module);
 
   ///////////////////////////////////////////////////////////////////////////
@@ -1014,6 +1015,20 @@ class AudioCodingModule: public Module {
   // is returned.
   //
   virtual std::vector<uint16_t> GetNackList(int round_trip_time_ms) const = 0;
+};
+
+struct AudioCodingModuleFactory {
+  AudioCodingModuleFactory() {}
+  virtual ~AudioCodingModuleFactory() {}
+
+  virtual AudioCodingModule* Create(int id) const;
+};
+
+struct NewAudioCodingModuleFactory : AudioCodingModuleFactory {
+  NewAudioCodingModuleFactory() {}
+  virtual ~NewAudioCodingModuleFactory() {}
+
+  virtual AudioCodingModule* Create(int id) const;
 };
 
 }  // namespace webrtc

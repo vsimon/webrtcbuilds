@@ -50,7 +50,7 @@
         'video_coding/codecs/test_framework/test_framework.gypi',
         'video_coding/codecs/tools/video_codecs_tools.gypi',
       ], # includes
-     'variables': {
+      'variables': {
         'conditions': [
           # Desktop capturer is supported only on Windows, OSX and Linux.
           ['OS=="win" or OS=="mac" or OS=="linux"', {
@@ -87,7 +87,7 @@
             'webrtc_utility',
             'webrtc_video_coding',
             '<@(neteq_dependencies)',
-            '<(rbe_components_path)/remote_bitrate_estimator_components.gyp:rbe_components_unittests',
+            '<(rbe_components_path)/remote_bitrate_estimator_components.gyp:rbe_components',
             '<(DEPTH)/testing/gmock.gyp:gmock',
             '<(DEPTH)/testing/gtest.gyp:gtest',
             '<(webrtc_root)/common_audio/common_audio.gyp:common_audio',
@@ -164,13 +164,16 @@
             'pacing/paced_sender_unittest.cc',
             'remote_bitrate_estimator/include/mock/mock_remote_bitrate_observer.h',
             'remote_bitrate_estimator/bitrate_estimator_unittest.cc',
+            'remote_bitrate_estimator/remote_bitrate_estimator_single_stream_unittest.cc',
+            'remote_bitrate_estimator/remote_bitrate_estimator_unittest_helper.cc',
+            'remote_bitrate_estimator/remote_bitrate_estimator_unittest_helper.h',
             'remote_bitrate_estimator/rtp_to_ntp_unittest.cc',
             'rtp_rtcp/source/mock/mock_rtp_payload_strategy.h',
+            'rtp_rtcp/source/fec_receiver_unittest.cc',
             'rtp_rtcp/source/fec_test_helper.cc',
             'rtp_rtcp/source/fec_test_helper.h',
             'rtp_rtcp/source/nack_rtx_unittest.cc',
             'rtp_rtcp/source/producer_fec_unittest.cc',
-            'rtp_rtcp/source/receiver_fec_unittest.cc',
             'rtp_rtcp/source/receive_statistics_unittest.cc',
             'rtp_rtcp/source/rtcp_format_remb_unittest.cc',
             'rtp_rtcp/source/rtcp_sender_unittest.cc',
@@ -201,12 +204,12 @@
             'video_coding/main/source/jitter_buffer_unittest.cc',
             'video_coding/main/source/receiver_unittest.cc',
             'video_coding/main/source/session_info_unittest.cc',
-            'video_coding/main/source/stream_generator.cc',
-            'video_coding/main/source/stream_generator.h',
             'video_coding/main/source/timing_unittest.cc',
             'video_coding/main/source/video_coding_robustness_unittest.cc',
             'video_coding/main/source/video_coding_impl_unittest.cc',
             'video_coding/main/source/qm_select_unittest.cc',
+            'video_coding/main/source/test/stream_generator.cc',
+            'video_coding/main/source/test/stream_generator.h',
             'video_coding/main/test/pcap_file_reader.cc',
             'video_coding/main/test/pcap_file_reader_unittest.cc',
             'video_coding/main/test/rtp_file_reader.cc',

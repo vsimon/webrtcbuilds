@@ -19,6 +19,7 @@
 #include "webrtc/modules/audio_coding/main/test/Channel.h"
 #include "webrtc/modules/audio_coding/main/test/PCMFile.h"
 #include "webrtc/modules/audio_coding/main/test/TestStereo.h"
+#include "webrtc/system_wrappers/interface/scoped_ptr.h"
 
 namespace webrtc {
 
@@ -28,13 +29,14 @@ class OpusTest : public ACMTest {
   ~OpusTest();
 
   void Perform();
+
  private:
   void Run(TestPackStereo* channel, int channels, int bitrate, int frame_length,
            int percent_loss = 0);
 
   void OpenOutFile(int test_number);
 
-  AudioCodingModule* acm_receiver_;
+  scoped_ptr<AudioCodingModule> acm_receiver_;
   TestPackStereo* channel_a2b_;
   PCMFile in_file_stereo_;
   PCMFile in_file_mono_;
@@ -43,7 +45,7 @@ class OpusTest : public ACMTest {
   int counter_;
   uint8_t payload_type_;
   int rtp_timestamp_;
-  ACMResampler resampler_;
+  acm1::ACMResampler resampler_;
   WebRtcOpusEncInst* opus_mono_encoder_;
   WebRtcOpusEncInst* opus_stereo_encoder_;
   WebRtcOpusDecInst* opus_mono_decoder_;

@@ -94,7 +94,7 @@ class RTPSender : public Bitrate, public RTPSenderInterface {
 
   int SendPayloadFrequency() const;
 
-  void SetSendingStatus(const bool enabled);
+  void SetSendingStatus(bool enabled);
 
   void SetSendingMediaStatus(const bool enabled);
   bool SendingMedia() const;
@@ -314,6 +314,7 @@ class RTPSender : public Bitrate, public RTPSenderInterface {
   RTPPacketHistory *packet_history_;
 
   // Statistics
+  scoped_ptr<CriticalSectionWrapper> statistics_crit_;
   uint32_t packets_sent_;
   uint32_t payload_bytes_sent_;
 
