@@ -77,7 +77,6 @@ VideoCodingModuleImpl::VideoCodingModuleImpl(const int32_t id,
       _encodedFrameCallback(),
       _nextFrameTypes(1, kVideoFrameDelta),
       _mediaOpt(id, clock_),
-      _sendCodecType(kVideoCodecUnknown),
       _sendStatsCallback(NULL),
       _encoderInputFile(NULL),
       _codecDataBase(id),
@@ -299,6 +298,11 @@ VideoCodingModuleImpl::RegisterSendCodec(const VideoCodec* sendCodec,
     bool ret = _codecDataBase.SetSendCodec(sendCodec, numberOfCores,
                                            maxPayloadSize,
                                            &_encodedFrameCallback);
+
+    // Update encoder regardless of result to make sure that we're not holding
+    // on to a deleted instance.
+    _encoder = _codecDataBase.GetEncoder();
+
     if (!ret) {
         WEBRTC_TRACE(webrtc::kTraceError,
                      webrtc::kTraceVideoCoding,
@@ -307,9 +311,7 @@ VideoCodingModuleImpl::RegisterSendCodec(const VideoCodec* sendCodec,
         return VCM_CODEC_ERROR;
     }
 
-    _encoder = _codecDataBase.GetEncoder();
-    _sendCodecType = sendCodec->codecType;
-    int numLayers = (_sendCodecType != kVideoCodecVP8) ? 1 :
+    int numLayers = (sendCodec->codecType != kVideoCodecVP8) ? 1 :
                         sendCodec->codecSpecific.VP8.numberOfTemporalLayers;
     // If we have screensharing and we have layers, we disable frame dropper.
     bool disable_frame_dropper =
@@ -323,7 +325,7 @@ VideoCodingModuleImpl::RegisterSendCodec(const VideoCodec* sendCodec,
     _nextFrameTypes.resize(VCM_MAX(sendCodec->numberOfSimulcastStreams, 1),
                            kVideoFrameDelta);
 
-    _mediaOpt.SetEncodingData(_sendCodecType,
+    _mediaOpt.SetEncodingData(sendCodec->codecType,
                               sendCodec->maxBitrate * 1000,
                               sendCodec->maxFramerate * 1000,
                               sendCodec->startBitrate * 1000,
