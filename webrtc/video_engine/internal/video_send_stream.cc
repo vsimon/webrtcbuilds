@@ -80,7 +80,7 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
                                  bool overuse_detection,
                                  webrtc::VideoEngine* video_engine,
                                  const VideoSendStream::Config& config)
-    : transport_(transport), config_(config), external_codec_(NULL) {
+    : transport_adapter_(transport), config_(config), external_codec_(NULL) {
 
   if (config_.codec.numberOfSimulcastStreams > 0) {
     assert(config_.rtp.ssrcs.size() == config_.codec.numberOfSimulcastStreams);
@@ -105,6 +105,18 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
   }
   rtp_rtcp_->SetNACKStatus(channel_, config_.rtp.nack.rtp_history_ms > 0);
   rtp_rtcp_->SetTransmissionSmoothingStatus(channel_, config_.pacing);
+  if (!config_.rtp.rtx.ssrcs.empty()) {
+    assert(config_.rtp.rtx.ssrcs.size() == config_.rtp.ssrcs.size());
+    for (size_t i = 0; i < config_.rtp.rtx.ssrcs.size(); ++i) {
+      rtp_rtcp_->SetLocalSSRC(
+          channel_, config_.rtp.rtx.ssrcs[i], kViEStreamTypeRtx, i);
+    }
+
+    if (config_.rtp.rtx.rtx_payload_type != 0) {
+      rtp_rtcp_->SetRtxSendPayloadType(channel_,
+                                       config_.rtp.rtx.rtx_payload_type);
+    }
+  }
 
   for (size_t i = 0; i < config_.rtp.extensions.size(); ++i) {
     const std::string& extension = config_.rtp.extensions[i].name;
@@ -134,7 +146,7 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
   network_ = ViENetwork::GetInterface(video_engine);
   assert(network_ != NULL);
 
-  network_->RegisterSendTransport(channel_, *this);
+  network_->RegisterSendTransport(channel_, transport_adapter_);
 
   if (config.encoder) {
     external_codec_ = ViEExternalCodec::GetInterface(video_engine);
@@ -236,26 +248,6 @@ bool VideoSendStream::SetTargetBitrate(
 
 void VideoSendStream::GetSendCodec(VideoCodec* send_codec) {
   *send_codec = config_.codec;
-}
-
-int VideoSendStream::SendPacket(int /*channel*/,
-                                const void* packet,
-                                int length) {
-  // TODO(pbos): Lock these methods and the destructor so it can't be processing
-  //             a packet when the destructor has been called.
-  assert(length >= 0);
-  bool success = transport_->SendRTP(static_cast<const uint8_t*>(packet),
-                                     static_cast<size_t>(length));
-  return success ? length : -1;
-}
-
-int VideoSendStream::SendRTCPPacket(int /*channel*/,
-                                    const void* packet,
-                                    int length) {
-  assert(length >= 0);
-  bool success = transport_->SendRTCP(static_cast<const uint8_t*>(packet),
-                                      static_cast<size_t>(length));
-  return success ? length : -1;
 }
 
 bool VideoSendStream::DeliverRtcp(const uint8_t* packet, size_t length) {

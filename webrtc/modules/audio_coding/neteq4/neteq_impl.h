@@ -27,6 +27,7 @@
 namespace webrtc {
 
 // Forward declarations.
+class Accelerate;
 class BackgroundNoise;
 class BufferLevelFilter;
 class ComfortNoise;
@@ -38,9 +39,12 @@ class DelayPeakDetector;
 class DtmfBuffer;
 class DtmfToneGenerator;
 class Expand;
+class Merge;
+class Normal;
 class PacketBuffer;
 class PayloadSplitter;
 class PostDecodeVad;
+class PreemptiveExpand;
 class RandomVector;
 class SyncBuffer;
 class TimestampScaler;
@@ -284,7 +288,7 @@ class NetEqImpl : public webrtc::NetEq {
   // GetAudio().
   NetEqOutputType LastOutputType();
 
-  BackgroundNoise* background_noise_;
+  scoped_ptr<BackgroundNoise> background_noise_;
   scoped_ptr<BufferLevelFilter> buffer_level_filter_;
   scoped_ptr<DecoderDatabase> decoder_database_;
   scoped_ptr<DelayManager> delay_manager_;
@@ -296,11 +300,15 @@ class NetEqImpl : public webrtc::NetEq {
   scoped_ptr<TimestampScaler> timestamp_scaler_;
   scoped_ptr<DecisionLogic> decision_logic_;
   scoped_ptr<PostDecodeVad> vad_;
-  AudioMultiVector<int16_t>* algorithm_buffer_;
-  SyncBuffer* sync_buffer_;
-  Expand* expand_;
+  scoped_ptr<AudioMultiVector<int16_t> > algorithm_buffer_;
+  scoped_ptr<SyncBuffer> sync_buffer_;
+  scoped_ptr<Expand> expand_;
+  scoped_ptr<Normal> normal_;
+  scoped_ptr<Merge> merge_;
+  scoped_ptr<Accelerate> accelerate_;
+  scoped_ptr<PreemptiveExpand> preemptive_expand_;
   RandomVector random_vector_;
-  ComfortNoise* comfort_noise_;
+  scoped_ptr<ComfortNoise> comfort_noise_;
   Rtcp rtcp_;
   StatisticsCalculator stats_;
   int fs_hz_;
@@ -321,7 +329,7 @@ class NetEqImpl : public webrtc::NetEq {
   bool first_packet_;
   int error_code_;  // Store last error code.
   int decoder_error_code_;
-  CriticalSectionWrapper* crit_sect_;
+  scoped_ptr<CriticalSectionWrapper> crit_sect_;
 
   // These values are used by NACK module to estimate time-to-play of
   // a missing packet. Occasionally, NetEq might decide to decode more
