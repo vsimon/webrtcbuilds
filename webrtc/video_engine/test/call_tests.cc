@@ -22,28 +22,27 @@
 #include "webrtc/video_engine/test/common/direct_transport.h"
 #include "webrtc/video_engine/test/common/fake_decoder.h"
 #include "webrtc/video_engine/test/common/fake_encoder.h"
-#include "webrtc/video_engine/test/common/frame_generator.h"
 #include "webrtc/video_engine/test/common/frame_generator_capturer.h"
 #include "webrtc/video_engine/test/common/generate_ssrcs.h"
 #include "webrtc/video_engine/test/common/rtp_rtcp_observer.h"
 
 namespace webrtc {
 
-struct EngineTestParams {
+struct CallTestParams {
   size_t width, height;
   struct {
     unsigned int min, start, max;
   } bitrate;
 };
 
-class EngineTest : public ::testing::TestWithParam<EngineTestParams> {
+class CallTest : public ::testing::TestWithParam<CallTestParams> {
  public:
-  EngineTest()
+  CallTest()
       : send_stream_(NULL),
         receive_stream_(NULL),
         fake_encoder_(Clock::GetRealTimeClock()) {}
 
-  ~EngineTest() {
+  ~CallTest() {
     EXPECT_EQ(NULL, send_stream_);
     EXPECT_EQ(NULL, receive_stream_);
   }
@@ -84,12 +83,12 @@ class EngineTest : public ::testing::TestWithParam<EngineTestParams> {
   }
 
   void CreateFrameGenerator() {
-    frame_generator_capturer_.reset(test::FrameGeneratorCapturer::Create(
-        send_stream_->Input(),
-        test::FrameGenerator::Create(send_config_.codec.width,
-                                     send_config_.codec.height,
-                                     Clock::GetRealTimeClock()),
-        30));
+    frame_generator_capturer_.reset(
+        test::FrameGeneratorCapturer::Create(send_stream_->Input(),
+                                             send_config_.codec.width,
+                                             send_config_.codec.height,
+                                             30,
+                                             Clock::GetRealTimeClock()));
   }
 
   void StartSending() {
@@ -136,13 +135,13 @@ class EngineTest : public ::testing::TestWithParam<EngineTestParams> {
 
 // TODO(pbos): What are sane values here for bitrate? Are we missing any
 // important resolutions?
-EngineTestParams video_1080p = {1920, 1080, {300, 600, 800}};
-EngineTestParams video_720p = {1280, 720, {300, 600, 800}};
-EngineTestParams video_vga = {640, 480, {300, 600, 800}};
-EngineTestParams video_qvga = {320, 240, {300, 600, 800}};
-EngineTestParams video_4cif = {704, 576, {300, 600, 800}};
-EngineTestParams video_cif = {352, 288, {300, 600, 800}};
-EngineTestParams video_qcif = {176, 144, {300, 600, 800}};
+CallTestParams video_1080p = {1920, 1080, {300, 600, 800}};
+CallTestParams video_720p = {1280, 720, {300, 600, 800}};
+CallTestParams video_vga = {640, 480, {300, 600, 800}};
+CallTestParams video_qvga = {320, 240, {300, 600, 800}};
+CallTestParams video_4cif = {704, 576, {300, 600, 800}};
+CallTestParams video_cif = {352, 288, {300, 600, 800}};
+CallTestParams video_qcif = {176, 144, {300, 600, 800}};
 
 class NackObserver : public test::RtpRtcpObserver {
   static const int kNumberOfNacksToObserve = 4;
@@ -151,16 +150,11 @@ class NackObserver : public test::RtpRtcpObserver {
 
  public:
   NackObserver()
-      : received_all_retransmissions_(EventWrapper::Create()),
+      : test::RtpRtcpObserver(120 * 1000),
         rtp_parser_(RtpHeaderParser::Create()),
         drop_burst_count_(0),
         sent_rtp_packets_(0),
         nacks_left_(kNumberOfNacksToObserve) {}
-
-  EventTypeWrapper Wait() {
-    // 2 minutes should be more than enough time for the test to finish.
-    return received_all_retransmissions_->Wait(2 * 60 * 1000);
-  }
 
  private:
   virtual Action OnSendRtp(const uint8_t* packet, size_t length) OVERRIDE {
@@ -237,11 +231,9 @@ class NackObserver : public test::RtpRtcpObserver {
     // All packets retransmitted and no recent NACKs.
     if (dropped_packets_.size() == retransmitted_packets_.size() &&
         rtcp_without_nack_count_ >= kRequiredRtcpsWithoutNack) {
-      received_all_retransmissions_->Set();
+      observation_complete_->Set();
     }
   }
-
-  scoped_ptr<EventWrapper> received_all_retransmissions_;
 
   scoped_ptr<RtpHeaderParser> rtp_parser_;
   std::set<uint16_t> dropped_packets_;
@@ -253,7 +245,7 @@ class NackObserver : public test::RtpRtcpObserver {
   static const int kRequiredRtcpsWithoutNack = 2;
 };
 
-TEST_P(EngineTest, ReceivesAndRetransmitsNack) {
+TEST_P(CallTest, ReceivesAndRetransmitsNack) {
   NackObserver observer;
 
   CreateCalls(observer.SendTransport(), observer.ReceiveTransport());
@@ -281,12 +273,12 @@ TEST_P(EngineTest, ReceivesAndRetransmitsNack) {
   DestroyStreams();
 }
 
-class PliObserver : public test::RtpRtcpObserver {
+class PliObserver : public test::RtpRtcpObserver, public VideoRenderer {
   static const int kInverseDropProbability = 16;
 
  public:
-  PliObserver(bool nack_enabled)
-      : renderer_(this),
+  explicit PliObserver(bool nack_enabled)
+      : test::RtpRtcpObserver(120 * 1000),
         rtp_header_parser_(RtpHeaderParser::Create()),
         nack_enabled_(nack_enabled),
         first_retransmitted_timestamp_(0),
@@ -333,29 +325,15 @@ class PliObserver : public test::RtpRtcpObserver {
     return SEND_PACKET;
   }
 
-  class ReceiverRenderer : public VideoRenderer {
-   public:
-    ReceiverRenderer(PliObserver* observer)
-        : rendered_retransmission_(EventWrapper::Create()),
-          observer_(observer) {}
-
-    virtual void RenderFrame(const I420VideoFrame& video_frame,
-                             int time_to_render_ms) {
-      CriticalSectionScoped crit_(observer_->lock_.get());
-      if (observer_->first_retransmitted_timestamp_ != 0 &&
-          video_frame.timestamp() > observer_->first_retransmitted_timestamp_) {
-        EXPECT_TRUE(observer_->received_pli_);
-        rendered_retransmission_->Set();
-      }
-      observer_->rendered_frame_ = true;
+  virtual void RenderFrame(const I420VideoFrame& video_frame,
+                           int time_to_render_ms) OVERRIDE {
+    CriticalSectionScoped crit_(lock_.get());
+    if (first_retransmitted_timestamp_ != 0 &&
+        video_frame.timestamp() > first_retransmitted_timestamp_) {
+      EXPECT_TRUE(received_pli_);
+      observation_complete_->Set();
     }
-    scoped_ptr<EventWrapper> rendered_retransmission_;
-    PliObserver* observer_;
-  } renderer_;
-
-  EventTypeWrapper Wait() {
-    // 120 seconds should be plenty of time.
-    return renderer_.rendered_retransmission_->Wait(2 * 60 * 1000);
+    rendered_frame_ = true;
   }
 
  private:
@@ -369,7 +347,7 @@ class PliObserver : public test::RtpRtcpObserver {
   bool received_pli_;
 };
 
-void EngineTest::ReceivesPliAndRecovers(int rtp_history_ms) {
+void CallTest::ReceivesPliAndRecovers(int rtp_history_ms) {
   PliObserver observer(rtp_history_ms > 0);
 
   CreateCalls(observer.SendTransport(), observer.ReceiveTransport());
@@ -379,7 +357,7 @@ void EngineTest::ReceivesPliAndRecovers(int rtp_history_ms) {
   CreateTestConfigs();
   send_config_.rtp.nack.rtp_history_ms = rtp_history_ms;
   receive_config_.rtp.nack.rtp_history_ms = rtp_history_ms;
-  receive_config_.renderer = &observer.renderer_;
+  receive_config_.renderer = &observer;
 
   CreateStreams();
   CreateFrameGenerator();
@@ -397,16 +375,16 @@ void EngineTest::ReceivesPliAndRecovers(int rtp_history_ms) {
   DestroyStreams();
 }
 
-TEST_P(EngineTest, ReceivesPliAndRecoversWithNack) {
+TEST_P(CallTest, ReceivesPliAndRecoversWithNack) {
   ReceivesPliAndRecovers(1000);
 }
 
 // TODO(pbos): Enable this when 2250 is resolved.
-TEST_P(EngineTest, DISABLED_ReceivesPliAndRecoversWithoutNack) {
+TEST_P(CallTest, DISABLED_ReceivesPliAndRecoversWithoutNack) {
   ReceivesPliAndRecovers(0);
 }
 
-TEST_P(EngineTest, SurvivesIncomingRtpPacketsToDestroyedReceiveStream) {
+TEST_P(CallTest, SurvivesIncomingRtpPacketsToDestroyedReceiveStream) {
   class PacketInputObserver : public PacketReceiver {
    public:
     explicit PacketInputObserver(PacketReceiver* receiver)
@@ -458,5 +436,5 @@ TEST_P(EngineTest, SurvivesIncomingRtpPacketsToDestroyedReceiveStream) {
   receive_transport.StopSending();
 }
 
-INSTANTIATE_TEST_CASE_P(EngineTest, EngineTest, ::testing::Values(video_vga));
+INSTANTIATE_TEST_CASE_P(CallTest, CallTest, ::testing::Values(video_vga));
 }  // namespace webrtc
