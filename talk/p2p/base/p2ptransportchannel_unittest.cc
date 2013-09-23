@@ -25,6 +25,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "talk/base/dscp.h"
 #include "talk/base/fakenetwork.h"
 #include "talk/base/firewallsocketserver.h"
 #include "talk/base/gunit.h"
@@ -620,7 +621,7 @@ class P2PTransportChannelTestBase : public testing::Test,
   }
   int SendData(cricket::TransportChannel* channel,
                const char* data, size_t len) {
-    return channel->SendPacket(data, len, 0);
+    return channel->SendPacket(data, len, talk_base::DSCP_NO_CHANGE, 0);
   }
   bool CheckDataOnChannel(cricket::TransportChannel* channel,
                           const char* data, int len) {
@@ -1027,7 +1028,7 @@ const P2PTransportChannelTest::Result*
 #define P2P_TEST_SET(x) \
   P2P_TEST(x, OPEN) \
   FLAKY_P2P_TEST(x, NAT_FULL_CONE) \
-  P2P_TEST(x, NAT_ADDR_RESTRICTED) \
+  FLAKY_P2P_TEST(x, NAT_ADDR_RESTRICTED) \
   P2P_TEST(x, NAT_PORT_RESTRICTED) \
   P2P_TEST(x, NAT_SYMMETRIC) \
   FLAKY_P2P_TEST(x, NAT_DOUBLE_CONE) \
@@ -1146,7 +1147,7 @@ TEST_F(P2PTransportChannelTest, GetStats) {
 }
 
 // Test that we properly handle getting a STUN error due to slow signaling.
-TEST_F(P2PTransportChannelTest, SlowSignaling) {
+TEST_F(P2PTransportChannelTest, DISABLED_SlowSignaling) {
   ConfigureEndpoints(OPEN, NAT_SYMMETRIC,
                      kDefaultPortAllocatorFlags,
                      kDefaultPortAllocatorFlags,
@@ -1268,129 +1269,6 @@ TEST_F(P2PTransportChannelTest, TestTcpConnectionsFromActiveToPassive) {
   DestroyChannels();
 }
 
-
-// Test what happens when we have 2 users behind the same NAT. This can lead
-// to interesting behavior because the STUN server will only give out the
-// address of the outermost NAT.
-class P2PTransportChannelSameNatTest : public P2PTransportChannelTestBase {
- protected:
-  void ConfigureEndpoints(Config nat_type, Config config1, Config config2) {
-    ASSERT(nat_type >= NAT_FULL_CONE && nat_type <= NAT_SYMMETRIC);
-    talk_base::NATSocketServer::Translator* outer_nat =
-        nat()->AddTranslator(kPublicAddrs[0], kNatAddrs[0],
-            static_cast<talk_base::NATType>(nat_type - NAT_FULL_CONE));
-    ConfigureEndpoint(outer_nat, 0, config1);
-    ConfigureEndpoint(outer_nat, 1, config2);
-  }
-  void ConfigureEndpoint(talk_base::NATSocketServer::Translator* nat,
-                         int endpoint, Config config) {
-    ASSERT(config <= NAT_SYMMETRIC);
-    if (config == OPEN) {
-      AddAddress(endpoint, kPrivateAddrs[endpoint]);
-      nat->AddClient(kPrivateAddrs[endpoint]);
-    } else {
-      AddAddress(endpoint, kCascadedPrivateAddrs[endpoint]);
-      nat->AddTranslator(kPrivateAddrs[endpoint], kCascadedNatAddrs[endpoint],
-          static_cast<talk_base::NATType>(config - NAT_FULL_CONE))->AddClient(
-              kCascadedPrivateAddrs[endpoint]);
-    }
-  }
-};
-
-TEST_F(P2PTransportChannelSameNatTest, TestConesBehindSameCone) {
-  ConfigureEndpoints(NAT_FULL_CONE, NAT_FULL_CONE, NAT_FULL_CONE);
-  Test(kLocalUdpToStunUdp);
-}
-
-// Test what happens when we have multiple available pathways.
-// In the future we will try different RTTs and configs for the different
-// interfaces, so that we can simulate a user with Ethernet and VPN networks.
-class P2PTransportChannelMultihomedTest : public P2PTransportChannelTestBase {
-};
-
-// Test that we can establish connectivity when both peers are multihomed.
-TEST_F(P2PTransportChannelMultihomedTest, TestBasic) {
-  AddAddress(0, kPublicAddrs[0]);
-  AddAddress(0, kAlternateAddrs[0]);
-  AddAddress(1, kPublicAddrs[1]);
-  AddAddress(1, kAlternateAddrs[1]);
-  Test(kLocalUdpToLocalUdp);
-}
-
-// Test that we can quickly switch links if an interface goes down.
-TEST_F(P2PTransportChannelMultihomedTest, TestFailover) {
-  AddAddress(0, kPublicAddrs[0]);
-  AddAddress(1, kPublicAddrs[1]);
-  AddAddress(1, kAlternateAddrs[1]);
-  // Use only local ports for simplicity.
-  SetAllocatorFlags(0, kOnlyLocalPorts);
-  SetAllocatorFlags(1, kOnlyLocalPorts);
-
-  // Create channels and let them go writable, as usual.
-  CreateChannels(1);
-  EXPECT_TRUE_WAIT(ep1_ch1()->readable() && ep1_ch1()->writable() &&
-                   ep2_ch1()->readable() && ep2_ch1()->writable(),
-                   1000);
-  EXPECT_TRUE(
-      ep1_ch1()->best_connection() && ep2_ch1()->best_connection() &&
-      LocalCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[0]) &&
-      RemoteCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[1]));
-
-  // Blackhole any traffic to or from the public addrs.
-  LOG(LS_INFO) << "Failing over...";
-  fw()->AddRule(false, talk_base::FP_ANY, talk_base::FD_ANY,
-                kPublicAddrs[1]);
-
-  // We should detect loss of connectivity within 5 seconds or so.
-  EXPECT_TRUE_WAIT(!ep1_ch1()->writable(), 7000);
-
-  // We should switch over to use the alternate addr immediately
-  // when we lose writability.
-  EXPECT_TRUE_WAIT(
-      ep1_ch1()->best_connection() && ep2_ch1()->best_connection() &&
-      LocalCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[0]) &&
-      RemoteCandidate(ep1_ch1())->address().EqualIPs(kAlternateAddrs[1]),
-      3000);
-
-  DestroyChannels();
-}
-
-// Test that we can switch links in a coordinated fashion.
-TEST_F(P2PTransportChannelMultihomedTest, TestDrain) {
-  AddAddress(0, kPublicAddrs[0]);
-  AddAddress(1, kPublicAddrs[1]);
-  // Use only local ports for simplicity.
-  SetAllocatorFlags(0, kOnlyLocalPorts);
-  SetAllocatorFlags(1, kOnlyLocalPorts);
-
-  // Create channels and let them go writable, as usual.
-  CreateChannels(1);
-  EXPECT_TRUE_WAIT(ep1_ch1()->readable() && ep1_ch1()->writable() &&
-                   ep2_ch1()->readable() && ep2_ch1()->writable(),
-                   1000);
-  EXPECT_TRUE(
-      ep1_ch1()->best_connection() && ep2_ch1()->best_connection() &&
-      LocalCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[0]) &&
-      RemoteCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[1]));
-
-  // Remove the public interface, add the alternate interface, and allocate
-  // a new generation of candidates for the new interface (via Connect()).
-  LOG(LS_INFO) << "Draining...";
-  AddAddress(1, kAlternateAddrs[1]);
-  RemoveAddress(1, kPublicAddrs[1]);
-  ep2_ch1()->Connect();
-
-  // We should switch over to use the alternate address after
-  // an exchange of pings.
-  EXPECT_TRUE_WAIT(
-      ep1_ch1()->best_connection() && ep2_ch1()->best_connection() &&
-      LocalCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[0]) &&
-      RemoteCandidate(ep1_ch1())->address().EqualIPs(kAlternateAddrs[1]),
-      3000);
-
-  DestroyChannels();
-}
-
 TEST_F(P2PTransportChannelTest, TestBundleAllocatorToBundleAllocator) {
   AddAddress(0, kPublicAddrs[0]);
   AddAddress(1, kPublicAddrs[1]);
@@ -1507,3 +1385,152 @@ TEST_F(P2PTransportChannelTest, TestIceConfigWillPassDownToPort) {
   TestSendRecv(1);
 }
 
+// Verify that we can set DSCP value and retrieve properly from P2PTC.
+TEST_F(P2PTransportChannelTest, TestDefaultDscpValue) {
+  AddAddress(0, kPublicAddrs[0]);
+  AddAddress(1, kPublicAddrs[1]);
+
+  CreateChannels(1);
+  EXPECT_EQ(talk_base::DSCP_NO_CHANGE,
+            GetEndpoint(0)->cd1_.ch_->DefaultDscpValue());
+  EXPECT_EQ(talk_base::DSCP_NO_CHANGE,
+            GetEndpoint(1)->cd1_.ch_->DefaultDscpValue());
+  GetEndpoint(0)->cd1_.ch_->SetOption(
+      talk_base::Socket::OPT_DSCP, talk_base::DSCP_CS6);
+  GetEndpoint(1)->cd1_.ch_->SetOption(
+      talk_base::Socket::OPT_DSCP, talk_base::DSCP_CS6);
+  EXPECT_EQ(talk_base::DSCP_CS6,
+            GetEndpoint(0)->cd1_.ch_->DefaultDscpValue());
+  EXPECT_EQ(talk_base::DSCP_CS6,
+            GetEndpoint(1)->cd1_.ch_->DefaultDscpValue());
+  GetEndpoint(0)->cd1_.ch_->SetOption(
+      talk_base::Socket::OPT_DSCP, talk_base::DSCP_AF41);
+  GetEndpoint(1)->cd1_.ch_->SetOption(
+      talk_base::Socket::OPT_DSCP, talk_base::DSCP_AF41);
+  EXPECT_EQ(talk_base::DSCP_AF41,
+            GetEndpoint(0)->cd1_.ch_->DefaultDscpValue());
+  EXPECT_EQ(talk_base::DSCP_AF41,
+            GetEndpoint(1)->cd1_.ch_->DefaultDscpValue());
+}
+
+// Test what happens when we have 2 users behind the same NAT. This can lead
+// to interesting behavior because the STUN server will only give out the
+// address of the outermost NAT.
+class P2PTransportChannelSameNatTest : public P2PTransportChannelTestBase {
+ protected:
+  void ConfigureEndpoints(Config nat_type, Config config1, Config config2) {
+    ASSERT(nat_type >= NAT_FULL_CONE && nat_type <= NAT_SYMMETRIC);
+    talk_base::NATSocketServer::Translator* outer_nat =
+        nat()->AddTranslator(kPublicAddrs[0], kNatAddrs[0],
+            static_cast<talk_base::NATType>(nat_type - NAT_FULL_CONE));
+    ConfigureEndpoint(outer_nat, 0, config1);
+    ConfigureEndpoint(outer_nat, 1, config2);
+  }
+  void ConfigureEndpoint(talk_base::NATSocketServer::Translator* nat,
+                         int endpoint, Config config) {
+    ASSERT(config <= NAT_SYMMETRIC);
+    if (config == OPEN) {
+      AddAddress(endpoint, kPrivateAddrs[endpoint]);
+      nat->AddClient(kPrivateAddrs[endpoint]);
+    } else {
+      AddAddress(endpoint, kCascadedPrivateAddrs[endpoint]);
+      nat->AddTranslator(kPrivateAddrs[endpoint], kCascadedNatAddrs[endpoint],
+          static_cast<talk_base::NATType>(config - NAT_FULL_CONE))->AddClient(
+              kCascadedPrivateAddrs[endpoint]);
+    }
+  }
+};
+
+TEST_F(P2PTransportChannelSameNatTest, TestConesBehindSameCone) {
+  ConfigureEndpoints(NAT_FULL_CONE, NAT_FULL_CONE, NAT_FULL_CONE);
+  Test(kLocalUdpToStunUdp);
+}
+
+// Test what happens when we have multiple available pathways.
+// In the future we will try different RTTs and configs for the different
+// interfaces, so that we can simulate a user with Ethernet and VPN networks.
+class P2PTransportChannelMultihomedTest : public P2PTransportChannelTestBase {
+};
+
+// Test that we can establish connectivity when both peers are multihomed.
+TEST_F(P2PTransportChannelMultihomedTest, DISABLED_TestBasic) {
+  AddAddress(0, kPublicAddrs[0]);
+  AddAddress(0, kAlternateAddrs[0]);
+  AddAddress(1, kPublicAddrs[1]);
+  AddAddress(1, kAlternateAddrs[1]);
+  Test(kLocalUdpToLocalUdp);
+}
+
+// Test that we can quickly switch links if an interface goes down.
+TEST_F(P2PTransportChannelMultihomedTest, TestFailover) {
+  AddAddress(0, kPublicAddrs[0]);
+  AddAddress(1, kPublicAddrs[1]);
+  AddAddress(1, kAlternateAddrs[1]);
+  // Use only local ports for simplicity.
+  SetAllocatorFlags(0, kOnlyLocalPorts);
+  SetAllocatorFlags(1, kOnlyLocalPorts);
+
+  // Create channels and let them go writable, as usual.
+  CreateChannels(1);
+  EXPECT_TRUE_WAIT(ep1_ch1()->readable() && ep1_ch1()->writable() &&
+                   ep2_ch1()->readable() && ep2_ch1()->writable(),
+                   1000);
+  EXPECT_TRUE(
+      ep1_ch1()->best_connection() && ep2_ch1()->best_connection() &&
+      LocalCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[0]) &&
+      RemoteCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[1]));
+
+  // Blackhole any traffic to or from the public addrs.
+  LOG(LS_INFO) << "Failing over...";
+  fw()->AddRule(false, talk_base::FP_ANY, talk_base::FD_ANY,
+                kPublicAddrs[1]);
+
+  // We should detect loss of connectivity within 5 seconds or so.
+  EXPECT_TRUE_WAIT(!ep1_ch1()->writable(), 7000);
+
+  // We should switch over to use the alternate addr immediately
+  // when we lose writability.
+  EXPECT_TRUE_WAIT(
+      ep1_ch1()->best_connection() && ep2_ch1()->best_connection() &&
+      LocalCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[0]) &&
+      RemoteCandidate(ep1_ch1())->address().EqualIPs(kAlternateAddrs[1]),
+      3000);
+
+  DestroyChannels();
+}
+
+// Test that we can switch links in a coordinated fashion.
+TEST_F(P2PTransportChannelMultihomedTest, TestDrain) {
+  AddAddress(0, kPublicAddrs[0]);
+  AddAddress(1, kPublicAddrs[1]);
+  // Use only local ports for simplicity.
+  SetAllocatorFlags(0, kOnlyLocalPorts);
+  SetAllocatorFlags(1, kOnlyLocalPorts);
+
+  // Create channels and let them go writable, as usual.
+  CreateChannels(1);
+  EXPECT_TRUE_WAIT(ep1_ch1()->readable() && ep1_ch1()->writable() &&
+                   ep2_ch1()->readable() && ep2_ch1()->writable(),
+                   1000);
+  EXPECT_TRUE(
+      ep1_ch1()->best_connection() && ep2_ch1()->best_connection() &&
+      LocalCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[0]) &&
+      RemoteCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[1]));
+
+  // Remove the public interface, add the alternate interface, and allocate
+  // a new generation of candidates for the new interface (via Connect()).
+  LOG(LS_INFO) << "Draining...";
+  AddAddress(1, kAlternateAddrs[1]);
+  RemoveAddress(1, kPublicAddrs[1]);
+  ep2_ch1()->Connect();
+
+  // We should switch over to use the alternate address after
+  // an exchange of pings.
+  EXPECT_TRUE_WAIT(
+      ep1_ch1()->best_connection() && ep2_ch1()->best_connection() &&
+      LocalCandidate(ep1_ch1())->address().EqualIPs(kPublicAddrs[0]) &&
+      RemoteCandidate(ep1_ch1())->address().EqualIPs(kAlternateAddrs[1]),
+      3000);
+
+  DestroyChannels();
+}

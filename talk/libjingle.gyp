@@ -229,6 +229,7 @@
           'link_settings': {
             'libraries': [
               '$(SDKROOT)/System/Library/Frameworks/Foundation.framework',
+              '-lstdc++',
             ],
           },
           'xcode_settings': {
