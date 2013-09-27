@@ -34,6 +34,7 @@ class EchoCancellationImpl : public EchoCancellationImplWrapper {
 
   // ProcessingComponent implementation.
   virtual int Initialize() OVERRIDE;
+  virtual void SetExtraOptions(const Config& config) OVERRIDE;
 
  private:
   // EchoCancellation implementation.
@@ -70,6 +71,7 @@ class EchoCancellationImpl : public EchoCancellationImplWrapper {
   bool was_stream_drift_set_;
   bool stream_has_echo_;
   bool delay_logging_enabled_;
+  bool delay_correction_enabled_;
 };
 
 }  // namespace webrtc
