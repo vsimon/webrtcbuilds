@@ -21,6 +21,8 @@
 
 namespace webrtc {
 
+namespace acm2 {
+
 // Enum for CNG
 enum {
   kMaxPLCParamsCNG = WEBRTC_CNG_MAX_LPC_ORDER,
@@ -318,11 +320,7 @@ int16_t ACMGenericCodec::Encode(uint8_t* bitstream,
             // break from the loop
             break;
           }
-
-          // TODO(andrew): This should be multiplied by the number of
-          //               channels, right?
-          // http://code.google.com/p/webrtc/issues/detail?id=714
-          done = in_audio_ix_read_ >= frame_len_smpl_;
+          done = in_audio_ix_read_ >= frame_len_smpl_ * num_channels_;
         }
       }
       if (status >= 0) {
@@ -1005,5 +1003,7 @@ int16_t ACMGenericCodec::REDPayloadISAC(const int32_t /* isac_rate */,
                "Error: REDPayloadISAC is an iSAC specific function");
   return -1;
 }
+
+}  // namespace acm2
 
 }  // namespace webrtc

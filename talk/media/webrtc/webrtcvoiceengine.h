@@ -184,6 +184,7 @@ class WebRtcVoiceEngine
   void Construct();
   void ConstructCodecs();
   bool InitInternal();
+  bool EnsureSoundclipEngineInit();
   void SetTraceFilter(int filter);
   void SetTraceOptions(const std::string& options);
   // Applies either options or overrides.  Every option that is "set"
@@ -227,6 +228,7 @@ class WebRtcVoiceEngine
   talk_base::scoped_ptr<VoEWrapper> voe_wrapper_;
   // A secondary instance, for playing out soundclips (on the 'ring' device).
   talk_base::scoped_ptr<VoEWrapper> voe_wrapper_sc_;
+  bool voe_wrapper_sc_initialized_;
   talk_base::scoped_ptr<VoETraceWrapper> tracing_;
   // The external audio device manager
   webrtc::AudioDeviceModule* adm_;
@@ -381,6 +383,7 @@ class WebRtcVoiceMediaChannel
   bool ChangeSend(SendFlags send);
   bool ChangeSend(int channel, SendFlags send);
   void ConfigureSendChannel(int channel);
+  bool ConfigureRecvChannel(int channel);
   bool DeleteChannel(int channel);
   bool InConferenceMode() const {
     return options_.conference_mode.GetWithDefaultIfUnset(false);

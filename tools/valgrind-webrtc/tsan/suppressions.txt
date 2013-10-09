@@ -47,6 +47,27 @@
   fun:webrtc::ThreadPosix::Run
   fun:webrtc::StartThread
 }
+{
+  bug_2461_1
+  ThreadSanitizer:Race
+  fun:webrtc::voe::Channel::SetChannelOutputVolumeScaling
+  fun:webrtc::VoEVolumeControlImpl::SetChannelOutputVolumeScaling
+  fun:cricket::WebRtcVoiceMediaChannel::SetOutputScaling
+  fun:cricket::VoiceChannel::SetOutputScaling_w
+  fun:cricket::VoiceChannel::OnMessage
+  ...
+}
+{
+  bug_2461_2
+  ThreadSanitizer:Race
+  fun:webrtc::voe::Channel::SetOutputVolumePan
+  fun:webrtc::VoEVolumeControlImpl::SetOutputVolumePan
+  fun:cricket::WebRtcVoiceMediaChannel::SetOutputScaling
+  fun:cricket::VoiceChannel::SetOutputScaling_w
+  fun:cricket::VoiceChannel::OnMessage
+  ...
+}
+
 
 #-----------------------------------------------------------------------
 # 2. libjingle stuff (talk folder)
@@ -60,17 +81,6 @@
   fun:webrtc::ProcessThreadImpl::Run
   fun:webrtc::ThreadPosix::Run
   fun:StartThread
-}
-{
-  bug_1205_6
-  ThreadSanitizer:Race
-  fun:std::__detail::_List_node_base::_M_hook
-  fun:std::list::_M_insert
-  fun:std::list::push_back
-  fun:webrtc::ModuleRtpRtcpImpl::RegisterChildModule
-  fun:webrtc::ModuleRtpRtcpImpl::ModuleRtpRtcpImpl
-  fun:webrtc::RtpRtcp::CreateRtpRtcp
-  ...
 }
 {
   bug_1205_7
@@ -145,99 +155,12 @@
   fun:talk_base::Thread::PreRun
 }
 {
-  bug_1205_14
-  ThreadSanitizer:Race
-  fun:cricket::BaseChannel::~BaseChannel
-  fun:cricket::VoiceChannel::~VoiceChannel
-  fun:cricket::VoiceChannel::~VoiceChannel
-  fun:cricket::ChannelManager::DestroyVoiceChannel_w
-  ...
-}
-{
-  bug_1205_15
-  ThreadSanitizer:Race
-  fun:cricket::BaseChannel::~BaseChannel
-  fun:cricket::VideoChannel::~VideoChannel
-  fun:cricket::VideoChannel::~VideoChannel
-  fun:cricket::ChannelManager::DestroyVideoChannel_w
-  ...
-}
-{
-  bug_1205_16
-  ThreadSanitizer:Race
-  fun:std::__detail::_List_node_base::_M_unhook
-  fun:std::list::_M_erase
-  fun:std::list::erase
-  fun:webrtc::ModuleRtpRtcpImpl::DeRegisterChildModule
-  fun:webrtc::ModuleRtpRtcpImpl::~ModuleRtpRtcpImpl
-  fun:webrtc::ModuleRtpRtcpImpl::~ModuleRtpRtcpImpl
-  ...
-}
-{
-  bug_1205_18
-  ThreadSanitizer:Race
-  fun:webrtc::voe::Channel::SetChannelOutputVolumeScaling
-  fun:webrtc::VoEVolumeControlImpl::SetChannelOutputVolumeScaling
-  fun:cricket::WebRtcVoiceMediaChannel::SetOutputScaling
-  fun:cricket::VoiceChannel::SetOutputScaling_w
-  fun:cricket::VoiceChannel::OnMessage
-  ...
-}
-{
-  bug_1205_19
-  ThreadSanitizer:Race
-  fun:webrtc::voe::Channel::SetOutputVolumePan
-  fun:webrtc::VoEVolumeControlImpl::SetOutputVolumePan
-  fun:cricket::WebRtcVoiceMediaChannel::SetOutputScaling
-  fun:cricket::VoiceChannel::SetOutputScaling_w
-  fun:cricket::VoiceChannel::OnMessage
-  ...
-}
-{
-  bug_1205_20
-  ThreadSanitizer:Race
-  fun:cricket::WebRtcDecoderObserver::IncomingRate
-  fun:webrtc::ViEChannel::ReceiveStatistics
-  fun:webrtc::VideoCodingModuleImpl::Process
-  fun:webrtc::ProcessThreadImpl::Process
-  fun:webrtc::ProcessThreadImpl::Run
-  fun:webrtc::ThreadPosix::Run
-  fun:StartThread
-}
-{
-  bug_1205_21
-  ThreadSanitizer:Race
-  fun:talk_base::Thread::ReceiveSends
-  fun:talk_base::MessageQueue::Get
-  fun:talk_base::Thread::ProcessMessages
-  fun:talk_base::Thread::Run
-  fun:talk_base::Thread::PreRun
-}
-{
   bug_1205_22
   ThreadSanitizer:Race
   fun:webrtc::EventPosix::Process
   fun:webrtc::EventPosix::Run
   fun:webrtc::ThreadPosix::Run
   fun:StartThread
-}
-{
-  bug_1205_23
-  ThreadSanitizer:Race
-  fun:cricket::WebRtcEncoderObserver::framerate
-  fun:cricket::WebRtcVideoMediaChannel::GetStats
-  fun:cricket::VideoChannel::GetStats_w
-  fun:cricket::VideoChannel::OnMessage
-  ...
-}
-{
-  bug_1205_24
-  ThreadSanitizer:Race
-  fun:cricket::WebRtcEncoderObserver::bitrate
-  fun:cricket::WebRtcVideoMediaChannel::GetStats
-  fun:cricket::VideoChannel::GetStats_w
-  fun:cricket::VideoChannel::OnMessage
-  ...
 }
 {
   bug_1205_25
@@ -317,14 +240,6 @@
   fun:webrtc::RTPSenderVideo::ProcessBitrate
   fun:webrtc::RTPSender::ProcessBitrate
   fun:webrtc::ModuleRtpRtcpImpl::Process
-  ...
-}
-{
-  bug_1205_32
-  ThreadSanitizer:Race
-  fun:cricket::WebRtcEncoderObserver::OutgoingRate
-  fun:webrtc::ViEEncoder::SendStatistics
-  fun:webrtc::VideoCodingModuleImpl::Process
   ...
 }
 {
@@ -431,15 +346,6 @@
   ...
 }
 {
-  bug_1205_45
-  ThreadSanitizer:Race
-  fun:cricket::WebRtcDecoderObserver::framerate
-  fun:cricket::WebRtcVideoMediaChannel::GetStats
-  fun:cricket::VideoChannel::GetStats_w
-  fun:cricket::VideoChannel::OnMessage
-  ...
-}
-{
   bug_1205_46
   ThreadSanitizer:Race
   fun:talk_base::Thread::Send
@@ -447,17 +353,6 @@
   fun:FakeAudioCaptureModule::StopRecording
   fun:webrtc::VoEBaseImpl::StopSend
   ...
-}
-{
-  bug_1205_47
-  ThreadSanitizer:Race
-  fun:cricket::WebRtcDecoderObserver::IncomingRate
-  fun:webrtc::ViEChannel::OnReceiveStatisticsUpdate
-  fun:webrtc::VideoCodingModuleImpl::Process
-  fun:webrtc::ProcessThreadImpl::Process
-  fun:webrtc::ProcessThreadImpl::Run
-  fun:webrtc::ThreadPosix::Run
-  fun:StartThread
 }
 {
   bug_1205_48

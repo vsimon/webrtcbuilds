@@ -234,6 +234,9 @@ class WebRtcSoundclipMedia : public SoundclipMedia {
   }
 
   bool Init() {
+    if (!engine_->voe_sc()) {
+      return false;
+    }
     webrtc_channel_ = engine_->voe_sc()->base()->CreateChannel();
     if (webrtc_channel_ == -1) {
       LOG_RTCERR0(CreateChannel);
@@ -300,6 +303,7 @@ class WebRtcSoundclipMedia : public SoundclipMedia {
 WebRtcVoiceEngine::WebRtcVoiceEngine()
     : voe_wrapper_(new VoEWrapper()),
       voe_wrapper_sc_(new VoEWrapper()),
+      voe_wrapper_sc_initialized_(false),
       tracing_(new VoETraceWrapper()),
       adm_(NULL),
       adm_sc_(NULL),
@@ -316,6 +320,7 @@ WebRtcVoiceEngine::WebRtcVoiceEngine(VoEWrapper* voe_wrapper,
                                      VoETraceWrapper* tracing)
     : voe_wrapper_(voe_wrapper),
       voe_wrapper_sc_(voe_wrapper_sc),
+      voe_wrapper_sc_initialized_(false),
       tracing_(tracing),
       adm_(NULL),
       adm_sc_(NULL),
@@ -539,6 +544,23 @@ bool WebRtcVoiceEngine::InitInternal() {
     LOG(LS_INFO) << ToString(*it);
   }
 
+  // Disable the DTMF playout when a tone is sent.
+  // PlayDtmfTone will be used if local playout is needed.
+  if (voe_wrapper_->dtmf()->SetDtmfFeedbackStatus(false) == -1) {
+    LOG_RTCERR1(SetDtmfFeedbackStatus, false);
+  }
+
+  initialized_ = true;
+  return true;
+}
+
+bool WebRtcVoiceEngine::EnsureSoundclipEngineInit() {
+  if (voe_wrapper_sc_initialized_) {
+    return true;
+  }
+  // Note that, if initialization fails, voe_wrapper_sc_initialized_ will still
+  // be false, so subsequent calls to EnsureSoundclipEngineInit will
+  // probably just fail again. That's acceptable behavior.
 #if defined(LINUX) && !defined(HAVE_LIBPULSE)
   voe_wrapper_sc_->hw()->SetAudioDeviceLayer(webrtc::kAudioLinuxAlsa);
 #endif
@@ -572,14 +594,8 @@ bool WebRtcVoiceEngine::InitInternal() {
     }
   }
 #endif
-
-  // Disable the DTMF playout when a tone is sent.
-  // PlayDtmfTone will be used if local playout is needed.
-  if (voe_wrapper_->dtmf()->SetDtmfFeedbackStatus(false) == -1) {
-    LOG_RTCERR1(SetDtmfFeedbackStatus, false);
-  }
-
-  initialized_ = true;
+  voe_wrapper_sc_initialized_ = true;
+  LOG(LS_INFO) << "Initialized WebRtc soundclip engine.";
   return true;
 }
 
@@ -589,7 +605,10 @@ void WebRtcVoiceEngine::Terminate() {
 
   StopAecDump();
 
-  voe_wrapper_sc_->base()->Terminate();
+  if (voe_wrapper_sc_) {
+    voe_wrapper_sc_initialized_ = false;
+    voe_wrapper_sc_->base()->Terminate();
+  }
   voe_wrapper_->base()->Terminate();
   desired_local_monitor_enable_ = false;
 }
@@ -608,6 +627,11 @@ VoiceMediaChannel *WebRtcVoiceEngine::CreateChannel() {
 }
 
 SoundclipMedia *WebRtcVoiceEngine::CreateSoundclip() {
+  if (!EnsureSoundclipEngineInit()) {
+    LOG(LS_ERROR) << "Unable to create soundclip: soundclip engine failed to "
+                  << "initialize.";
+    return NULL;
+  }
   WebRtcSoundclipMedia *soundclip = new WebRtcSoundclipMedia(this);
   if (!soundclip->Init() || !soundclip->Enable()) {
     delete soundclip;
@@ -2158,6 +2182,11 @@ bool WebRtcVoiceMediaChannel::AddRecvStream(const StreamParams& sp) {
     return false;
   uint32 ssrc = sp.first_ssrc();
 
+  if (ssrc == 0) {
+    LOG(LS_WARNING) << "AddRecvStream with 0 ssrc is not supported.";
+    return false;
+  }
+
   if (receive_channels_.find(ssrc) != receive_channels_.end()) {
     LOG(LS_ERROR) << "Stream already exists with ssrc " << ssrc;
     return false;
@@ -2181,6 +2210,21 @@ bool WebRtcVoiceMediaChannel::AddRecvStream(const StreamParams& sp) {
     return false;
   }
 
+  if (!ConfigureRecvChannel(channel)) {
+    DeleteChannel(channel);
+    return false;
+  }
+
+  receive_channels_.insert(
+      std::make_pair(ssrc, WebRtcVoiceChannelInfo(channel, NULL)));
+
+  LOG(LS_INFO) << "New audio stream " << ssrc
+               << " registered to VoiceEngine channel #"
+               << channel << ".";
+  return true;
+}
+
+bool WebRtcVoiceMediaChannel::ConfigureRecvChannel(int channel) {
   // Configure to use external transport, like our default channel.
   if (engine()->voe()->network()->RegisterExternalTransport(
           channel, *this) == -1) {
@@ -2237,13 +2281,6 @@ bool WebRtcVoiceMediaChannel::AddRecvStream(const StreamParams& sp) {
   }
   SetNack(channel, nack_enabled_);
 
-  receive_channels_.insert(
-      std::make_pair(ssrc, WebRtcVoiceChannelInfo(channel, NULL)));
-
-  // TODO(juberti): We should rollback the add if SetPlayout fails.
-  LOG(LS_INFO) << "New audio stream " << ssrc
-            << " registered to VoiceEngine channel #"
-            << channel << ".";
   return SetPlayout(channel, playout_);
 }
 

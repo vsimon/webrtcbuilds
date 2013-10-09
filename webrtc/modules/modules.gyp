@@ -64,6 +64,9 @@
         {
           'target_name': 'modules_unittests',
           'type': '<(gtest_target_type)',
+          'defines': [
+            '<@(audio_coding_defines)',
+          ],
           'dependencies': [
             'audio_coding_module',
             'audio_processing',
@@ -90,6 +93,7 @@
             '<(rbe_components_path)/remote_bitrate_estimator_components.gyp:rbe_components',
             '<(DEPTH)/testing/gmock.gyp:gmock',
             '<(DEPTH)/testing/gtest.gyp:gtest',
+            '<(DEPTH)/third_party/gflags/gflags.gyp:gflags',
             '<(webrtc_root)/common_audio/common_audio.gyp:common_audio',
             '<(webrtc_root)/modules/video_coding/codecs/vp8/vp8.gyp:webrtc_vp8',
             '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
@@ -97,8 +101,10 @@
             '<(webrtc_root)/common_video/common_video.gyp:frame_generator',
           ],
           'sources': [
+            'audio_coding/main/acm2/acm_receiver_unittest.cc',
+            'audio_coding/main/acm2/initial_delay_manager_unittest.cc',
+            'audio_coding/main/acm2/nack_unittest.cc',
             'audio_coding/main/source/acm_neteq_unittest.cc',
-            'audio_coding/main/source/nack_unittest.cc',
             'audio_coding/codecs/cng/cng_unittest.cc',
             'audio_coding/codecs/isac/fix/source/filters_unittest.cc',
             'audio_coding/codecs/isac/fix/source/filterbanks_unittest.cc',
@@ -348,10 +354,10 @@
               'target_name': 'modules_tests_run',
               'type': 'none',
               'dependencies': [
-                '<(import_isolate_path):import_isolate_gypi',
                 'modules_tests',
               ],
               'includes': [
+                '../build/isolate.gypi',
                 'modules_tests.isolate',
               ],
               'sources': [
@@ -362,10 +368,10 @@
               'target_name': 'modules_unittests_run',
               'type': 'none',
               'dependencies': [
-                '<(import_isolate_path):import_isolate_gypi',
                 'modules_unittests',
               ],
               'includes': [
+                '../build/isolate.gypi',
                 'modules_unittests.isolate',
               ],
               'sources': [

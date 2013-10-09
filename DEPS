@@ -11,7 +11,7 @@ vars = {
   "googlecode_url": "http://%s.googlecode.com/svn",
   "sourceforge_url": "http://svn.code.sf.net/p/%(repo)s/code",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
-  "chromium_revision": "224141",
+  "chromium_revision": "226126",
 
   # A small subset of WebKit is needed for the Android Python test framework.
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
@@ -177,9 +177,6 @@ deps_os = {
     # compile them from source in WebRTC since they depend on Chromium's base.
     "tools/android":
       (Var("googlecode_url") % "webrtc") + "/deps/tools/android@4258",
-
-    "tools/android-dummy-test":
-      (Var("googlecode_url") % "webrtc") + "/deps/tools/android-dummy-test@4244",
 
     "third_party/android_tools":
       From("chromium_deps", "src/third_party/android_tools"),

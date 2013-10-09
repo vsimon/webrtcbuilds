@@ -118,34 +118,31 @@ def on_message(room, user, message):
     new_message.put()
     logging.info('Saved message for user ' + user)
 
-def make_media_constraints(media, min_re, max_re):
-  video_constraints = { 'optional': [], 'mandatory': {} }
-  media_constraints = { 'video':video_constraints, 'audio':True }
-
-  # Media: audio:audio only; video:video only; (default):both.
-  if media.lower() == 'audio':
-    media_constraints['video'] = False
-  elif media.lower() == 'video':
-    media_constraints['audio'] = False
-
-  if media.lower() != 'audio' :
-    if min_re:
-      min_sizes = min_re.split('x')
-      if len(min_sizes) == 2:
-        video_constraints['mandatory']['minWidth'] = min_sizes[0]
-        video_constraints['mandatory']['minHeight'] = min_sizes[1]
+def make_media_track_constraints(constraints_string):
+  if not constraints_string or constraints_string.lower() == 'true':
+    track_constraints = True
+  elif constraints_string.lower() == 'false':
+    track_constraints = False
+  else:
+    track_constraints = {'mandatory': {}, 'optional': []}
+    for constraint_string in constraints_string.split(','):
+      constraint = constraint_string.split('=')
+      if len(constraint) != 2:
+        logging.error('Ignoring malformed constraint: ' + constraint_string)
+        continue
+      if constraint[0].startswith('goog'):
+        track_constraints['optional'].append({constraint[0]: constraint[1]})
       else:
-        logging.info('Ignored invalid min_re: ' + min_re)
-    if max_re:
-      max_sizes = max_re.split('x')
-      if len(max_sizes) == 2:
-        video_constraints['mandatory']['maxWidth'] = max_sizes[0]
-        video_constraints['mandatory']['maxHeight'] = max_sizes[1]
-      else:
-        logging.info('Ignored invalid max_re: ' + max_re)
-    media_constraints['video'] = video_constraints
+        track_constraints['mandatory'][constraint[0]] = constraint[1]
 
-  return media_constraints
+  return track_constraints
+
+def make_media_stream_constraints(audio, video):
+  stream_constraints = (
+      {'audio': make_media_track_constraints(audio),
+       'video': make_media_track_constraints(video)})
+  logging.info('Applying media constraints: ' + str(stream_constraints))
+  return stream_constraints
 
 def make_pc_constraints(compat):
   constraints = { 'optional': [] }
@@ -305,41 +302,83 @@ class MainPage(webapp2.RequestHandler):
   def get(self):
     """Renders the main page. When this page is shown, we create a new
     channel to push asynchronous updates to the client."""
-    # get the base url without arguments.
+
+    # Append strings to this list to have them thrown up in message boxes. This
+    # will also cause the app to fail.
+    error_messages = []
+    # Get the base url without arguments.
     base_url = self.request.path_url
     user_agent = self.request.headers['User-Agent']
     room_key = sanitize(self.request.get('r'))
-    debug = self.request.get('debug')
-    unittest = self.request.get('unittest')
     stun_server = self.request.get('ss')
+    if not stun_server:
+      stun_server = get_default_stun_server(user_agent)
     turn_server = self.request.get('ts')
-    min_re = self.request.get('minre')
-    max_re = self.request.get('maxre')
+
+    ts_pwd = self.request.get('tp')
+
+    # Use "audio" and "video" to set the media stream constraints. Defined here:
+    # http://dev.w3.org/2011/webrtc/editor/getusermedia.html#idl-def-MediaStreamConstraints
+    #
+    # "true" and "false" are recognized and interpreted as bools, for example:
+    #   "?audio=true&video=false" (Start an audio-only call.)
+    #   "?audio=false" (Start a video-only call.)
+    # If unspecified, the stream constraint defaults to True.
+    #
+    # To specify media track constraints, pass in a comma-separated list of
+    # key/value pairs, separated by a "=". Examples:
+    #   "?audio=googEchoCancellation=false,googAutoGainControl=true"
+    #   (Disable echo cancellation and enable gain control.)
+    #
+    #   "?video=minWidth=1280,minHeight=720,googNoiseReduction=true"
+    #   (Set the minimum resolution to 1280x720 and enable noise reduction.)
+    #
+    # Keys starting with "goog" will be added to the "optional" key; all others
+    # will be added to the "mandatory" key.
+    #
+    # The audio keys are defined here:
+    # https://code.google.com/p/webrtc/source/browse/trunk/talk/app/webrtc/localaudiosource.cc
+    #
+    # The video keys are defined here:
+    # https://code.google.com/p/webrtc/source/browse/trunk/talk/app/webrtc/videosource.cc
+    audio = self.request.get('audio')
+    video = self.request.get('video')
+
+    if self.request.get('hd').lower() == 'true':
+      if video:
+        message = 'The "hd" parameter has overridden video=' + str(video)
+        logging.error(message)
+        error_messages.append(message)
+      video = 'minWidth=1280,minHeight=720'
+
+    if self.request.get('minre') or self.request.get('maxre'):
+      message = ('The "minre" and "maxre" parameters are no longer supported. '
+                 'Use "video" instead.')
+      logging.error(message)
+      error_messages.append(message)
+
     audio_send_codec = self.request.get('asc')
     if not audio_send_codec:
       audio_send_codec = get_preferred_audio_send_codec(user_agent)
+
     audio_receive_codec = self.request.get('arc')
     if not audio_receive_codec:
       audio_receive_codec = get_preferred_audio_receive_codec()
-    hd_video = self.request.get('hd')
-    turn_url = 'https://computeengineondemand.appspot.com/'
-    if hd_video.lower() == 'true':
-      min_re = '1280x720'
-    ts_pwd = self.request.get('tp')
-    media = self.request.get('media')
-    # set compat to true by default.
-    compat = 'true'
-    if self.request.get('compat'):
-      compat = self.request.get('compat')
-    if debug == 'loopback':
-    # set compat to false as DTLS does not work for loopback.
-      compat = 'false'
-    # set stereo to false by default
+
+    # Set stereo to false by default.
     stereo = 'false'
     if self.request.get('stereo'):
       stereo = self.request.get('stereo')
-    if not stun_server:
-      stun_server = get_default_stun_server(user_agent)
+
+    # Set compat to true by default.
+    compat = 'true'
+    if self.request.get('compat'):
+      compat = self.request.get('compat')
+
+    debug = self.request.get('debug')
+    if debug == 'loopback':
+      # Set compat to false as DTLS does not work for loopback.
+      compat = 'false'
 
     # token_timeout for channel creation, default 30min, max 2 days, min 3min.
     token_timeout = self.request.get_range('tt',
@@ -347,6 +386,7 @@ class MainPage(webapp2.RequestHandler):
                                            max_value = 3000,
                                            default = 30)
 
+    unittest = self.request.get('unittest')
     if unittest:
       # Always create a new room for the unit tests.
       room_key = generate_random(8)
@@ -387,13 +427,15 @@ class MainPage(webapp2.RequestHandler):
 
     room_link = base_url + '?r=' + room_key
     room_link = append_url_arguments(self.request, room_link)
+    turn_url = 'https://computeengineondemand.appspot.com/'
     turn_url = turn_url + 'turn?' + 'username=' + user + '&key=4080218913'
     token = create_channel(room, user, token_timeout)
     pc_config = make_pc_config(stun_server, turn_server, ts_pwd)
     pc_constraints = make_pc_constraints(compat)
     offer_constraints = make_offer_constraints()
-    media_constraints = make_media_constraints(media, min_re, max_re)
-    template_values = {'token': token,
+    media_constraints = make_media_stream_constraints(audio, video)
+    template_values = {'error_messages': error_messages,
+                       'token': token,
                        'me': user,
                        'room_key': room_key,
                        'room_link': room_link,

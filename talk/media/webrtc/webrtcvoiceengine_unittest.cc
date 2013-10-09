@@ -294,7 +294,8 @@ TEST_F(WebRtcVoiceEngineTestFake, StartupShutdown) {
   EXPECT_FALSE(voe_sc_.IsInited());
   EXPECT_TRUE(engine_.Init(talk_base::Thread::Current()));
   EXPECT_TRUE(voe_.IsInited());
-  EXPECT_TRUE(voe_sc_.IsInited());
+  // The soundclip engine is lazily initialized.
+  EXPECT_FALSE(voe_sc_.IsInited());
   engine_.Terminate();
   EXPECT_FALSE(voe_.IsInited());
   EXPECT_FALSE(voe_sc_.IsInited());
@@ -2044,6 +2045,26 @@ TEST_F(WebRtcVoiceEngineTestFake, StreamCleanup) {
   EXPECT_EQ(0, voe_.GetNumChannels());
 }
 
+TEST_F(WebRtcVoiceEngineTestFake, TestAddRecvStreamFailWithZeroSsrc) {
+  EXPECT_TRUE(SetupEngine());
+  EXPECT_FALSE(channel_->AddRecvStream(cricket::StreamParams::CreateLegacy(0)));
+}
+
+TEST_F(WebRtcVoiceEngineTestFake, TestNoLeakingWhenAddRecvStreamFail) {
+  EXPECT_TRUE(SetupEngine());
+  // Stream 1 reuses default channel.
+  EXPECT_TRUE(channel_->AddRecvStream(cricket::StreamParams::CreateLegacy(1)));
+  // Manually delete default channel to simulate a failure.
+  int default_channel = voe_.GetLastChannel();
+  EXPECT_EQ(0, voe_.DeleteChannel(default_channel));
+  // Add recv stream 2 should fail because default channel is gone.
+  EXPECT_FALSE(channel_->AddRecvStream(cricket::StreamParams::CreateLegacy(2)));
+  int new_channel = voe_.GetLastChannel();
+  EXPECT_NE(default_channel, new_channel);
+  // The last created channel should have already been deleted.
+  EXPECT_EQ(-1, voe_.DeleteChannel(new_channel));
+}
+
 // Test the InsertDtmf on default send stream as caller.
 TEST_F(WebRtcVoiceEngineTestFake, InsertDtmfOnDefaultSendStreamAsCaller) {
   TestInsertDtmf(0, true);
@@ -2122,7 +2143,9 @@ TEST_F(WebRtcVoiceEngineTestFake, PlayRingbackWithMultipleStreams) {
 // Tests creating soundclips, and make sure they come from the right engine.
 TEST_F(WebRtcVoiceEngineTestFake, CreateSoundclip) {
   EXPECT_TRUE(engine_.Init(talk_base::Thread::Current()));
+  EXPECT_FALSE(voe_sc_.IsInited());
   soundclip_ = engine_.CreateSoundclip();
+  EXPECT_TRUE(voe_sc_.IsInited());
   ASSERT_TRUE(soundclip_ != NULL);
   EXPECT_EQ(0, voe_.GetNumChannels());
   EXPECT_EQ(1, voe_sc_.GetNumChannels());
@@ -2131,6 +2154,10 @@ TEST_F(WebRtcVoiceEngineTestFake, CreateSoundclip) {
   delete soundclip_;
   soundclip_ = NULL;
   EXPECT_EQ(0, voe_sc_.GetNumChannels());
+  // Make sure the soundclip engine is uninitialized on shutdown, now that
+  // we've initialized it by creating a soundclip.
+  engine_.Terminate();
+  EXPECT_FALSE(voe_sc_.IsInited());
 }
 
 // Tests playing out a fake sound.

@@ -21,7 +21,7 @@
 #include "webrtc/modules/audio_coding/main/source/acm_dtmf_detection.h"
 #include "webrtc/modules/audio_coding/main/source/acm_generic_codec.h"
 #include "webrtc/modules/audio_coding/main/source/acm_resampler.h"
-#include "webrtc/modules/audio_coding/main/source/nack.h"
+#include "webrtc/modules/audio_coding/main/acm2/nack.h"
 #include "webrtc/system_wrappers/interface/clock.h"
 #include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 #include "webrtc/system_wrappers/interface/logging.h"
@@ -3002,12 +3002,13 @@ int AudioCodingModuleImpl::LeastRequiredDelayMs() const {
 
 int AudioCodingModuleImpl::EnableNack(size_t max_nack_list_size) {
   // Don't do anything if |max_nack_list_size| is out of range.
-  if (max_nack_list_size == 0 || max_nack_list_size > Nack::kNackListSizeLimit)
+  if (max_nack_list_size == 0 ||
+      max_nack_list_size > acm2::Nack::kNackListSizeLimit)
     return -1;
 
   CriticalSectionScoped lock(acm_crit_sect_);
   if (!nack_enabled_) {
-    nack_.reset(Nack::Create(kNackThresholdPackets));
+    nack_.reset(acm2::Nack::Create(kNackThresholdPackets));
     nack_enabled_ = true;
 
     // Sampling rate might need to be updated if we change from disable to
