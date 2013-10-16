@@ -1001,6 +1001,10 @@ class P2PTestConductor : public testing::Test {
 };
 typedef P2PTestConductor<JsepTestClient> JsepPeerConnectionP2PTestClient;
 
+// Disable for TSan v2, see
+// https://code.google.com/p/webrtc/issues/detail?id=1205 for details.
+#if !defined(THREAD_SANITIZER)
+
 // This test sets up a Jsep call between two parties and test Dtmf.
 // TODO(holmer): Disabled due to sometimes crashing on buildbots.
 // See issue webrtc/2378.
@@ -1061,7 +1065,7 @@ TEST_F(JsepPeerConnectionP2PTestClient, LocalP2PTestDtls) {
 
 // This test sets up a audio call initially and then upgrades to audio/video,
 // using DTLS.
-TEST_F(JsepPeerConnectionP2PTestClient, LocalP2PTestDtlsRenegotiate) {
+TEST_F(JsepPeerConnectionP2PTestClient, DISABLED_LocalP2PTestDtlsRenegotiate) {
   MAYBE_SKIP_TEST(talk_base::SSLStreamAdapter::HaveDtlsSrtp);
   FakeConstraints setup_constraints;
   setup_constraints.AddMandatory(MediaConstraintsInterface::kEnableDtlsSrtp,
@@ -1406,3 +1410,6 @@ TEST_F(JsepPeerConnectionP2PTestClient,
   EnableVideoDecoderFactory();
   LocalP2PTest();
 }
+
+#endif // if !defined(THREAD_SANITIZER)
+
