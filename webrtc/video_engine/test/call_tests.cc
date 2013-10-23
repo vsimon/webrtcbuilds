@@ -13,6 +13,7 @@
 
 #include "testing/gtest/include/gtest/gtest.h"
 
+#include "webrtc/common_video/test/frame_generator.h"
 #include "webrtc/modules/rtp_rtcp/interface/rtp_header_parser.h"
 #include "webrtc/modules/rtp_rtcp/source/rtcp_utility.h"
 #include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
@@ -27,6 +28,9 @@
 #include "webrtc/video_engine/test/common/rtp_rtcp_observer.h"
 
 namespace webrtc {
+
+static unsigned int kDefaultTimeoutMs = 30 * 1000;
+static unsigned int kLongTimeoutMs = 120 * 1000;
 
 class CallTest : public ::testing::Test {
  public:
@@ -85,11 +89,13 @@ class CallTest : public ::testing::Test {
   void StartSending() {
     receive_stream_->StartReceive();
     send_stream_->StartSend();
-    frame_generator_capturer_->Start();
+    if (frame_generator_capturer_.get() != NULL)
+      frame_generator_capturer_->Start();
   }
 
   void StopSending() {
-    frame_generator_capturer_->Stop();
+    if (frame_generator_capturer_.get() != NULL)
+      frame_generator_capturer_->Stop();
     if (send_stream_ != NULL)
       send_stream_->StopSend();
     if (receive_stream_ != NULL)
@@ -106,6 +112,7 @@ class CallTest : public ::testing::Test {
   }
 
   void ReceivesPliAndRecovers(int rtp_history_ms);
+  void RespectsRtcpMode(newapi::RtcpMode rtcp_mode);
 
   scoped_ptr<Call> sender_call_;
   scoped_ptr<Call> receiver_call_;
@@ -131,7 +138,7 @@ class NackObserver : public test::RtpRtcpObserver {
 
  public:
   NackObserver()
-      : test::RtpRtcpObserver(120 * 1000),
+      : test::RtpRtcpObserver(kLongTimeoutMs),
         rtp_parser_(RtpHeaderParser::Create()),
         drop_burst_count_(0),
         sent_rtp_packets_(0),
@@ -229,7 +236,7 @@ class NackObserver : public test::RtpRtcpObserver {
 TEST_F(CallTest, UsesTraceCallback) {
   const unsigned int kSenderTraceFilter = kTraceDebug;
   const unsigned int kReceiverTraceFilter = kTraceDefault & (~kTraceDebug);
-  class TraceObserver: public TraceCallback {
+  class TraceObserver : public TraceCallback {
    public:
     TraceObserver(unsigned int filter)
         : filter_(filter), messages_left_(50), done_(EventWrapper::Create()) {}
@@ -242,7 +249,7 @@ TEST_F(CallTest, UsesTraceCallback) {
         done_->Set();
     }
 
-    EventTypeWrapper Wait() { return done_->Wait(30 * 1000); }
+    EventTypeWrapper Wait() { return done_->Wait(kDefaultTimeoutMs); }
 
    private:
     unsigned int filter_;
@@ -281,6 +288,50 @@ TEST_F(CallTest, UsesTraceCallback) {
   receiver_call_.reset();
 }
 
+TEST_F(CallTest, TransmitsFirstFrame) {
+  class Renderer : public VideoRenderer {
+   public:
+    Renderer() : event_(EventWrapper::Create()) {}
+
+    virtual void RenderFrame(const I420VideoFrame& video_frame,
+                             int /*time_to_render_ms*/) OVERRIDE {
+      event_->Set();
+    }
+
+    EventTypeWrapper Wait() { return event_->Wait(kDefaultTimeoutMs); }
+
+    scoped_ptr<EventWrapper> event_;
+  } renderer;
+
+  test::DirectTransport sender_transport, receiver_transport;
+
+  CreateCalls(Call::Config(&sender_transport),
+              Call::Config(&receiver_transport));
+
+  sender_transport.SetReceiver(receiver_call_->Receiver());
+  receiver_transport.SetReceiver(sender_call_->Receiver());
+
+  CreateTestConfigs();
+  receive_config_.renderer = &renderer;
+
+  CreateStreams();
+  StartSending();
+
+  scoped_ptr<test::FrameGenerator> frame_generator(test::FrameGenerator::Create(
+      send_config_.codec.width, send_config_.codec.height));
+  send_stream_->Input()->PutFrame(frame_generator->NextFrame(), 0);
+
+  EXPECT_EQ(kEventSignaled, renderer.Wait())
+      << "Timed out while waiting for the frame to render.";
+
+  StopSending();
+
+  sender_transport.StopSending();
+  receiver_transport.StopSending();
+
+  DestroyStreams();
+}
+
 TEST_F(CallTest, ReceivesAndRetransmitsNack) {
   NackObserver observer;
 
@@ -296,7 +347,6 @@ TEST_F(CallTest, ReceivesAndRetransmitsNack) {
 
   CreateStreams();
   CreateFrameGenerator();
-
   StartSending();
 
   // Wait() waits for an event triggered when NACKs have been received, NACKed
@@ -310,12 +360,109 @@ TEST_F(CallTest, ReceivesAndRetransmitsNack) {
   DestroyStreams();
 }
 
+TEST_F(CallTest, UsesFrameCallbacks) {
+  static const int kWidth = 320;
+  static const int kHeight = 240;
+
+  class Renderer : public VideoRenderer {
+   public:
+    Renderer() : event_(EventWrapper::Create()) {}
+
+    virtual void RenderFrame(const I420VideoFrame& video_frame,
+                             int /*time_to_render_ms*/) OVERRIDE {
+      EXPECT_EQ(0, *video_frame.buffer(kYPlane))
+          << "Rendered frame should have zero luma which is applied by the "
+             "pre-render callback.";
+      event_->Set();
+    }
+
+    EventTypeWrapper Wait() { return event_->Wait(kDefaultTimeoutMs); }
+    scoped_ptr<EventWrapper> event_;
+  } renderer;
+
+  class TestFrameCallback : public I420FrameCallback {
+   public:
+    TestFrameCallback(int expected_luma_byte, int next_luma_byte)
+        : event_(EventWrapper::Create()),
+          expected_luma_byte_(expected_luma_byte),
+          next_luma_byte_(next_luma_byte) {}
+
+    EventTypeWrapper Wait() { return event_->Wait(kDefaultTimeoutMs); }
+
+   private:
+    virtual void FrameCallback(I420VideoFrame* frame) {
+      EXPECT_EQ(kWidth, frame->width())
+          << "Width not as expected, callback done before resize?";
+      EXPECT_EQ(kHeight, frame->height())
+          << "Height not as expected, callback done before resize?";
+
+      // Previous luma specified, observed luma should be fairly close.
+      if (expected_luma_byte_ != -1) {
+        EXPECT_NEAR(expected_luma_byte_, *frame->buffer(kYPlane), 10);
+      }
+
+      memset(frame->buffer(kYPlane),
+             next_luma_byte_,
+             frame->allocated_size(kYPlane));
+
+      event_->Set();
+    }
+
+    scoped_ptr<EventWrapper> event_;
+    int expected_luma_byte_;
+    int next_luma_byte_;
+  };
+
+  TestFrameCallback pre_encode_callback(-1, 255);  // Changes luma to 255.
+  TestFrameCallback pre_render_callback(255, 0);  // Changes luma from 255 to 0.
+
+  test::DirectTransport sender_transport, receiver_transport;
+
+  CreateCalls(Call::Config(&sender_transport),
+              Call::Config(&receiver_transport));
+
+  sender_transport.SetReceiver(receiver_call_->Receiver());
+  receiver_transport.SetReceiver(sender_call_->Receiver());
+
+  CreateTestConfigs();
+  send_config_.encoder = NULL;
+  send_config_.codec = sender_call_->GetVideoCodecs()[0];
+  send_config_.codec.width = kWidth;
+  send_config_.codec.height = kHeight;
+  send_config_.pre_encode_callback = &pre_encode_callback;
+  receive_config_.pre_render_callback = &pre_render_callback;
+  receive_config_.renderer = &renderer;
+
+  CreateStreams();
+  StartSending();
+
+  // Create frames that are smaller than the send width/height, this is done to
+  // check that the callbacks are done after processing video.
+  scoped_ptr<test::FrameGenerator> frame_generator(
+      test::FrameGenerator::Create(kWidth / 2, kHeight / 2));
+  send_stream_->Input()->PutFrame(frame_generator->NextFrame(), 0);
+
+  EXPECT_EQ(kEventSignaled, pre_encode_callback.Wait())
+      << "Timed out while waiting for pre-encode callback.";
+  EXPECT_EQ(kEventSignaled, pre_render_callback.Wait())
+      << "Timed out while waiting for pre-render callback.";
+  EXPECT_EQ(kEventSignaled, renderer.Wait())
+      << "Timed out while waiting for the frame to render.";
+
+  StopSending();
+
+  sender_transport.StopSending();
+  receiver_transport.StopSending();
+
+  DestroyStreams();
+}
+
 class PliObserver : public test::RtpRtcpObserver, public VideoRenderer {
   static const int kInverseDropProbability = 16;
 
  public:
   explicit PliObserver(bool nack_enabled)
-      : test::RtpRtcpObserver(120 * 1000),
+      : test::RtpRtcpObserver(kLongTimeoutMs),
         rtp_header_parser_(RtpHeaderParser::Create()),
         nack_enabled_(nack_enabled),
         first_retransmitted_timestamp_(0),
@@ -399,7 +546,6 @@ void CallTest::ReceivesPliAndRecovers(int rtp_history_ms) {
 
   CreateStreams();
   CreateFrameGenerator();
-
   StartSending();
 
   // Wait() waits for an event triggered when Pli has been received and frames
@@ -428,7 +574,9 @@ TEST_F(CallTest, SurvivesIncomingRtpPacketsToDestroyedReceiveStream) {
     explicit PacketInputObserver(PacketReceiver* receiver)
         : receiver_(receiver), delivered_packet_(EventWrapper::Create()) {}
 
-    EventTypeWrapper Wait() { return delivered_packet_->Wait(30 * 1000); }
+    EventTypeWrapper Wait() {
+      return delivered_packet_->Wait(kDefaultTimeoutMs);
+    }
 
    private:
     virtual bool DeliverPacket(const uint8_t* packet, size_t length) {
@@ -457,7 +605,6 @@ TEST_F(CallTest, SurvivesIncomingRtpPacketsToDestroyedReceiveStream) {
 
   CreateStreams();
   CreateFrameGenerator();
-
   StartSending();
 
   receiver_call_->DestroyReceiveStream(receive_stream_);
@@ -472,6 +619,100 @@ TEST_F(CallTest, SurvivesIncomingRtpPacketsToDestroyedReceiveStream) {
 
   send_transport.StopSending();
   receive_transport.StopSending();
+}
+
+void CallTest::RespectsRtcpMode(newapi::RtcpMode rtcp_mode) {
+  static const int kRtpHistoryMs = 1000;
+  static const int kNumCompoundRtcpPacketsToObserve = 10;
+  class RtcpModeObserver : public test::RtpRtcpObserver {
+   public:
+    RtcpModeObserver(newapi::RtcpMode rtcp_mode)
+        : test::RtpRtcpObserver(kDefaultTimeoutMs),
+          rtcp_mode_(rtcp_mode),
+          sent_rtp_(0),
+          sent_rtcp_(0) {}
+
+   private:
+    virtual Action OnSendRtp(const uint8_t* packet, size_t length) OVERRIDE {
+      if (++sent_rtp_ % 3 == 0)
+        return DROP_PACKET;
+
+      return SEND_PACKET;
+    }
+
+    virtual Action OnReceiveRtcp(const uint8_t* packet,
+                                 size_t length) OVERRIDE {
+      ++sent_rtcp_;
+      RTCPUtility::RTCPParserV2 parser(packet, length, true);
+      EXPECT_TRUE(parser.IsValid());
+
+      RTCPUtility::RTCPPacketTypes packet_type = parser.Begin();
+      bool has_report_block = false;
+      while (packet_type != RTCPUtility::kRtcpNotValidCode) {
+        EXPECT_NE(RTCPUtility::kRtcpSrCode, packet_type);
+        if (packet_type == RTCPUtility::kRtcpRrCode) {
+          has_report_block = true;
+          break;
+        }
+        packet_type = parser.Iterate();
+      }
+
+      switch (rtcp_mode_) {
+        case newapi::kRtcpCompound:
+          if (!has_report_block) {
+            ADD_FAILURE() << "Received RTCP packet without receiver report for "
+                             "kRtcpCompound.";
+            observation_complete_->Set();
+          }
+
+          if (sent_rtcp_ >= kNumCompoundRtcpPacketsToObserve)
+            observation_complete_->Set();
+
+          break;
+        case newapi::kRtcpReducedSize:
+          if (!has_report_block)
+            observation_complete_->Set();
+          break;
+      }
+
+      return SEND_PACKET;
+    }
+
+    newapi::RtcpMode rtcp_mode_;
+    int sent_rtp_;
+    int sent_rtcp_;
+  } observer(rtcp_mode);
+
+  CreateCalls(Call::Config(observer.SendTransport()),
+              Call::Config(observer.ReceiveTransport()));
+
+  observer.SetReceivers(receiver_call_->Receiver(), sender_call_->Receiver());
+
+  CreateTestConfigs();
+  send_config_.rtp.nack.rtp_history_ms = kRtpHistoryMs;
+  receive_config_.rtp.nack.rtp_history_ms = kRtpHistoryMs;
+  receive_config_.rtp.rtcp_mode = rtcp_mode;
+
+  CreateStreams();
+  CreateFrameGenerator();
+  StartSending();
+
+  EXPECT_EQ(kEventSignaled, observer.Wait())
+      << (rtcp_mode == newapi::kRtcpCompound
+              ? "Timed out before observing enough compound packets."
+              : "Timed out before receiving a non-compound RTCP packet.");
+
+  StopSending();
+  observer.StopSending();
+  DestroyStreams();
+}
+
+TEST_F(CallTest, UsesRtcpCompoundMode) {
+  RespectsRtcpMode(newapi::kRtcpCompound);
+}
+
+TEST_F(CallTest, UsesRtcpReducedSizeMode) {
+  RespectsRtcpMode(newapi::kRtcpReducedSize);
 }
 
 // Test sets up a Call multiple senders with different resolutions and SSRCs.
@@ -493,7 +734,7 @@ TEST_F(CallTest, SendsAndReceivesMultipleStreams) {
       done_->Set();
     }
 
-    void Wait() { done_->Wait(30 * 1000); }
+    void Wait() { done_->Wait(kDefaultTimeoutMs); }
 
    private:
     int width_;

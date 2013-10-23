@@ -48,26 +48,17 @@
   fun:webrtc::StartThread
 }
 {
-  bug_2461_1
+  bug_2497
   ThreadSanitizer:Race
-  fun:webrtc::voe::Channel::SetChannelOutputVolumeScaling
-  fun:webrtc::VoEVolumeControlImpl::SetChannelOutputVolumeScaling
-  fun:cricket::WebRtcVoiceMediaChannel::SetOutputScaling
-  fun:cricket::VoiceChannel::SetOutputScaling_w
-  fun:cricket::VoiceChannel::OnMessage
+  fun:webrtc::VCMJitterBuffer::RecycleFramesUntilKeyFrame
   ...
 }
 {
-  bug_2461_2
+  bug_2497_2
   ThreadSanitizer:Race
-  fun:webrtc::voe::Channel::SetOutputVolumePan
-  fun:webrtc::VoEVolumeControlImpl::SetOutputVolumePan
-  fun:cricket::WebRtcVoiceMediaChannel::SetOutputScaling
-  fun:cricket::VoiceChannel::SetOutputScaling_w
-  fun:cricket::VoiceChannel::OnMessage
+  fun:webrtc::VideoEngine::SetTraceFilter
   ...
 }
-
 
 #-----------------------------------------------------------------------
 # 2. libjingle stuff (talk folder)
@@ -136,48 +127,12 @@
   fun:StartThread
 }
 {
-  bug_1205_12
-  ThreadSanitizer:Race
-  fun:webrtc::voe::Channel::GetAudioFrame
-  fun:webrtc::AudioConferenceMixerImpl::UpdateToMix
-  fun:webrtc::AudioConferenceMixerImpl::Process
-  fun:webrtc::voe::OutputMixer::MixActiveChannels
-  fun:webrtc::VoEBaseImpl::NeedMorePlayData
-  ...
-}
-{
-  bug_1205_13
-  ThreadSanitizer:Race
-  fun:talk_base::Thread::ReceiveSends
-  fun:talk_base::MessageQueue::Get
-  fun:talk_base::Thread::ProcessMessages
-  fun:talk_base::Thread::Run
-  fun:talk_base::Thread::PreRun
-}
-{
   bug_1205_22
   ThreadSanitizer:Race
   fun:webrtc::EventPosix::Process
   fun:webrtc::EventPosix::Run
   fun:webrtc::ThreadPosix::Run
   fun:StartThread
-}
-{
-  bug_1205_25
-  ThreadSanitizer:Race
-  fun:webrtc::AudioCodingModuleImpl::PlayoutData10Ms
-  fun:webrtc::voe::Channel::GetAudioFrame
-  fun:webrtc::AudioConferenceMixerImpl::UpdateToMix
-  fun:webrtc::AudioConferenceMixerImpl::Process
-  fun:webrtc::voe::OutputMixer::MixActiveChannels
-  fun:webrtc::VoEBaseImpl::NeedMorePlayData
-  fun:FakeAudioCaptureModule::ReceiveFrameP
-  fun:FakeAudioCaptureModule::ProcessFrameP
-  fun:FakeAudioCaptureModule::OnMessage
-  fun:talk_base::MessageQueue::Dispatch
-  fun:talk_base::Thread::ProcessMessages
-  fun:talk_base::Thread::Run
-  fun:talk_base::Thread::PreRun
 }
 {
   bug_1205_26
@@ -358,15 +313,6 @@
   bug_1205_48
   ThreadSanitizer:Race
   fun:webrtc::Bitrate::BitrateLast
-  ...
-}
-{
-  bug_2078_1
-  ThreadSanitizer:Race
-  fun:talk_base::Thread::~Thread
-  fun:cricket::RtpSenderReceiver::~RtpSenderReceiver
-  fun:cricket::RtpSenderReceiver::~RtpSenderReceiver
-  fun:talk_base::scoped_ptr::~scoped_ptr
   ...
 }
 {
@@ -635,15 +581,6 @@
   ...
 }
 {
-  bug_2079_4
-  ThreadSanitizer:Race
-  fun:talk_base::Thread::ReceiveSends
-  fun:talk_base::MessageQueue::Get
-  fun:talk_base::Thread::ProcessMessages
-  fun:talk_base::Thread::Run
-  fun:talk_base::Thread::PreRun
-}
-{
   bug_2079_5
   ThreadSanitizer:Race
   fun:talk_base::Thread::Send
@@ -709,22 +646,6 @@
   fun:talk_base::LogMessage::UpdateMinLogSeverity
   fun:talk_base::LogMessage::AddLogToStream
   ...
-}
-{
-  bug_2080_4
-  ThreadSanitizer:Race
-  fun:talk_base::Thread::~Thread
-  fun:talk_base::LogThread::~LogThread
-  ...
-}
-{
-  bug_2080_5
-  ThreadSanitizer:Race
-  fun:talk_base::Thread::ReceiveSends
-  fun:talk_base::MessageQueue::Get
-  fun:talk_base::Thread::ProcessMessages
-  fun:talk_base::Thread::Run
-  fun:talk_base::Thread::PreRun
 }
 {
   bug_2080_6
@@ -910,16 +831,6 @@
   fun:OwnerThread::~OwnerThread
   fun:talk_base::scoped_ptr::~scoped_ptr
   ...
-}
-{
-  bug_2080_28
-  ThreadSanitizer:Race
-  fun:talk_base::Thread::~Thread
-  fun:OwnerThread::~OwnerThread
-  fun:OwnerThread::~OwnerThread
-  fun:talk_base::scoped_ptr::~scoped_ptr
-  fun:SignalThreadTest_OwnerThreadGoesAway_Test::TestBody
-  fun:testing::internal::HandleSehExceptionsInMethodIfSupported
 }
 {
   bug_2080_29

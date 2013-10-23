@@ -22,6 +22,15 @@
 
 namespace webrtc {
 
+namespace newapi {
+// RTCP mode to use. Compound mode is described by RFC 4585 and reduced-size
+// RTCP mode is described by RFC 5506.
+enum RtcpMode {
+  kRtcpCompound,
+  kRtcpReducedSize
+};
+}  // namespace newapi
+
 class VideoDecoder;
 
 // TODO(mflodman) Move all these settings to VideoDecoder and move the
@@ -89,17 +98,21 @@ class VideoReceiveStream {
           render_delay_ms(0),
           audio_channel_id(0),
           pre_decode_callback(NULL),
-          post_decode_callback(NULL),
+          pre_render_callback(NULL),
           target_delay_ms(0) {}
     // Codecs the receive stream can receive.
     std::vector<VideoCodec> codecs;
 
     // Receive-stream specific RTP settings.
     struct Rtp {
-      Rtp() : ssrc(0) {}
+      Rtp() : ssrc(0), rtcp_mode(newapi::kRtcpReducedSize) {}
+
       // TODO(mflodman) Do we require a set ssrc? What happens if the ssrc
       // changes?
       uint32_t ssrc;
+
+      // See RtcpMode for description.
+      newapi::RtcpMode rtcp_mode;
 
       // See NackConfig for description.
       NackConfig nack;
@@ -137,7 +150,7 @@ class VideoReceiveStream {
     // Called for each decoded frame. E.g. used when adding effects to the
     // decoded
     // stream. 'NULL' disables the callback.
-    I420FrameCallback* post_decode_callback;
+    I420FrameCallback* pre_render_callback;
 
     // External video decoders to be used if incoming payload type matches the
     // registered type for an external decoder.

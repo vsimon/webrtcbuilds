@@ -29,6 +29,7 @@
 #include "webrtc/video_engine/include/vie_errors.h"
 #include "webrtc/video_engine/include/vie_image_process.h"
 #include "webrtc/video_engine/include/vie_rtp_rtcp.h"
+#include "webrtc/video_engine/new_include/frame_callback.h"
 #include "webrtc/video_engine/vie_defines.h"
 
 namespace webrtc {
@@ -73,7 +74,6 @@ ViEChannel::ViEChannel(int32_t channel_id,
       callback_cs_(CriticalSectionWrapper::CreateCriticalSection()),
       rtp_rtcp_cs_(CriticalSectionWrapper::CreateCriticalSection()),
       default_rtp_rtcp_(default_rtp_rtcp),
-      rtp_rtcp_(NULL),
       vcm_(*VideoCodingModule::Create(ViEModuleId(engine_id, channel_id))),
       vie_receiver_(channel_id, &vcm_, remote_bitrate_estimator, this),
       vie_sender_(channel_id),
@@ -101,7 +101,8 @@ ViEChannel::ViEChannel(int32_t channel_id,
       mtu_(0),
       sender_(sender),
       nack_history_size_sender_(kSendSidePacketHistorySize),
-      max_nack_reordering_threshold_(kMaxPacketAgeToNack) {
+      max_nack_reordering_threshold_(kMaxPacketAgeToNack),
+      pre_render_callback_(NULL) {
   WEBRTC_TRACE(kTraceMemory, kTraceVideo, ViEId(engine_id, channel_id),
                "ViEChannel::ViEChannel(channel_id: %d, engine_id: %d)",
                channel_id, engine_id);
@@ -1599,6 +1600,8 @@ int32_t ViEChannel::FrameToRender(
   }
   // Post processing is not supported if the frame is backed by a texture.
   if (video_frame.native_handle() == NULL) {
+    if (pre_render_callback_ != NULL)
+      pre_render_callback_->FrameCallback(&video_frame);
     if (effect_filter_) {
       unsigned int length = CalcBufferSize(kI420,
                                            video_frame.width(),
@@ -1825,6 +1828,12 @@ int32_t ViEChannel::RegisterEffectFilter(ViEEffectFilter* effect_filter) {
   }
   effect_filter_ = effect_filter;
   return 0;
+}
+
+void ViEChannel::RegisterPreRenderCallback(
+    I420FrameCallback* pre_render_callback) {
+  CriticalSectionScoped cs(callback_cs_.get());
+  pre_render_callback_ = pre_render_callback;
 }
 
 void ViEChannel::OnApplicationDataReceived(const int32_t id,
