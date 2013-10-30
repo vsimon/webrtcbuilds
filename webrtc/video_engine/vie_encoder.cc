@@ -28,7 +28,7 @@
 #include "webrtc/system_wrappers/interface/trace_event.h"
 #include "webrtc/video_engine/include/vie_codec.h"
 #include "webrtc/video_engine/include/vie_image_process.h"
-#include "webrtc/video_engine/new_include/frame_callback.h"
+#include "webrtc/frame_callback.h"
 #include "webrtc/video_engine/vie_defines.h"
 
 namespace webrtc {
@@ -1156,8 +1156,9 @@ int ViEEncoder::StopDebugRecording() {
   return vcm_.StopDebugRecording();
 }
 
-void ViEEncoder::EnableAutoMuting(int threshold_bps, int window_bps) {
-  vcm_.EnableAutoMuting(threshold_bps, window_bps);
+void ViEEncoder::EnableAutoMuting() {
+  vcm_.EnableAutoMuting();
+  bitrate_controller_->EnforceMinBitrate(false);
 }
 
 void ViEEncoder::RegisterPreEncodeCallback(

@@ -110,7 +110,8 @@ class WebRtcSession : public cricket::BaseSession,
                 MediaStreamSignaling* mediastream_signaling);
   virtual ~WebRtcSession();
 
-  bool Initialize(const MediaConstraintsInterface* constraints,
+  bool Initialize(const PeerConnectionFactoryInterface::Options& options,
+                  const MediaConstraintsInterface* constraints,
                   DTLSIdentityServiceInterface* dtls_identity_service);
   // Deletes the voice, video and data channel and changes the session state
   // to STATE_RECEIVEDTERMINATE.
@@ -189,7 +190,10 @@ class WebRtcSession : public cricket::BaseSession,
                         cricket::SendDataResult* result) OVERRIDE;
   virtual bool ConnectDataChannel(DataChannel* webrtc_data_channel) OVERRIDE;
   virtual void DisconnectDataChannel(DataChannel* webrtc_data_channel) OVERRIDE;
-
+  virtual void AddRtpDataStream(uint32 send_ssrc, uint32 recv_ssrc) OVERRIDE;
+  virtual void AddSctpDataStream(uint32 sid) OVERRIDE;
+  virtual void RemoveRtpDataStream(uint32 send_ssrc, uint32 recv_ssrc) OVERRIDE;
+  virtual void RemoveSctpDataStream(uint32 sid) OVERRIDE;
 
   talk_base::scoped_refptr<DataChannel> CreateDataChannel(
       const std::string& label,

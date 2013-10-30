@@ -118,7 +118,7 @@ class WebRtcVideoEngineTestFake : public testing::Test,
     }
     cricket::WebRtcVideoFrame frame;
     size_t size = width * height * 3 / 2;  // I420
-    talk_base::scoped_array<uint8> pixel(new uint8[size]);
+    talk_base::scoped_ptr<uint8[]> pixel(new uint8[size]);
     if (!frame.Init(cricket::FOURCC_I420,
                     width, height, width, height,
                     pixel.get(), size, 1, 1, 0, 0, 0)) {
@@ -138,7 +138,7 @@ class WebRtcVideoEngineTestFake : public testing::Test,
     }
     cricket::WebRtcVideoFrame frame;
     size_t size = width * height * 3 / 2;  // I420
-    talk_base::scoped_array<uint8> pixel(new uint8[size]);
+    talk_base::scoped_ptr<uint8[]> pixel(new uint8[size]);
     if (!frame.Init(cricket::FOURCC_I420,
                     width, height, width, height,
                     pixel.get(), size, 1, 1, 0, timestamp, 0)) {
@@ -378,6 +378,25 @@ TEST_F(WebRtcVideoEngineTestFake, SetOptionsWithMaxBitrate) {
   EXPECT_TRUE(channel_->SetOptions(options));
   VerifyVP8SendCodec(
       channel_num, kVP8Codec.width, kVP8Codec.height, 0, 20, 10, 20);
+}
+
+TEST_F(WebRtcVideoEngineTestFake, SetOptionsWithLoweredBitrate) {
+  EXPECT_TRUE(SetupEngine());
+  int channel_num = vie_.GetLastChannel();
+  std::vector<cricket::VideoCodec> codecs(engine_.codecs());
+  codecs[0].params[cricket::kCodecParamMinBitrate] = "50";
+  codecs[0].params[cricket::kCodecParamMaxBitrate] = "100";
+  EXPECT_TRUE(channel_->SetSendCodecs(codecs));
+
+  VerifyVP8SendCodec(
+      channel_num, kVP8Codec.width, kVP8Codec.height, 0, 100, 50, 100);
+
+  // Verify that min bitrate changes after SetOptions().
+  cricket::VideoOptions options;
+  options.lower_min_bitrate.Set(true);
+  EXPECT_TRUE(channel_->SetOptions(options));
+  VerifyVP8SendCodec(
+      channel_num, kVP8Codec.width, kVP8Codec.height, 0, 100, 30, 100);
 }
 
 TEST_F(WebRtcVideoEngineTestFake, MaxBitrateResetWithConferenceMode) {
@@ -1161,7 +1180,8 @@ TEST_F(WebRtcVideoEngineTestFake, SetOptionsWithDenoising) {
 }
 
 
-TEST_F(WebRtcVideoEngineTestFake, SendReceiveBitratesStats) {
+// Disabled since its flaky: b/11288120
+TEST_F(WebRtcVideoEngineTestFake, DISABLED_SendReceiveBitratesStats) {
   EXPECT_TRUE(SetupEngine());
   cricket::VideoOptions options;
   options.conference_mode.Set(true);

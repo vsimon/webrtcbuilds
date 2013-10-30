@@ -21,7 +21,7 @@
 #include "webrtc/modules/video_processing/main/interface/video_processing.h"
 #include "webrtc/system_wrappers/interface/scoped_ptr.h"
 #include "webrtc/typedefs.h"
-#include "webrtc/video_engine/new_include/frame_callback.h"
+#include "webrtc/frame_callback.h"
 #include "webrtc/video_engine/vie_defines.h"
 #include "webrtc/video_engine/vie_frame_provider_base.h"
 
@@ -166,7 +166,7 @@ class ViEEncoder
   // Enables AutoMuter to turn off video when the rate drops below
   // |threshold_bps|, and turns back on when the rate goes back up above
   // |threshold_bps| + |window_bps|.
-  virtual void EnableAutoMuting(int threshold_bps, int window_bps);
+  virtual void EnableAutoMuting();
 
   // New-style callback, used by VideoSendStream.
   void RegisterPreEncodeCallback(I420FrameCallback* pre_encode_callback);

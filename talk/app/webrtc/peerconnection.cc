@@ -317,7 +317,8 @@ bool PeerConnection::DoInitialize(
   stats_.set_session(session_.get());
 
   // Initialize the WebRtcSession. It creates transport channels etc.
-  if (!session_->Initialize(constraints, dtls_identity_service))
+  if (!session_->Initialize(factory_->options(), constraints,
+                            dtls_identity_service))
     return false;
 
   // Register PeerConnection as receiver of local ice candidates.
@@ -425,14 +426,6 @@ PeerConnection::CreateDataChannel(
       session_->CreateDataChannel(label, config));
   if (!channel.get())
     return NULL;
-
-  // If we've already passed the underlying channel's setup phase, have the
-  // MediaStreamSignaling update data channels manually.
-  if (session_->data_channel() != NULL &&
-      session_->data_channel_type() == cricket::DCT_SCTP) {
-    mediastream_signaling_->UpdateLocalSctpDataChannels();
-    mediastream_signaling_->UpdateRemoteSctpDataChannels();
-  }
 
   observer_->OnRenegotiationNeeded();
 

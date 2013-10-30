@@ -93,6 +93,9 @@ static const int kStartVideoBitrate = 300;
 static const int kMaxVideoBitrate = 2000;
 static const int kDefaultConferenceModeMaxVideoBitrate = 500;
 
+// Controlled by exp, try a super low minimum bitrate for poor connections.
+static const int kLowerMinBitrate = 30;
+
 static const int kVideoMtu = 1200;
 
 static const int kVideoRtpBufferSize = 65536;
@@ -309,6 +312,13 @@ class WebRtcDecoderObserver : public webrtc::ViEDecoderObserver {
        : video_channel_(video_channel),
          framerate_(0),
          bitrate_(0),
+         decode_ms_(0),
+         max_decode_ms_(0),
+         current_delay_ms_(0),
+         target_delay_ms_(0),
+         jitter_buffer_ms_(0),
+         min_playout_delay_ms_(0),
+         render_delay_ms_(0),
          firs_requested_(0) {
   }
 
@@ -323,23 +333,42 @@ class WebRtcDecoderObserver : public webrtc::ViEDecoderObserver {
     framerate_ = framerate;
     bitrate_ = bitrate;
   }
+
+  virtual void DecoderTiming(int decode_ms,
+                             int max_decode_ms,
+                             int current_delay_ms,
+                             int target_delay_ms,
+                             int jitter_buffer_ms,
+                             int min_playout_delay_ms,
+                             int render_delay_ms) {
+    talk_base::CritScope cs(&crit_);
+    decode_ms_ = decode_ms;
+    max_decode_ms_ = max_decode_ms;
+    current_delay_ms_ = current_delay_ms;
+    target_delay_ms_ = target_delay_ms;
+    jitter_buffer_ms_ = jitter_buffer_ms;
+    min_playout_delay_ms_ = min_playout_delay_ms;
+    render_delay_ms_ = render_delay_ms;
+  }
+
   virtual void RequestNewKeyFrame(const int videoChannel) {
     talk_base::CritScope cs(&crit_);
     ASSERT(video_channel_ == videoChannel);
     ++firs_requested_;
   }
 
-  int framerate() const {
+  // Populate |rinfo| based on previously-set data in |*this|.
+  void ExportTo(VideoReceiverInfo* rinfo) {
     talk_base::CritScope cs(&crit_);
-    return framerate_;
-  }
-  int bitrate() const {
-    talk_base::CritScope cs(&crit_);
-    return bitrate_;
-  }
-  int firs_requested() const {
-    talk_base::CritScope cs(&crit_);
-    return firs_requested_;
+    rinfo->firs_sent = firs_requested_;
+    rinfo->framerate_rcvd = framerate_;
+    rinfo->decode_ms = decode_ms_;
+    rinfo->max_decode_ms = max_decode_ms_;
+    rinfo->current_delay_ms = current_delay_ms_;
+    rinfo->target_delay_ms = target_delay_ms_;
+    rinfo->jitter_buffer_ms = jitter_buffer_ms_;
+    rinfo->min_playout_delay_ms = min_playout_delay_ms_;
+    rinfo->render_delay_ms = render_delay_ms_;
   }
 
  private:
@@ -347,6 +376,13 @@ class WebRtcDecoderObserver : public webrtc::ViEDecoderObserver {
   int video_channel_;
   int framerate_;
   int bitrate_;
+  int decode_ms_;
+  int max_decode_ms_;
+  int current_delay_ms_;
+  int target_delay_ms_;
+  int jitter_buffer_ms_;
+  int min_playout_delay_ms_;
+  int render_delay_ms_;
   int firs_requested_;
 };
 
@@ -2303,14 +2339,13 @@ bool WebRtcVideoMediaChannel::GetStats(VideoMediaInfo* info) {
     rinfo.packets_lost = -1;
     rinfo.packets_concealed = -1;
     rinfo.fraction_lost = -1;  // from SentRTCP
-    rinfo.firs_sent = channel->decoder_observer()->firs_requested();
     rinfo.nacks_sent = -1;
     rinfo.frame_width = channel->render_adapter()->width();
     rinfo.frame_height = channel->render_adapter()->height();
-    rinfo.framerate_rcvd = channel->decoder_observer()->framerate();
     int fps = channel->render_adapter()->framerate();
     rinfo.framerate_decoded = fps;
     rinfo.framerate_output = fps;
+    channel->decoder_observer()->ExportTo(&rinfo);
 
     // Get sent RTCP statistics.
     uint16 s_fraction_lost;
@@ -2536,7 +2571,7 @@ bool WebRtcVideoMediaChannel::SetSendBandwidth(bool autobw, int bps) {
   int max_bitrate;
   if (autobw) {
     // Use the default values for min bitrate.
-    min_bitrate = kMinVideoBitrate;
+    min_bitrate = send_min_bitrate_;
     // Use the default value or the bps for the max
     max_bitrate = (bps <= 0) ? send_max_bitrate_ : (bps / 1000);
     // Maximum start bitrate can be kStartVideoBitrate.
@@ -2599,6 +2634,17 @@ bool WebRtcVideoMediaChannel::SetOptions(const VideoOptions &options) {
   // Adjust send codec bitrate if needed.
   int conf_max_bitrate = kDefaultConferenceModeMaxVideoBitrate;
 
+  // Save altered min_bitrate level and apply if necessary.
+  bool adjusted_min_bitrate = false;
+  if (options.lower_min_bitrate.IsSet()) {
+    bool lower;
+    options.lower_min_bitrate.Get(&lower);
+
+    int new_send_min_bitrate = lower ? kLowerMinBitrate : kMinVideoBitrate;
+    adjusted_min_bitrate = (new_send_min_bitrate != send_min_bitrate_);
+    send_min_bitrate_ = new_send_min_bitrate;
+  }
+
   int expected_bitrate = send_max_bitrate_;
   if (InConferenceMode()) {
     expected_bitrate = conf_max_bitrate;
@@ -2610,7 +2656,8 @@ bool WebRtcVideoMediaChannel::SetOptions(const VideoOptions &options) {
   }
 
   if (send_codec_ &&
-      (send_max_bitrate_ != expected_bitrate || denoiser_changed)) {
+      (send_max_bitrate_ != expected_bitrate || denoiser_changed ||
+       adjusted_min_bitrate)) {
     // On success, SetSendCodec() will reset send_max_bitrate_ to
     // expected_bitrate.
     if (!SetSendCodec(*send_codec_,
