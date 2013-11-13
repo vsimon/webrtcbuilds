@@ -7,6 +7,12 @@
 # be found in the AUTHORS file in the root of the source tree.
 
 {
+  'variables': {
+    'audio_processing_dependencies': [
+      '<(webrtc_root)/common_audio/common_audio.gyp:common_audio',
+      '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
+    ],
+  },
   'targets': [
     {
       'target_name': 'audio_processing',
@@ -21,24 +27,8 @@
         'aec_untrusted_delay_for_testing%': 0,
       },
       'dependencies': [
-        '<(webrtc_root)/common_audio/common_audio.gyp:common_audio',
-        '<(webrtc_root)/system_wrappers/source/system_wrappers.gyp:system_wrappers',
+        '<@(audio_processing_dependencies)',
       ],
-      'include_dirs': [
-        '../interface',
-        'aec/include',
-        'aecm/include',
-        'agc/include',
-        'include',
-        'ns/include',
-        'utility',
-      ],
-      'direct_dependent_settings': {
-        'include_dirs': [
-          '../interface',
-          'include',
-        ],
-      },
       'sources': [
         'aec/include/echo_cancellation.h',
         'aec/echo_cancellation.c',
@@ -129,6 +119,15 @@
         }],
         ['(target_arch=="arm" and armv7==1) or target_arch=="armv7"', {
           'dependencies': ['audio_processing_neon',],
+        }],
+        ['target_arch=="mipsel"', {
+          'sources': [
+            'aecm/aecm_core_mips.c',
+          ],
+        }, {
+          'sources': [
+            'aecm/aecm_core_c.c',
+          ],
         }],
       ],
       # TODO(jschuh): Bug 1348: fix size_t to int truncations.
