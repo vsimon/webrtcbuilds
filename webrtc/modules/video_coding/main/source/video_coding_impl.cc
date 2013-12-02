@@ -197,16 +197,12 @@ class VideoCodingModuleImpl : public VideoCodingModule {
     return sender_->StopDebugRecording();
   }
 
-  virtual void EnableAutoMuting() {
-    return sender_->EnableAutoMuting();
+  virtual void SuspendBelowMinBitrate() {
+    return sender_->SuspendBelowMinBitrate();
   }
 
-  virtual void DisableAutoMuting() {
-    return sender_->DisableAutoMuting();
-  }
-
-  virtual bool VideoMuted() const {
-    return sender_->VideoMuted();
+  virtual bool VideoSuspended() const {
+    return sender_->VideoSuspended();
   }
 
   virtual int32_t InitializeReceiver() OVERRIDE {
@@ -321,6 +317,16 @@ class VideoCodingModuleImpl : public VideoCodingModule {
 
   virtual int32_t SetReceiveChannelParameters(uint32_t rtt) OVERRIDE {
     return receiver_->SetReceiveChannelParameters(rtt);
+  }
+
+  virtual void RegisterPreDecodeImageCallback(
+      EncodedImageCallback* observer) OVERRIDE {
+    receiver_->RegisterPreDecodeImageCallback(observer);
+  }
+
+  virtual void RegisterPostEncodeImageCallback(
+      EncodedImageCallback* observer) OVERRIDE {
+    sender_->RegisterPostEncodeImageCallback(observer);
   }
 
  private:

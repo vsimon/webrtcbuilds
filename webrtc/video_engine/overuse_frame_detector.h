@@ -71,6 +71,14 @@ class OveruseFrameDetector : public Module {
   // Called for each captured frame.
   void FrameCaptured(int width, int height);
 
+  void FrameEncoded(int encode_time_ms);
+
+  int last_capture_jitter_ms() const;
+
+  // Running average of reported encode time (FrameEncoded()).
+  // Only used for stats.
+  int avg_encode_time_ms() const;
+
   // Implements Module.
   virtual int32_t TimeUntilNextProcess() OVERRIDE;
   virtual int32_t Process() OVERRIDE;
@@ -104,6 +112,8 @@ class OveruseFrameDetector : public Module {
 
   // Number of pixels of last captured frame.
   int num_pixels_;
+
+  float avg_encode_time_ms_;
 
   DISALLOW_COPY_AND_ASSIGN(OveruseFrameDetector);
 };

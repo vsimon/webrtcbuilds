@@ -23,8 +23,6 @@ namespace webrtc {
 
 class VideoEncoder;
 
-struct SendStreamState;
-
 // Class to deliver captured frame to the video send stream.
 class VideoSendStreamInput {
  public:
@@ -73,7 +71,7 @@ class VideoSendStream {
   struct Config {
     Config()
         : pre_encode_callback(NULL),
-          encoded_callback(NULL),
+          post_encode_callback(NULL),
           local_renderer(NULL),
           render_delay_ms(0),
           encoder(NULL),
@@ -81,8 +79,7 @@ class VideoSendStream {
           target_delay_ms(0),
           pacing(false),
           stats_callback(NULL),
-          start_state(NULL),
-          auto_mute(false) {}
+          suspend_below_min_bitrate(false) {}
     VideoCodec codec;
 
     static const size_t kDefaultMaxPacketSize = 1500 - 40;  // TCP over IPv4.
@@ -116,7 +113,7 @@ class VideoSendStream {
 
     // Called for each encoded frame, e.g. used for file storage. 'NULL'
     // disables the callback.
-    EncodedFrameObserver* encoded_callback;
+    EncodedFrameObserver* post_encode_callback;
 
     // Renderer for local preview. The local renderer will be called even if
     // sending hasn't started. 'NULL' disables local rendering.
@@ -145,28 +142,23 @@ class VideoSendStream {
     // Callback for periodically receiving send stats.
     StatsCallback* stats_callback;
 
-    // Set to resume a previously destroyed send stream.
-    SendStreamState* start_state;
-
-    // True if video should be muted when video goes under the minimum video
-    // bitrate. Unless muted, video will be sent at a bitrate higher than
-    // estimated available.
-    bool auto_mute;
+    // True if the stream should be suspended when the available bitrate fall
+    // below the minimum configured bitrate. If this variable is false, the
+    // stream may send at a rate higher than the estimated available bitrate.
+    // Enabling suspend_below_min_bitrate will also enable pacing and padding,
+    // otherwise, the video will be unable to recover from suspension.
+    bool suspend_below_min_bitrate;
   };
 
   // Gets interface used to insert captured frames. Valid as long as the
   // VideoSendStream is valid.
   virtual VideoSendStreamInput* Input() = 0;
 
-  virtual void StartSend() = 0;
-  virtual void StopSend() = 0;
+  virtual void StartSending() = 0;
+  virtual void StopSending() = 0;
 
-  // TODO(mflodman) Change VideoCodec struct and use here.
-  virtual bool SetTargetBitrate(
-      int min_bitrate, int max_bitrate,
-      const std::vector<SimulcastStream>& streams) = 0;
-
-  virtual void GetSendCodec(VideoCodec* send_codec) = 0;
+  virtual bool SetCodec(const VideoCodec& codec) = 0;
+  virtual VideoCodec GetCodec() = 0;
 
  protected:
   virtual ~VideoSendStream() {}

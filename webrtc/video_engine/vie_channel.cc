@@ -62,7 +62,7 @@ ViEChannel::ViEChannel(int32_t channel_id,
                        RtcpIntraFrameObserver* intra_frame_observer,
                        RtcpBandwidthObserver* bandwidth_observer,
                        RemoteBitrateEstimator* remote_bitrate_estimator,
-                       RtcpRttObserver* rtt_observer,
+                       RtcpRttStats* rtt_stats,
                        PacedSender* paced_sender,
                        RtpRtcp* default_rtp_rtcp,
                        bool sender)
@@ -85,7 +85,7 @@ ViEChannel::ViEChannel(int32_t channel_id,
       rtp_observer_(NULL),
       rtcp_observer_(NULL),
       intra_frame_observer_(intra_frame_observer),
-      rtt_observer_(rtt_observer),
+      rtt_stats_(rtt_stats),
       paced_sender_(paced_sender),
       bandwidth_observer_(bandwidth_observer),
       send_timestamp_extension_id_(kInvalidRtpExtensionId),
@@ -115,7 +115,7 @@ ViEChannel::ViEChannel(int32_t channel_id,
   configuration.rtcp_feedback = this;
   configuration.intra_frame_callback = intra_frame_observer;
   configuration.bandwidth_callback = bandwidth_observer;
-  configuration.rtt_observer = rtt_observer;
+  configuration.rtt_stats = rtt_stats;
   configuration.remote_bitrate_estimator = remote_bitrate_estimator;
   configuration.paced_sender = paced_sender;
   configuration.receive_statistics = vie_receiver_.GetReceiveStatistics();
@@ -319,7 +319,7 @@ int32_t ViEChannel::SetSendCodec(const VideoCodec& video_codec,
       configuration.outgoing_transport = &vie_sender_;
       configuration.intra_frame_callback = intra_frame_observer_;
       configuration.bandwidth_callback = bandwidth_observer_.get();
-      configuration.rtt_observer = rtt_observer_;
+      configuration.rtt_stats = rtt_stats_;
       configuration.paced_sender = paced_sender_;
 
       RtpRtcp* rtp_rtcp = RtpRtcp::CreateRtpRtcp(configuration);
@@ -406,6 +406,7 @@ int32_t ViEChannel::SetSendCodec(const VideoCodec& video_codec,
         rtp_rtcp->DeregisterSendRtpHeaderExtension(
             kRtpExtensionAbsoluteSendTime);
       }
+      rtp_rtcp->SetRtcpXrRrtrStatus(rtp_rtcp_->RtcpXrRrtrStatus());
     }
     // |RegisterSimulcastRtpRtcpModules| resets all old weak pointers and old
     // modules can be deleted after this step.
@@ -920,6 +921,15 @@ int ViEChannel::SetReceiveAbsoluteSendTimeStatus(bool enable, int id) {
 
 bool ViEChannel::GetReceiveAbsoluteSendTimeStatus() const {
   return receive_absolute_send_time_enabled_;
+}
+
+void ViEChannel::SetRtcpXrRrtrStatus(bool enable) {
+  CriticalSectionScoped cs(rtp_rtcp_cs_.get());
+  rtp_rtcp_->SetRtcpXrRrtrStatus(enable);
+  for (std::list<RtpRtcp*>::iterator it = simulcast_rtp_rtcp_.begin();
+       it != simulcast_rtp_rtcp_.end(); it++) {
+    (*it)->SetRtcpXrRrtrStatus(enable);
+  }
 }
 
 void ViEChannel::SetTransmissionSmoothingStatus(bool enable) {
@@ -1858,6 +1868,12 @@ void ViEChannel::RegisterPreRenderCallback(
     I420FrameCallback* pre_render_callback) {
   CriticalSectionScoped cs(callback_cs_.get());
   pre_render_callback_ = pre_render_callback;
+}
+
+void ViEChannel::RegisterPreDecodeImageCallback(
+    EncodedImageCallback* pre_decode_callback) {
+  CriticalSectionScoped cs(callback_cs_.get());
+  vcm_.RegisterPreDecodeImageCallback(pre_decode_callback);
 }
 
 void ViEChannel::OnApplicationDataReceived(const int32_t id,

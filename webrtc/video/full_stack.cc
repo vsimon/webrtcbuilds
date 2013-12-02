@@ -149,7 +149,7 @@ class VideoAnalyzer : public PacketReceiver,
     input_->PutFrame(video_frame, delta_capture_ms);
   }
 
-  virtual bool SendRTP(const uint8_t* packet, size_t length) OVERRIDE {
+  virtual bool SendRtp(const uint8_t* packet, size_t length) OVERRIDE {
     scoped_ptr<RtpHeaderParser> parser(RtpHeaderParser::Create());
     RTPHeader header;
     parser->Parse(packet, static_cast<int>(length), &header);
@@ -165,11 +165,11 @@ class VideoAnalyzer : public PacketReceiver,
           Clock::GetRealTimeClock()->CurrentNtpInMilliseconds();
     }
 
-    return transport_->SendRTP(packet, length);
+    return transport_->SendRtp(packet, length);
   }
 
-  virtual bool SendRTCP(const uint8_t* packet, size_t length) OVERRIDE {
-    return transport_->SendRTCP(packet, length);
+  virtual bool SendRtcp(const uint8_t* packet, size_t length) OVERRIDE {
+    return transport_->SendRtcp(packet, length);
   }
 
   virtual void RenderFrame(const I420VideoFrame& video_frame,
@@ -402,7 +402,7 @@ TEST_P(FullStackTest, NoPacketLoss) {
   send_config.codec.startBitrate = params.bitrate;
   send_config.codec.maxBitrate = params.bitrate;
 
-  VideoSendStream* send_stream = call->CreateSendStream(send_config);
+  VideoSendStream* send_stream = call->CreateVideoSendStream(send_config);
   analyzer.input_ = send_stream->Input();
 
   scoped_ptr<test::FrameGeneratorCapturer> file_capturer(
@@ -422,21 +422,21 @@ TEST_P(FullStackTest, NoPacketLoss) {
   receive_config.renderer = &analyzer;
 
   VideoReceiveStream* receive_stream =
-      call->CreateReceiveStream(receive_config);
+      call->CreateVideoReceiveStream(receive_config);
 
-  receive_stream->StartReceive();
-  send_stream->StartSend();
+  receive_stream->StartReceiving();
+  send_stream->StartSending();
 
   file_capturer->Start();
 
   analyzer.Wait();
 
   file_capturer->Stop();
-  send_stream->StopSend();
-  receive_stream->StopReceive();
+  send_stream->StopSending();
+  receive_stream->StopReceiving();
 
-  call->DestroyReceiveStream(receive_stream);
-  call->DestroySendStream(send_stream);
+  call->DestroyVideoReceiveStream(receive_stream);
+  call->DestroyVideoSendStream(send_stream);
 
   transport.StopSending();
 }

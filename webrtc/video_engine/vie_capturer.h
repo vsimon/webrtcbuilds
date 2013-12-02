@@ -104,6 +104,9 @@ class ViECapturer
 
   void RegisterCpuOveruseObserver(CpuOveruseObserver* observer);
 
+  void CpuOveruseMeasures(int* capture_jitter_ms,
+                          int* avg_encode_time_ms) const;
+
  protected:
   ViECapturer(int capture_id,
               int engine_id,
@@ -154,6 +157,10 @@ class ViECapturer
   ProcessThread& module_process_thread_;
   const int capture_id_;
 
+  // Frame used in IncomingFrameI420.
+  scoped_ptr<CriticalSectionWrapper> incoming_frame_cs_;
+  I420VideoFrame incoming_frame_;
+
   // Capture thread.
   ThreadWrapper& capture_thread_;
   EventWrapper& capture_event_;
@@ -177,8 +184,6 @@ class ViECapturer
   ViECaptureObserver* observer_;
 
   CaptureCapability requested_capability_;
-
-  I420VideoFrame capture_device_image_;
 
   scoped_ptr<OveruseFrameDetector> overuse_detector_;
 };

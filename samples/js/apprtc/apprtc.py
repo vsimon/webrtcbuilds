@@ -144,7 +144,7 @@ def make_media_stream_constraints(audio, video):
   logging.info('Applying media constraints: ' + str(stream_constraints))
   return stream_constraints
 
-def make_pc_constraints(compat):
+def make_pc_constraints(compat, dscp):
   constraints = { 'optional': [] }
   # For interop with FireFox. Enable DTLS in peerConnection ctor.
   if compat.lower() == 'true':
@@ -153,6 +153,11 @@ def make_pc_constraints(compat):
   # of compat is false for loopback mode.
   else:
     constraints['optional'].append({'DtlsSrtpKeyAgreement': False})
+
+  # DSCP for QoS support
+  if dscp.lower() == 'true':
+    constraints['optional'].append({'googDscp': True})
+
   return constraints
 
 def make_offer_constraints():
@@ -318,7 +323,7 @@ class MainPage(webapp2.RequestHandler):
     ts_pwd = self.request.get('tp')
 
     # Use "audio" and "video" to set the media stream constraints. Defined here:
-    # http://dev.w3.org/2011/webrtc/editor/getusermedia.html#idl-def-MediaStreamConstraints
+    # http://goo.gl/V7cZg
     #
     # "true" and "false" are recognized and interpreted as bools, for example:
     #   "?audio=true&video=false" (Start an audio-only call.)
@@ -336,11 +341,8 @@ class MainPage(webapp2.RequestHandler):
     # Keys starting with "goog" will be added to the "optional" key; all others
     # will be added to the "mandatory" key.
     #
-    # The audio keys are defined here:
-    # https://code.google.com/p/webrtc/source/browse/trunk/talk/app/webrtc/localaudiosource.cc
-    #
-    # The video keys are defined here:
-    # https://code.google.com/p/webrtc/source/browse/trunk/talk/app/webrtc/videosource.cc
+    # The audio keys are defined here: talk/app/webrtc/localaudiosource.cc
+    # The video keys are defined here: talk/app/webrtc/videosource.cc
     audio = self.request.get('audio')
     video = self.request.get('video')
 
@@ -379,6 +381,9 @@ class MainPage(webapp2.RequestHandler):
     if debug == 'loopback':
       # Set compat to false as DTLS does not work for loopback.
       compat = 'false'
+
+    # Set DSCP for QoS support in WebRTC
+    dscp = self.request.get('dscp')
 
     # token_timeout for channel creation, default 30min, max 2 days, min 3min.
     token_timeout = self.request.get_range('tt',
@@ -431,7 +436,7 @@ class MainPage(webapp2.RequestHandler):
     turn_url = turn_url + 'turn?' + 'username=' + user + '&key=4080218913'
     token = create_channel(room, user, token_timeout)
     pc_config = make_pc_config(stun_server, turn_server, ts_pwd)
-    pc_constraints = make_pc_constraints(compat)
+    pc_constraints = make_pc_constraints(compat, dscp)
     offer_constraints = make_offer_constraints()
     media_constraints = make_media_stream_constraints(audio, video)
     template_values = {'error_messages': error_messages,

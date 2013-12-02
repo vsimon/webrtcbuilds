@@ -47,6 +47,8 @@ const int kMaxRampUpDelayMs = 120 * 1000;
 // Expontential back-off factor, to prevent annoying up-down behaviour.
 const double kRampUpBackoffFactor = 2.0;
 
+// The initial average encode time (set to a fairly small value).
+const float kInitialAvgEncodeTimeMs = 5.0f;
 }  // namespace
 
 Statistics::Statistics() :
@@ -116,7 +118,8 @@ OveruseFrameDetector::OveruseFrameDetector(Clock* clock,
       last_rampup_time_(0),
       in_quick_rampup_(false),
       current_rampup_delay_ms_(kStandardRampUpDelayMs),
-      num_pixels_(0) {}
+      num_pixels_(0),
+      avg_encode_time_ms_(kInitialAvgEncodeTimeMs) {}
 
 OveruseFrameDetector::~OveruseFrameDetector() {
 }
@@ -142,6 +145,23 @@ void OveruseFrameDetector::FrameCaptured(int width, int height) {
     capture_deltas_.AddSample(time - last_capture_time_);
   }
   last_capture_time_ = time;
+}
+
+void OveruseFrameDetector::FrameEncoded(int encode_time_ms) {
+  CriticalSectionScoped cs(crit_.get());
+  const float kWeight = 0.1f;
+  avg_encode_time_ms_ = kWeight * encode_time_ms +
+                        (1.0f - kWeight) * avg_encode_time_ms_;
+}
+
+int OveruseFrameDetector::last_capture_jitter_ms() const {
+  CriticalSectionScoped cs(crit_.get());
+  return static_cast<int>(capture_deltas_.StdDev() + 0.5);
+}
+
+int OveruseFrameDetector::avg_encode_time_ms() const {
+  CriticalSectionScoped cs(crit_.get());
+  return static_cast<int>(avg_encode_time_ms_ + 0.5);
 }
 
 int32_t OveruseFrameDetector::TimeUntilNextProcess() {

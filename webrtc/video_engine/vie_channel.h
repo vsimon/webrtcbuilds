@@ -33,11 +33,12 @@ class CallStatsObserver;
 class ChannelStatsObserver;
 class Config;
 class CriticalSectionWrapper;
+class EncodedImageCallback;
 class Encryption;
 class I420FrameCallback;
 class PacedSender;
 class ProcessThread;
-class RtcpRttObserver;
+class RtcpRttStats;
 class RtpRtcp;
 class ThreadWrapper;
 class ViEDecoderObserver;
@@ -69,7 +70,7 @@ class ViEChannel
              RtcpIntraFrameObserver* intra_frame_observer,
              RtcpBandwidthObserver* bandwidth_observer,
              RemoteBitrateEstimator* remote_bitrate_estimator,
-             RtcpRttObserver* rtt_observer,
+             RtcpRttStats* rtt_stats,
              PacedSender* paced_sender,
              RtpRtcp* default_rtp_rtcp,
              bool sender);
@@ -125,6 +126,7 @@ class ViEChannel
   int SetSendAbsoluteSendTimeStatus(bool enable, int id);
   int SetReceiveAbsoluteSendTimeStatus(bool enable, int id);
   bool GetReceiveAbsoluteSendTimeStatus() const;
+  void SetRtcpXrRrtrStatus(bool enable);
   void SetTransmissionSmoothingStatus(bool enable);
   int32_t EnableTMMBR(const bool enable);
   int32_t EnableKeyFrameRequestCallback(const bool enable);
@@ -319,8 +321,10 @@ class ViEChannel
 
   int32_t RegisterEffectFilter(ViEEffectFilter* effect_filter);
 
-  // New-style callback, used by VideoReceiveStream.
+  // New-style callbacks, used by VideoReceiveStream.
   void RegisterPreRenderCallback(I420FrameCallback* pre_render_callback);
+  void RegisterPreDecodeImageCallback(
+      EncodedImageCallback* pre_decode_callback);
 
  protected:
   static bool ChannelDecodeThreadFunction(void* obj);
@@ -370,7 +374,7 @@ class ViEChannel
   ViERTPObserver* rtp_observer_;
   ViERTCPObserver* rtcp_observer_;
   RtcpIntraFrameObserver* intra_frame_observer_;
-  RtcpRttObserver* rtt_observer_;
+  RtcpRttStats* rtt_stats_;
   PacedSender* paced_sender_;
 
   scoped_ptr<RtcpBandwidthObserver> bandwidth_observer_;

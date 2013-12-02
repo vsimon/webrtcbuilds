@@ -196,15 +196,19 @@ void WebRtc_InitBinaryDelayEstimator(BinaryDelayEstimator* self) {
 
   // Default return value if we're unable to estimate. -1 is used for errors.
   self->last_delay = -2;
+
+  self->robust_validation_enabled = 0;  // Disabled by default.
 }
 
 int WebRtc_ProcessBinarySpectrum(BinaryDelayEstimator* self,
                                  uint32_t binary_near_spectrum) {
   int i = 0;
   int candidate_delay = -1;
+  int valid_candidate = 0;
 
   int32_t value_best_candidate = 32 << 9;  // 32 in Q9, (max |mean_bit_counts|).
   int32_t value_worst_candidate = 0;
+  int32_t valley_depth = 0;
 
   assert(self != NULL);
   if (self->near_history_size > 1) {
@@ -249,6 +253,7 @@ int WebRtc_ProcessBinarySpectrum(BinaryDelayEstimator* self,
       value_worst_candidate = self->mean_bit_counts[i];
     }
   }
+  valley_depth = value_worst_candidate - value_best_candidate;
 
   // The |value_best_candidate| is a good indicator on the probability of
   // |candidate_delay| being an accurate delay (a small |value_best_candidate|
@@ -265,7 +270,7 @@ int WebRtc_ProcessBinarySpectrum(BinaryDelayEstimator* self,
 
   // Update |minimum_probability|.
   if ((self->minimum_probability > kProbabilityLowerLimit) &&
-      (value_worst_candidate - value_best_candidate > kProbabilityMinSpread)) {
+      (valley_depth > kProbabilityMinSpread)) {
     // The "hard" threshold can't be lower than 17 (in Q9).
     // The valley in the curve also has to be distinct, i.e., the
     // difference between |value_worst_candidate| and |value_best_candidate| has
@@ -281,14 +286,21 @@ int WebRtc_ProcessBinarySpectrum(BinaryDelayEstimator* self,
   // Update |last_delay_probability|.
   // We use a Markov type model, i.e., a slowly increasing level over time.
   self->last_delay_probability++;
-  if (value_worst_candidate > value_best_candidate + kProbabilityOffset) {
-    // Reliable delay value for usage.
-    if (value_best_candidate < self->minimum_probability) {
-      self->last_delay = candidate_delay;
-    }
+  // Validate |candidate_delay|.  We have a reliable instantaneous delay
+  // estimate if
+  //  1) The valley is distinct enough (|valley_depth| > |kProbabilityOffset|)
+  // and
+  //  2) The depth of the valley is deep enough
+  //      (|value_best_candidate| < |minimum_probability|)
+  //     and deeper than the best estimate so far
+  //      (|value_best_candidate| < |last_delay_probability|)
+  valid_candidate = ((valley_depth > kProbabilityOffset) &&
+      ((value_best_candidate < self->minimum_probability) ||
+          (value_best_candidate < self->last_delay_probability)));
+
+  if (valid_candidate) {
+    self->last_delay = candidate_delay;
     if (value_best_candidate < self->last_delay_probability) {
-      self->last_delay = candidate_delay;
-      // Reset |last_delay_probability|.
       self->last_delay_probability = value_best_candidate;
     }
   }

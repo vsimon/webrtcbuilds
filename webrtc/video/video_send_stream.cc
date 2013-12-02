@@ -82,14 +82,11 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
                                  bool overuse_detection,
                                  webrtc::VideoEngine* video_engine,
                                  const VideoSendStream::Config& config)
-    : transport_adapter_(transport), config_(config), external_codec_(NULL) {
-
-  if (config_.codec.numberOfSimulcastStreams > 0) {
-    assert(config_.rtp.ssrcs.size() == config_.codec.numberOfSimulcastStreams);
-  } else {
-    assert(config_.rtp.ssrcs.size() == 1);
-  }
-
+    : transport_adapter_(transport),
+      encoded_frame_proxy_(config.post_encode_callback),
+      codec_lock_(CriticalSectionWrapper::CreateCriticalSection()),
+      config_(config),
+      external_codec_(NULL) {
   video_engine_base_ = ViEBase::GetInterface(video_engine);
   video_engine_base_->CreateChannel(channel_);
   assert(channel_ != -1);
@@ -97,39 +94,18 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
   rtp_rtcp_ = ViERTP_RTCP::GetInterface(video_engine);
   assert(rtp_rtcp_ != NULL);
 
-  if (config_.rtp.ssrcs.size() == 1) {
-    rtp_rtcp_->SetLocalSSRC(channel_, config_.rtp.ssrcs[0]);
-  } else {
-    for (size_t i = 0; i < config_.rtp.ssrcs.size(); ++i) {
-      rtp_rtcp_->SetLocalSSRC(channel_,
-                              config_.rtp.ssrcs[i],
-                              kViEStreamTypeNormal,
-                              static_cast<unsigned char>(i));
-    }
-  }
+  assert(config_.rtp.ssrcs.size() > 0);
+  if (config_.suspend_below_min_bitrate)
+    config_.pacing = true;
   rtp_rtcp_->SetTransmissionSmoothingStatus(channel_, config_.pacing);
-  if (!config_.rtp.rtx.ssrcs.empty()) {
-    assert(config_.rtp.rtx.ssrcs.size() == config_.rtp.ssrcs.size());
-    for (size_t i = 0; i < config_.rtp.rtx.ssrcs.size(); ++i) {
-      rtp_rtcp_->SetLocalSSRC(channel_,
-                              config_.rtp.rtx.ssrcs[i],
-                              kViEStreamTypeRtx,
-                              static_cast<unsigned char>(i));
-    }
-
-    if (config_.rtp.rtx.rtx_payload_type != 0) {
-      rtp_rtcp_->SetRtxSendPayloadType(channel_,
-                                       config_.rtp.rtx.rtx_payload_type);
-    }
-  }
 
   for (size_t i = 0; i < config_.rtp.extensions.size(); ++i) {
     const std::string& extension = config_.rtp.extensions[i].name;
     int id = config_.rtp.extensions[i].id;
-    if (extension == "toffset") {
+    if (extension == RtpExtension::kTOffset) {
       if (rtp_rtcp_->SetSendTimestampOffsetStatus(channel_, true, id) != 0)
         abort();
-    } else if (extension == "abs-send-time") {
+    } else if (extension == RtpExtension::kAbsSendTime) {
       if (rtp_rtcp_->SetSendAbsoluteSendTimeStatus(channel_, true, id) != 0)
         abort();
     } else {
@@ -186,9 +162,8 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
   }
 
   codec_ = ViECodec::GetInterface(video_engine);
-  if (codec_->SetSendCodec(channel_, config_.codec) != 0) {
+  if (!SetCodec(config_.codec))
     abort();
-  }
 
   if (overuse_detection) {
     overuse_observer_.reset(
@@ -201,9 +176,13 @@ VideoSendStream::VideoSendStream(newapi::Transport* transport,
   image_process_ = ViEImageProcess::GetInterface(video_engine);
   image_process_->RegisterPreEncodeCallback(channel_,
                                             config_.pre_encode_callback);
+  if (config_.post_encode_callback) {
+    image_process_->RegisterPostEncodeImageCallback(channel_,
+                                                    &encoded_frame_proxy_);
+  }
 
-  if (config.auto_mute) {
-    codec_->EnableAutoMuting(channel_);
+  if (config.suspend_below_min_bitrate) {
+    codec_->SuspendBelowMinBitrate(channel_);
   }
 }
 
@@ -261,35 +240,63 @@ void VideoSendStream::PutFrame(const I420VideoFrame& frame,
 
 VideoSendStreamInput* VideoSendStream::Input() { return this; }
 
-void VideoSendStream::StartSend() {
+void VideoSendStream::StartSending() {
   if (video_engine_base_->StartSend(channel_) != 0)
     abort();
   if (video_engine_base_->StartReceive(channel_) != 0)
     abort();
 }
 
-void VideoSendStream::StopSend() {
+void VideoSendStream::StopSending() {
   if (video_engine_base_->StopSend(channel_) != 0)
     abort();
   if (video_engine_base_->StopReceive(channel_) != 0)
     abort();
 }
 
-bool VideoSendStream::SetTargetBitrate(
-    int min_bitrate,
-    int max_bitrate,
-    const std::vector<SimulcastStream>& streams) {
-  return false;
+bool VideoSendStream::SetCodec(const VideoCodec& codec) {
+  assert(config_.rtp.ssrcs.size() >= codec.numberOfSimulcastStreams);
+
+  CriticalSectionScoped crit(codec_lock_.get());
+  if (codec_->SetSendCodec(channel_, codec) != 0)
+    return false;
+
+  for (size_t i = 0; i < config_.rtp.ssrcs.size(); ++i) {
+    rtp_rtcp_->SetLocalSSRC(channel_,
+                            config_.rtp.ssrcs[i],
+                            kViEStreamTypeNormal,
+                            static_cast<unsigned char>(i));
+  }
+
+  config_.codec = codec;
+  if (config_.rtp.rtx.ssrcs.empty())
+    return true;
+
+  // Set up RTX.
+  assert(config_.rtp.rtx.ssrcs.size() == config_.rtp.ssrcs.size());
+  for (size_t i = 0; i < config_.rtp.ssrcs.size(); ++i) {
+    rtp_rtcp_->SetLocalSSRC(channel_,
+                            config_.rtp.rtx.ssrcs[i],
+                            kViEStreamTypeRtx,
+                            static_cast<unsigned char>(i));
+  }
+
+  if (config_.rtp.rtx.rtx_payload_type != 0) {
+    rtp_rtcp_->SetRtxSendPayloadType(channel_,
+                                     config_.rtp.rtx.rtx_payload_type);
+  }
+
+  return true;
 }
 
-void VideoSendStream::GetSendCodec(VideoCodec* send_codec) {
-  *send_codec = config_.codec;
+VideoCodec VideoSendStream::GetCodec() {
+  CriticalSectionScoped crit(codec_lock_.get());
+  return config_.codec;
 }
 
 bool VideoSendStream::DeliverRtcp(const uint8_t* packet, size_t length) {
   return network_->ReceivedRTCPPacket(
              channel_, packet, static_cast<int>(length)) == 0;
 }
-
 }  // namespace internal
 }  // namespace webrtc

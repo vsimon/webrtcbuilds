@@ -38,18 +38,18 @@ class Call : public webrtc::Call, public PacketReceiver {
 
   virtual VideoSendStream::Config GetDefaultSendConfig() OVERRIDE;
 
-  virtual VideoSendStream* CreateSendStream(
+  virtual VideoSendStream* CreateVideoSendStream(
       const VideoSendStream::Config& config) OVERRIDE;
 
-  virtual SendStreamState* DestroySendStream(
-      webrtc::VideoSendStream* send_stream) OVERRIDE;
+  virtual void DestroyVideoSendStream(webrtc::VideoSendStream* send_stream)
+      OVERRIDE;
 
   virtual VideoReceiveStream::Config GetDefaultReceiveConfig() OVERRIDE;
 
-  virtual VideoReceiveStream* CreateReceiveStream(
+  virtual VideoReceiveStream* CreateVideoReceiveStream(
       const VideoReceiveStream::Config& config) OVERRIDE;
 
-  virtual void DestroyReceiveStream(
+  virtual void DestroyVideoReceiveStream(
       webrtc::VideoReceiveStream* receive_stream) OVERRIDE;
 
   virtual uint32_t SendBitrateEstimate() OVERRIDE;
@@ -212,10 +212,10 @@ VideoSendStream::Config Call::GetDefaultSendConfig() {
   return config;
 }
 
-VideoSendStream* Call::CreateSendStream(const VideoSendStream::Config& config) {
+VideoSendStream* Call::CreateVideoSendStream(
+    const VideoSendStream::Config& config) {
   assert(config.rtp.ssrcs.size() > 0);
-  assert(config.codec.numberOfSimulcastStreams == 0 ||
-         config.codec.numberOfSimulcastStreams == config.rtp.ssrcs.size());
+  assert(config.rtp.ssrcs.size() >= config.codec.numberOfSimulcastStreams);
 
   VideoSendStream* send_stream = new VideoSendStream(
       config_.send_transport, config_.overuse_detection, video_engine_, config);
@@ -228,7 +228,7 @@ VideoSendStream* Call::CreateSendStream(const VideoSendStream::Config& config) {
   return send_stream;
 }
 
-SendStreamState* Call::DestroySendStream(webrtc::VideoSendStream* send_stream) {
+void Call::DestroyVideoSendStream(webrtc::VideoSendStream* send_stream) {
   assert(send_stream != NULL);
 
   VideoSendStream* send_stream_impl = NULL;
@@ -248,19 +248,16 @@ SendStreamState* Call::DestroySendStream(webrtc::VideoSendStream* send_stream) {
 
   assert(send_stream_impl != NULL);
   delete send_stream_impl;
-
-  // TODO(pbos): Return its previous state
-  return NULL;
 }
 
 VideoReceiveStream::Config Call::GetDefaultReceiveConfig() {
   return VideoReceiveStream::Config();
 }
 
-VideoReceiveStream* Call::CreateReceiveStream(
+VideoReceiveStream* Call::CreateVideoReceiveStream(
     const VideoReceiveStream::Config& config) {
-  VideoReceiveStream* receive_stream =
-      new VideoReceiveStream(video_engine_, config, config_.send_transport);
+  VideoReceiveStream* receive_stream = new VideoReceiveStream(
+      video_engine_, config, config_.send_transport, config_.voice_engine);
 
   WriteLockScoped write_lock(*receive_lock_);
   assert(receive_ssrcs_.find(config.rtp.ssrc) == receive_ssrcs_.end());
@@ -268,7 +265,8 @@ VideoReceiveStream* Call::CreateReceiveStream(
   return receive_stream;
 }
 
-void Call::DestroyReceiveStream(webrtc::VideoReceiveStream* receive_stream) {
+void Call::DestroyVideoReceiveStream(
+    webrtc::VideoReceiveStream* receive_stream) {
   assert(receive_stream != NULL);
 
   VideoReceiveStream* receive_stream_impl = NULL;

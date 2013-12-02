@@ -19,6 +19,7 @@
 #include "webrtc/modules/rtp_rtcp/source/rtcp_sender.h"
 #include "webrtc/modules/rtp_rtcp/source/rtp_sender.h"
 #include "webrtc/system_wrappers/interface/scoped_ptr.h"
+#include "webrtc/test/testsupport/gtest_prod_util.h"
 
 #ifdef MATLAB
 class MatlabPlot;
@@ -258,6 +259,8 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   // (XR) Receiver reference time report.
   virtual void SetRtcpXrRrtrStatus(bool enable) OVERRIDE;
 
+  virtual bool RtcpXrRrtrStatus() const OVERRIDE;
+
   // Audio part.
 
   // Set audio packet size, used to determine when it's time to send a DTMF
@@ -383,8 +386,12 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   Clock*                    clock_;
 
  private:
+  FRIEND_TEST_ALL_PREFIXES(RtpRtcpImplTest, RttForReceiverOnly);
   int64_t RtcpReportInterval();
   void SetRtcpReceiverSsrcs(uint32_t main_ssrc);
+
+  void set_rtt_ms(uint32_t rtt_ms);
+  uint32_t rtt_ms() const;
 
   int32_t             id_;
   const bool                audio_;
@@ -414,7 +421,11 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   MatlabPlot*           plot1_;
 #endif
 
-  RtcpRttObserver* rtt_observer_;
+  RtcpRttStats* rtt_stats_;
+
+  // The processed RTT from RtcpRttStats.
+  scoped_ptr<CriticalSectionWrapper> critical_section_rtt_;
+  uint32_t rtt_ms_;
 };
 
 }  // namespace webrtc

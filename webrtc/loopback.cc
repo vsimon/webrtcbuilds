@@ -63,7 +63,7 @@ TEST_F(LoopbackTest, Test) {
   send_config.codec.maxBitrate =
       static_cast<unsigned int>(test::flags::MaxBitrate());
 
-  VideoSendStream* send_stream = call->CreateSendStream(send_config);
+  VideoSendStream* send_stream = call->CreateVideoSendStream(send_config);
 
   Clock* test_clock = Clock::GetRealTimeClock();
 
@@ -79,20 +79,20 @@ TEST_F(LoopbackTest, Test) {
   receive_config.renderer = loopback_video.get();
 
   VideoReceiveStream* receive_stream =
-      call->CreateReceiveStream(receive_config);
+      call->CreateVideoReceiveStream(receive_config);
 
-  receive_stream->StartReceive();
-  send_stream->StartSend();
+  receive_stream->StartReceiving();
+  send_stream->StartSending();
   camera->Start();
 
   test::PressEnterToContinue();
 
   camera->Stop();
-  send_stream->StopSend();
-  receive_stream->StopReceive();
+  send_stream->StopSending();
+  receive_stream->StopReceiving();
 
-  call->DestroyReceiveStream(receive_stream);
-  call->DestroySendStream(send_stream);
+  call->DestroyVideoReceiveStream(receive_stream);
+  call->DestroyVideoSendStream(send_stream);
 
   transport.StopSending();
 }

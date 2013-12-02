@@ -29,6 +29,7 @@ namespace webrtc {
 
 class Config;
 class CriticalSectionWrapper;
+class EncodedImageCallback;
 class PacedSender;
 class ProcessThread;
 class QMVideoSettingsCallback;
@@ -163,16 +164,20 @@ class ViEEncoder
   // Disables recording of debugging information.
   virtual int StopDebugRecording();
 
-  // Enables AutoMuter to turn off video when the rate drops below
+  // Lets the sender suspend video when the rate drops below
   // |threshold_bps|, and turns back on when the rate goes back up above
   // |threshold_bps| + |window_bps|.
-  virtual void EnableAutoMuting();
+  virtual void SuspendBelowMinBitrate();
 
-  // New-style callback, used by VideoSendStream.
+  // New-style callbacks, used by VideoSendStream.
   void RegisterPreEncodeCallback(I420FrameCallback* pre_encode_callback);
   void DeRegisterPreEncodeCallback();
+  void RegisterPostEncodeImageCallback(
+        EncodedImageCallback* post_encode_callback);
+  void DeRegisterPostEncodeImageCallback();
 
   int channel_id() const { return channel_id_; }
+
  protected:
   // Called by BitrateObserver.
   void OnNetworkChanged(const uint32_t bitrate_bps,
@@ -226,7 +231,7 @@ class ViEEncoder
 
   // Quality modes callback
   QMVideoSettingsCallback* qm_callback_;
-  bool video_auto_muted_;
+  bool video_suspended_;
   I420FrameCallback* pre_encode_callback_;
 };
 

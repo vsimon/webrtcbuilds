@@ -13,6 +13,7 @@
 #include <map>
 #include <vector>
 
+#include "webrtc/modules/rtp_rtcp/interface/rtp_header_parser.h"
 #include "webrtc/typedefs.h"
 #include "webrtc/video_send_stream.h"
 
@@ -21,6 +22,7 @@ namespace test {
 
 class RtpRtcpObserver {
  public:
+  virtual ~RtpRtcpObserver() {}
   newapi::Transport* SendTransport() {
     return &send_transport_;
   }
@@ -40,20 +42,43 @@ class RtpRtcpObserver {
     receive_transport_.StopSending();
   }
 
-  EventTypeWrapper Wait() { return observation_complete_->Wait(timeout_ms_); }
+  virtual EventTypeWrapper Wait() {
+    EventTypeWrapper result = observation_complete_->Wait(timeout_ms_);
+    observation_complete_->Reset();
+    return result;
+  }
 
  protected:
-  RtpRtcpObserver(unsigned int event_timeout_ms)
+  RtpRtcpObserver(unsigned int event_timeout_ms, int delay_ms)
       : lock_(CriticalSectionWrapper::CreateCriticalSection()),
         observation_complete_(EventWrapper::Create()),
+        parser_(RtpHeaderParser::Create()),
         send_transport_(lock_.get(),
                         this,
                         &RtpRtcpObserver::OnSendRtp,
-                        &RtpRtcpObserver::OnSendRtcp),
+                        &RtpRtcpObserver::OnSendRtcp,
+                        delay_ms),
         receive_transport_(lock_.get(),
                            this,
                            &RtpRtcpObserver::OnReceiveRtp,
-                           &RtpRtcpObserver::OnReceiveRtcp),
+                           &RtpRtcpObserver::OnReceiveRtcp,
+                           delay_ms),
+        timeout_ms_(event_timeout_ms) {}
+
+  explicit RtpRtcpObserver(unsigned int event_timeout_ms)
+      : lock_(CriticalSectionWrapper::CreateCriticalSection()),
+        observation_complete_(EventWrapper::Create()),
+        parser_(RtpHeaderParser::Create()),
+        send_transport_(lock_.get(),
+                        this,
+                        &RtpRtcpObserver::OnSendRtp,
+                        &RtpRtcpObserver::OnSendRtcp,
+                        0),
+        receive_transport_(lock_.get(),
+                           this,
+                           &RtpRtcpObserver::OnReceiveRtp,
+                           &RtpRtcpObserver::OnReceiveRtcp,
+                           0),
         timeout_ms_(event_timeout_ms) {}
 
   enum Action {
@@ -83,17 +108,20 @@ class RtpRtcpObserver {
    public:
     typedef Action (RtpRtcpObserver::*PacketTransportAction)(const uint8_t*,
                                                              size_t);
+
     PacketTransport(CriticalSectionWrapper* lock,
                     RtpRtcpObserver* observer,
                     PacketTransportAction on_rtp,
-                    PacketTransportAction on_rtcp)
-        : lock_(lock),
+                    PacketTransportAction on_rtcp,
+                    int delay_ms)
+        : test::DirectTransport(delay_ms),
+          lock_(lock),
           observer_(observer),
           on_rtp_(on_rtp),
           on_rtcp_(on_rtcp) {}
 
   private:
-    virtual bool SendRTP(const uint8_t* packet, size_t length) OVERRIDE {
+    virtual bool SendRtp(const uint8_t* packet, size_t length) OVERRIDE {
       Action action;
       {
         CriticalSectionScoped crit_(lock_);
@@ -104,12 +132,12 @@ class RtpRtcpObserver {
           // Drop packet silently.
           return true;
         case SEND_PACKET:
-          return test::DirectTransport::SendRTP(packet, length);
+          return test::DirectTransport::SendRtp(packet, length);
       }
       return true;  // Will never happen, makes compiler happy.
     }
 
-    virtual bool SendRTCP(const uint8_t* packet, size_t length) OVERRIDE {
+    virtual bool SendRtcp(const uint8_t* packet, size_t length) OVERRIDE {
       Action action;
       {
         CriticalSectionScoped crit_(lock_);
@@ -120,7 +148,7 @@ class RtpRtcpObserver {
           // Drop packet silently.
           return true;
         case SEND_PACKET:
-          return test::DirectTransport::SendRTCP(packet, length);
+          return test::DirectTransport::SendRtcp(packet, length);
       }
       return true;  // Will never happen, makes compiler happy.
     }
@@ -135,6 +163,7 @@ class RtpRtcpObserver {
  protected:
   scoped_ptr<CriticalSectionWrapper> lock_;
   scoped_ptr<EventWrapper> observation_complete_;
+  scoped_ptr<RtpHeaderParser> parser_;
 
  private:
   PacketTransport send_transport_, receive_transport_;

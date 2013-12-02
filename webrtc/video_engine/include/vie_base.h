@@ -120,6 +120,12 @@ class WEBRTC_DLLEXPORT ViEBase {
   virtual int RegisterCpuOveruseObserver(int channel,
                                          CpuOveruseObserver* observer) = 0;
 
+  // Gets the last cpu overuse measure.
+  // TODO(asapersson): Remove default implementation.
+  virtual int CpuOveruseMeasures(int channel,
+                                 int* capture_jitter_ms,
+                                 int* avg_encode_time_ms) { return -1; }
+
   // Specifies the VoiceEngine and VideoEngine channel pair to use for
   // audio/video synchronization.
   virtual int ConnectAudioChannel(const int video_channel,

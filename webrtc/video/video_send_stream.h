@@ -14,9 +14,11 @@
 #include <vector>
 
 #include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
+#include "webrtc/video/encoded_frame_callback_adapter.h"
 #include "webrtc/video/transport_adapter.h"
 #include "webrtc/video_receive_stream.h"
 #include "webrtc/video_send_stream.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 
 namespace webrtc {
 
@@ -49,21 +51,20 @@ class VideoSendStream : public webrtc::VideoSendStream,
 
   virtual VideoSendStreamInput* Input() OVERRIDE;
 
-  virtual void StartSend() OVERRIDE;
+  virtual void StartSending() OVERRIDE;
 
-  virtual void StopSend() OVERRIDE;
+  virtual void StopSending() OVERRIDE;
 
-  virtual bool SetTargetBitrate(int min_bitrate, int max_bitrate,
-                                const std::vector<SimulcastStream>& streams)
-      OVERRIDE;
-
-  virtual void GetSendCodec(VideoCodec* send_codec) OVERRIDE;
+  virtual bool SetCodec(const VideoCodec& codec) OVERRIDE;
+  virtual VideoCodec GetCodec() OVERRIDE;
 
  public:
   bool DeliverRtcp(const uint8_t* packet, size_t length);
 
  private:
   TransportAdapter transport_adapter_;
+  EncodedFrameCallbackAdapter encoded_frame_proxy_;
+  scoped_ptr<CriticalSectionWrapper> codec_lock_;
   VideoSendStream::Config config_;
 
   ViEBase* video_engine_base_;

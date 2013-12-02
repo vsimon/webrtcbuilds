@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "webrtc/common_video/interface/video_image.h"
 #include "webrtc/common_video/libyuv/include/webrtc_libyuv.h"
 #include "webrtc/modules/pacing/include/paced_sender.h"
 #include "webrtc/modules/rtp_rtcp/interface/rtp_rtcp.h"
@@ -21,6 +22,7 @@
 #include "webrtc/modules/video_coding/codecs/interface/video_codec_interface.h"
 #include "webrtc/modules/video_coding/main/interface/video_coding.h"
 #include "webrtc/modules/video_coding/main/interface/video_coding_defines.h"
+#include "webrtc/modules/video_coding/main/source/encoded_frame.h"
 #include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 #include "webrtc/system_wrappers/interface/logging.h"
 #include "webrtc/system_wrappers/interface/tick_util.h"
@@ -163,7 +165,7 @@ ViEEncoder::ViEEncoder(int32_t engine_id,
     has_received_rpsi_(false),
     picture_id_rpsi_(0),
     qm_callback_(NULL),
-    video_auto_muted_(false),
+    video_suspended_(false),
     pre_encode_callback_(NULL) {
   WEBRTC_TRACE(webrtc::kTraceMemory, webrtc::kTraceVideo,
                ViEId(engine_id, channel_id),
@@ -525,7 +527,12 @@ bool ViEEncoder::TimeToSendPacket(uint32_t ssrc,
 }
 
 int ViEEncoder::TimeToSendPadding(int bytes) {
-  if (send_padding_) {
+  bool send_padding;
+  {
+    CriticalSectionScoped cs(data_cs_.get());
+    send_padding = send_padding_ || video_suspended_;
+  }
+  if (send_padding) {
     return default_rtp_rtcp_->TimeToSendPadding(bytes);
   }
   return 0;
@@ -839,10 +846,15 @@ void ViEEncoder::SetSenderBufferingMode(int target_delay_ms) {
     // Disable external frame-droppers.
     vcm_.EnableFrameDropper(false);
     vpm_.EnableTemporalDecimation(false);
+    // We don't put any limits on the pacer queue when running in buffered mode
+    // since the encoder will be paused if the queue grow too large.
+    paced_sender_->set_max_queue_length_ms(-1);
   } else {
     // Real-time mode - enable frame droppers.
     vpm_.EnableTemporalDecimation(true);
     vcm_.EnableFrameDropper(true);
+    paced_sender_->set_max_queue_length_ms(
+        PacedSender::kDefaultMaxQueueLengthMs);
   }
 }
 
@@ -1050,7 +1062,7 @@ void ViEEncoder::OnNetworkChanged(const uint32_t bitrate_bps,
                __FUNCTION__, bitrate_bps, fraction_lost, round_trip_time_ms);
 
   vcm_.SetChannelParameters(bitrate_bps, fraction_lost, round_trip_time_ms);
-  bool video_is_muted = vcm_.VideoMuted();
+  bool video_is_suspended = vcm_.VideoSuspended();
   int bitrate_kbps = bitrate_bps / 1000;
   VideoCodec send_codec;
   if (vcm_.SendCodec(&send_codec) != 0) {
@@ -1087,10 +1099,10 @@ void ViEEncoder::OnNetworkChanged(const uint32_t bitrate_bps,
       pad_up_to_bitrate_kbps += stream_configs[i].targetBitrate;
     }
   }
-  if (video_is_muted || send_codec.numberOfSimulcastStreams > 1) {
+  if (video_is_suspended || send_codec.numberOfSimulcastStreams > 1) {
     pad_up_to_bitrate_kbps = std::min(bitrate_kbps, pad_up_to_bitrate_kbps);
   } else {
-    // Disable padding if only sending one stream and video isn't muted.
+    // Disable padding if only sending one stream and video isn't suspended.
     pad_up_to_bitrate_kbps = 0;
   }
 
@@ -1107,16 +1119,19 @@ void ViEEncoder::OnNetworkChanged(const uint32_t bitrate_bps,
                                max_padding_bitrate_kbps,
                                pad_up_to_bitrate_kbps);
   default_rtp_rtcp_->SetTargetSendBitrate(stream_bitrates);
-  if (video_is_muted != video_auto_muted_) {
-    // State changed now. Send callback to inform about that.
-    video_auto_muted_ = video_is_muted;
-    if (codec_observer_) {
-      WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideo,
-                   ViEId(engine_id_, channel_id_),
-                   "%s: video_auto_muted_ changed to %i",
-                   __FUNCTION__, video_auto_muted_);
-      codec_observer_->VideoAutoMuted(channel_id_, video_auto_muted_);
-    }
+  {
+    CriticalSectionScoped cs(data_cs_.get());
+    if (video_suspended_ == video_is_suspended)
+      return;
+    video_suspended_ = video_is_suspended;
+  }
+  // State changed, inform codec observer.
+  if (codec_observer_) {
+    WEBRTC_TRACE(webrtc::kTraceInfo, webrtc::kTraceVideo,
+                 ViEId(engine_id_, channel_id_),
+                 "%s: video_suspended_ changed to %i",
+                 __FUNCTION__, video_is_suspended);
+    codec_observer_->SuspendChange(channel_id_, video_is_suspended);
   }
 }
 
@@ -1159,8 +1174,8 @@ int ViEEncoder::StopDebugRecording() {
   return vcm_.StopDebugRecording();
 }
 
-void ViEEncoder::EnableAutoMuting() {
-  vcm_.EnableAutoMuting();
+void ViEEncoder::SuspendBelowMinBitrate() {
+  vcm_.SuspendBelowMinBitrate();
   bitrate_controller_->EnforceMinBitrate(false);
 }
 
@@ -1173,6 +1188,15 @@ void ViEEncoder::RegisterPreEncodeCallback(
 void ViEEncoder::DeRegisterPreEncodeCallback() {
   CriticalSectionScoped cs(callback_cs_.get());
   pre_encode_callback_ = NULL;
+}
+
+void ViEEncoder::RegisterPostEncodeImageCallback(
+      EncodedImageCallback* post_encode_callback) {
+  vcm_.RegisterPostEncodeImageCallback(post_encode_callback);
+}
+
+void ViEEncoder::DeRegisterPostEncodeImageCallback() {
+  vcm_.RegisterPostEncodeImageCallback(NULL);
 }
 
 QMVideoSettingsCallback::QMVideoSettingsCallback(VideoProcessingModule* vpm)

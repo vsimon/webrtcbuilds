@@ -63,7 +63,7 @@ class RtpRtcp : public Module {
     RtcpFeedback* rtcp_feedback;
     RtcpIntraFrameObserver* intra_frame_callback;
     RtcpBandwidthObserver* bandwidth_callback;
-    RtcpRttObserver* rtt_observer;
+    RtcpRttStats* rtt_stats;
     RtpAudioFeedback* audio_messages;
     RemoteBitrateEstimator* remote_bitrate_estimator;
     PacedSender* paced_sender;
@@ -509,6 +509,8 @@ class RtpRtcp : public Module {
     *   (XR) Receiver Reference Time Report
     */
     virtual void SetRtcpXrRrtrStatus(bool enable) = 0;
+
+    virtual bool RtcpXrRrtrStatus() const = 0;
 
     /*
     *  (REMB) Receiver Estimated Max Bitrate
