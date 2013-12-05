@@ -732,6 +732,18 @@ int ModuleRtpRtcpImpl::TimeToSendPadding(int bytes) {
   return 0;
 }
 
+bool ModuleRtpRtcpImpl::GetSendSideDelay(int* avg_send_delay_ms,
+                                         int* max_send_delay_ms) const {
+  assert(avg_send_delay_ms);
+  assert(max_send_delay_ms);
+
+  if (!child_modules_.empty()) {
+    // This API is only supported for child modules.
+    return false;
+  }
+  return rtp_sender_.GetSendSideDelay(avg_send_delay_ms, max_send_delay_ms);
+}
+
 uint16_t ModuleRtpRtcpImpl::MaxPayloadLength() const {
   WEBRTC_TRACE(kTraceModuleCall, kTraceRtpRtcp, id_, "MaxPayloadLength()");
 
@@ -1123,10 +1135,13 @@ int32_t ModuleRtpRtcpImpl::SendNACK(const uint16_t* nack_list,
                id_,
                "SendNACK(size:%u)", size);
 
-  uint16_t avg_rtt = 0;
-  rtcp_receiver_.RTT(rtcp_receiver_.RemoteSSRC(), NULL, &avg_rtt, NULL, NULL);
+  // Use RTT from RtcpRttStats class if provided.
+  uint16_t rtt = rtt_ms();
+  if (rtt == 0) {
+    rtcp_receiver_.RTT(rtcp_receiver_.RemoteSSRC(), NULL, &rtt, NULL, NULL);
+  }
 
-  int64_t wait_time = 5 + ((avg_rtt * 3) >> 1);  // 5 + RTT * 1.5.
+  int64_t wait_time = 5 + ((rtt * 3) >> 1);  // 5 + RTT * 1.5.
   if (wait_time == 5) {
     wait_time = 100;  // During startup we don't have an RTT.
   }
@@ -1187,6 +1202,16 @@ int32_t ModuleRtpRtcpImpl::SetStorePacketsStatus(
 
 bool ModuleRtpRtcpImpl::StorePackets() const {
   return rtp_sender_.StorePackets();
+}
+
+void ModuleRtpRtcpImpl::RegisterSendChannelRtcpStatisticsCallback(
+    RtcpStatisticsCallback* callback) {
+  rtcp_receiver_.RegisterRtcpStatisticsCallback(callback);
+}
+
+RtcpStatisticsCallback* ModuleRtpRtcpImpl::
+        GetSendChannelRtcpStatisticsCallback() {
+  return rtcp_receiver_.GetRtcpStatisticsCallback();
 }
 
 // Send a TelephoneEvent tone using RFC 2833 (4733).
@@ -1575,9 +1600,12 @@ void ModuleRtpRtcpImpl::OnReceivedNACK(
       nack_sequence_numbers.size() == 0) {
     return;
   }
-  uint16_t avg_rtt = 0;
-  rtcp_receiver_.RTT(rtcp_receiver_.RemoteSSRC(), NULL, &avg_rtt, NULL, NULL);
-  rtp_sender_.OnReceivedNACK(nack_sequence_numbers, avg_rtt);
+  // Use RTT from RtcpRttStats class if provided.
+  uint16_t rtt = rtt_ms();
+  if (rtt == 0) {
+    rtcp_receiver_.RTT(rtcp_receiver_.RemoteSSRC(), NULL, &rtt, NULL, NULL);
+  }
+  rtp_sender_.OnReceivedNACK(nack_sequence_numbers, rtt);
 }
 
 int32_t ModuleRtpRtcpImpl::LastReceivedNTP(
@@ -1643,6 +1671,16 @@ void ModuleRtpRtcpImpl::set_rtt_ms(uint32_t rtt_ms) {
 uint32_t ModuleRtpRtcpImpl::rtt_ms() const {
   CriticalSectionScoped cs(critical_section_rtt_.get());
   return rtt_ms_;
+}
+
+void ModuleRtpRtcpImpl::RegisterSendChannelRtpStatisticsCallback(
+    StreamDataCountersCallback* callback) {
+  rtp_sender_.RegisterRtpStatisticsCallback(callback);
+}
+
+StreamDataCountersCallback*
+    ModuleRtpRtcpImpl::GetSendChannelRtpStatisticsCallback() const {
+  return rtp_sender_.GetRtpStatisticsCallback();
 }
 
 void ModuleRtpRtcpImpl::RegisterSendFrameCountObserver(

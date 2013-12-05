@@ -174,6 +174,10 @@ class ViEChannel
                                 uint32_t* jitter_samples,
                                 int32_t* rtt_ms);
 
+  // Called on receipt of RTCP report block from remote side.
+  void RegisterSendChannelRtcpStatisticsCallback(
+      RtcpStatisticsCallback* callback);
+
   // Returns our localy created statistics of the received RTP stream.
   int32_t GetReceivedRtcpStatistics(uint16_t* fraction_lost,
                                     uint32_t* cumulative_lost,
@@ -186,10 +190,16 @@ class ViEChannel
                            uint32_t* packets_sent,
                            uint32_t* bytes_received,
                            uint32_t* packets_received) const;
+
+  // Called on update of RTP statistics.
+  void RegisterSendChannelRtpStatisticsCallback(
+      StreamDataCountersCallback* callback);
+
   void GetBandwidthUsage(uint32_t* total_bitrate_sent,
                          uint32_t* video_bitrate_sent,
                          uint32_t* fec_bitrate_sent,
                          uint32_t* nackBitrateSent) const;
+  bool GetSendSideDelay(int* avg_send_delay, int* max_send_delay) const;
   void GetEstimatedReceiveBandwidth(uint32_t* estimated_bandwidth) const;
 
   int32_t StartRTPDump(const char file_nameUTF8[1024],

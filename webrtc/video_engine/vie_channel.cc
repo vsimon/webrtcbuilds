@@ -357,6 +357,8 @@ int32_t ViEChannel::SetSendCodec(const VideoCodec& video_codec,
       rtp_rtcp->SetSendingStatus(false);
       rtp_rtcp->SetSendingMediaStatus(false);
       rtp_rtcp->RegisterSendFrameCountObserver(NULL);
+      rtp_rtcp->RegisterSendChannelRtcpStatisticsCallback(NULL);
+      rtp_rtcp->RegisterSendChannelRtpStatisticsCallback(NULL);
       simulcast_rtp_rtcp_.pop_back();
       removed_rtp_rtcp_.push_front(rtp_rtcp);
     }
@@ -413,6 +415,10 @@ int32_t ViEChannel::SetSendCodec(const VideoCodec& video_codec,
       rtp_rtcp->SetRtcpXrRrtrStatus(rtp_rtcp_->RtcpXrRrtrStatus());
       rtp_rtcp->RegisterSendFrameCountObserver(
           rtp_rtcp_->GetSendFrameCountObserver());
+      rtp_rtcp->RegisterSendChannelRtcpStatisticsCallback(
+          rtp_rtcp_->GetSendChannelRtcpStatisticsCallback());
+      rtp_rtcp->RegisterSendChannelRtpStatisticsCallback(
+          rtp_rtcp_->GetSendChannelRtpStatisticsCallback());
     }
     // |RegisterSimulcastRtpRtcpModules| resets all old weak pointers and old
     // modules can be deleted after this step.
@@ -424,6 +430,8 @@ int32_t ViEChannel::SetSendCodec(const VideoCodec& video_codec,
       rtp_rtcp->SetSendingStatus(false);
       rtp_rtcp->SetSendingMediaStatus(false);
       rtp_rtcp->RegisterSendFrameCountObserver(NULL);
+      rtp_rtcp->RegisterSendChannelRtcpStatisticsCallback(NULL);
+      rtp_rtcp->RegisterSendChannelRtpStatisticsCallback(NULL);
       simulcast_rtp_rtcp_.pop_back();
       removed_rtp_rtcp_.push_front(rtp_rtcp);
     }
@@ -1264,6 +1272,19 @@ int32_t ViEChannel::GetSendRtcpStatistics(uint16_t* fraction_lost,
   return 0;
 }
 
+void ViEChannel::RegisterSendChannelRtcpStatisticsCallback(
+    RtcpStatisticsCallback* callback) {
+  WEBRTC_TRACE(kTraceInfo, kTraceVideo, ViEId(engine_id_, channel_id_), "%s",
+               __FUNCTION__);
+  rtp_rtcp_->RegisterSendChannelRtcpStatisticsCallback(callback);
+  CriticalSectionScoped cs(rtp_rtcp_cs_.get());
+  for (std::list<RtpRtcp*>::const_iterator it = simulcast_rtp_rtcp_.begin();
+       it != simulcast_rtp_rtcp_.end();
+       ++it) {
+    (*it)->RegisterSendChannelRtcpStatisticsCallback(callback);
+  }
+}
+
 // TODO(holmer): This is a bad function name as it implies that it returns the
 // received RTCP, while it actually returns the statistics which will be sent
 // in the RTCP.
@@ -1276,7 +1297,6 @@ int32_t ViEChannel::GetReceivedRtcpStatistics(uint16_t* fraction_lost,
                "%s", __FUNCTION__);
 
   uint32_t remote_ssrc = vie_receiver_.GetRemoteSsrc();
-  uint8_t frac_lost = 0;
   StreamStatistician* statistician =
       vie_receiver_.GetReceiveStatistics()->GetStatistician(remote_ssrc);
   StreamStatistician::Statistics receive_stats;
@@ -1290,7 +1310,6 @@ int32_t ViEChannel::GetReceivedRtcpStatistics(uint16_t* fraction_lost,
   *cumulative_lost = receive_stats.cumulative_lost;
   *extended_max = receive_stats.extended_max_sequence_number;
   *jitter_samples = receive_stats.jitter;
-  *fraction_lost = frac_lost;
 
   uint16_t dummy = 0;
   uint16_t rtt = 0;
@@ -1334,6 +1353,21 @@ int32_t ViEChannel::GetRtpStatistics(uint32_t* bytes_sent,
   return 0;
 }
 
+void ViEChannel::RegisterSendChannelRtpStatisticsCallback(
+      StreamDataCountersCallback* callback) {
+  WEBRTC_TRACE(kTraceInfo, kTraceVideo, ViEId(engine_id_, channel_id_), "%s",
+                 __FUNCTION__);
+  rtp_rtcp_->RegisterSendChannelRtpStatisticsCallback(callback);
+  {
+    CriticalSectionScoped cs(rtp_rtcp_cs_.get());
+    for (std::list<RtpRtcp*>::iterator it = simulcast_rtp_rtcp_.begin();
+         it != simulcast_rtp_rtcp_.end();
+         it++) {
+      (*it)->RegisterSendChannelRtpStatisticsCallback(callback);
+    }
+  }
+}
+
 void ViEChannel::GetBandwidthUsage(uint32_t* total_bitrate_sent,
                                    uint32_t* video_bitrate_sent,
                                    uint32_t* fec_bitrate_sent,
@@ -1357,6 +1391,40 @@ void ViEChannel::GetBandwidthUsage(uint32_t* total_bitrate_sent,
     *fec_bitrate_sent += fec_rate;
     *nackBitrateSent += nackRate;
   }
+}
+
+bool ViEChannel::GetSendSideDelay(int* avg_send_delay,
+                                  int* max_send_delay) const {
+  WEBRTC_TRACE(kTraceInfo, kTraceVideo, ViEId(engine_id_, channel_id_), "%s",
+               __FUNCTION__);
+
+  *avg_send_delay = 0;
+  *max_send_delay = 0;
+  bool valid_estimate = false;
+  int num_send_delays = 0;
+  if (rtp_rtcp_->GetSendSideDelay(avg_send_delay, max_send_delay)) {
+    ++num_send_delays;
+    valid_estimate = true;
+  }
+  CriticalSectionScoped cs(rtp_rtcp_cs_.get());
+  for (std::list<RtpRtcp*>::const_iterator it = simulcast_rtp_rtcp_.begin();
+       it != simulcast_rtp_rtcp_.end(); it++) {
+    RtpRtcp* rtp_rtcp = *it;
+    int sub_stream_avg_delay = 0;
+    int sub_stream_max_delay = 0;
+    if (rtp_rtcp->GetSendSideDelay(&sub_stream_avg_delay,
+                                   &sub_stream_max_delay)) {
+      *avg_send_delay += sub_stream_avg_delay;
+      *max_send_delay = std::max(*max_send_delay, sub_stream_max_delay);
+      ++num_send_delays;
+    }
+  }
+  if (num_send_delays > 0) {
+    valid_estimate = true;
+    *avg_send_delay = *avg_send_delay / num_send_delays;
+    *avg_send_delay = (*avg_send_delay + num_send_delays / 2) / num_send_delays;
+  }
+  return valid_estimate;
 }
 
 void ViEChannel::GetEstimatedReceiveBandwidth(

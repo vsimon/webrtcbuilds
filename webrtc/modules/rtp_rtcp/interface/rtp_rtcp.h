@@ -335,6 +335,15 @@ class RtpRtcp : public Module {
         FrameCountObserver* observer) = 0;
     virtual FrameCountObserver* GetSendFrameCountObserver() const = 0;
 
+    virtual bool GetSendSideDelay(int* avg_send_delay_ms,
+                                  int* max_send_delay_ms) const = 0;
+
+    // Called on generation of new statistics after an RTP send.
+    virtual void RegisterSendChannelRtpStatisticsCallback(
+        StreamDataCountersCallback* callback) = 0;
+    virtual StreamDataCountersCallback*
+        GetSendChannelRtpStatisticsCallback() const = 0;
+
     /**************************************************************************
     *
     *   RTCP
@@ -589,6 +598,12 @@ class RtpRtcp : public Module {
 
     // Returns true if the module is configured to store packets.
     virtual bool StorePackets() const = 0;
+
+    // Called on receipt of RTCP report block from remote side.
+    virtual void RegisterSendChannelRtcpStatisticsCallback(
+        RtcpStatisticsCallback* callback) = 0;
+    virtual RtcpStatisticsCallback*
+        GetSendChannelRtcpStatisticsCallback() = 0;
 
     /**************************************************************************
     *

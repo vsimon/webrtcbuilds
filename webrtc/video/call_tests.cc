@@ -31,13 +31,13 @@
 #include "webrtc/voice_engine/include/voe_network.h"
 #include "webrtc/voice_engine/include/voe_rtp_rtcp.h"
 #include "webrtc/voice_engine/include/voe_video_sync.h"
-#include "webrtc/voice_engine/test/auto_test/resource_manager.h"
 #include "webrtc/test/direct_transport.h"
 #include "webrtc/test/fake_audio_device.h"
 #include "webrtc/test/fake_decoder.h"
 #include "webrtc/test/fake_encoder.h"
 #include "webrtc/test/frame_generator_capturer.h"
 #include "webrtc/test/rtp_rtcp_observer.h"
+#include "webrtc/test/testsupport/fileutils.h"
 #include "webrtc/test/testsupport/perf_test.h"
 
 namespace webrtc {
@@ -255,7 +255,7 @@ TEST_F(CallTest, UsesTraceCallback) {
   const unsigned int kReceiverTraceFilter = kTraceDefault & (~kTraceDebug);
   class TraceObserver : public TraceCallback {
    public:
-    TraceObserver(unsigned int filter)
+    explicit TraceObserver(unsigned int filter)
         : filter_(filter), messages_left_(50), done_(EventWrapper::Create()) {}
 
     virtual void Print(TraceLevel level,
@@ -685,7 +685,7 @@ void CallTest::RespectsRtcpMode(newapi::RtcpMode rtcp_mode) {
   static const int kNumCompoundRtcpPacketsToObserve = 10;
   class RtcpModeObserver : public test::RtpRtcpObserver {
    public:
-    RtcpModeObserver(newapi::RtcpMode rtcp_mode)
+    explicit RtcpModeObserver(newapi::RtcpMode rtcp_mode)
         : test::RtpRtcpObserver(kDefaultTimeoutMs),
           rtcp_mode_(rtcp_mode),
           sent_rtp_(0),
@@ -865,7 +865,7 @@ TEST_F(CallTest, SendsAndReceivesMultipleStreams) {
 
 class SyncRtcpObserver : public test::RtpRtcpObserver {
  public:
-  SyncRtcpObserver(int delay_ms)
+  explicit SyncRtcpObserver(int delay_ms)
       : test::RtpRtcpObserver(kLongTimeoutMs, delay_ms),
         critical_section_(CriticalSectionWrapper::CreateCriticalSection()) {}
 
@@ -997,8 +997,8 @@ TEST_F(CallTest, PlaysOutAudioAndVideoInSync) {
   VoECodec* voe_codec = VoECodec::GetInterface(voice_engine);
   VoENetwork* voe_network = VoENetwork::GetInterface(voice_engine);
   VoEVideoSync* voe_sync = VoEVideoSync::GetInterface(voice_engine);
-  ResourceManager resource_manager;
-  const std::string audio_filename = resource_manager.long_audio_file_path();
+  const std::string audio_filename =
+      test::ResourcePath("voice_engine/audio_long16", "pcm");
   ASSERT_STRNE("", audio_filename.c_str());
   test::FakeAudioDevice fake_audio_device(Clock::GetRealTimeClock(),
                                           audio_filename);

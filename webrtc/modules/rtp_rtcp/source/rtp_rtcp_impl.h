@@ -134,6 +134,10 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   // Returns the number of padding bytes actually sent, which can be more or
   // less than |bytes|.
   virtual int TimeToSendPadding(int bytes) OVERRIDE;
+
+  virtual bool GetSendSideDelay(int* avg_send_delay_ms,
+                                int* max_send_delay_ms) const OVERRIDE;
+
   // RTCP part.
 
   // Get RTCP status.
@@ -246,6 +250,12 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
 
   virtual bool StorePackets() const OVERRIDE;
 
+  // Called on receipt of RTCP report block from remote side.
+  virtual void RegisterSendChannelRtcpStatisticsCallback(
+      RtcpStatisticsCallback* callback) OVERRIDE;
+  virtual RtcpStatisticsCallback*
+      GetSendChannelRtcpStatisticsCallback() OVERRIDE;
+
   // (APP) Application specific data.
   virtual int32_t SetRTCPApplicationSpecificData(
       const uint8_t sub_type,
@@ -347,6 +357,11 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   virtual int32_t SendRTCPReferencePictureSelection(
       const uint64_t picture_id) OVERRIDE;
 
+  virtual void RegisterSendChannelRtpStatisticsCallback(
+      StreamDataCountersCallback* callback);
+  virtual StreamDataCountersCallback*
+      GetSendChannelRtpStatisticsCallback() const;
+
   void OnReceivedTMMBR();
 
   // Bad state of RTP receiver request a keyframe.
@@ -390,6 +405,7 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   Clock*                    clock_;
 
  private:
+  FRIEND_TEST_ALL_PREFIXES(RtpRtcpImplTest, Rtt);
   FRIEND_TEST_ALL_PREFIXES(RtpRtcpImplTest, RttForReceiverOnly);
   int64_t RtcpReportInterval();
   void SetRtcpReceiverSsrcs(uint32_t main_ssrc);

@@ -116,6 +116,8 @@ class MockRtpRtcp : public RtpRtcp {
            bool retransmission));
   MOCK_METHOD1(TimeToSendPadding,
       int(int bytes));
+  MOCK_CONST_METHOD2(GetSendSideDelay,
+      bool(int* avg_send_delay_ms, int* max_send_delay_ms));
   MOCK_METHOD3(RegisterRtcpObservers,
       void(RtcpIntraFrameObserver* intraFrameCallback,
            RtcpBandwidthObserver* bandwidthCallback,
@@ -201,6 +203,10 @@ class MockRtpRtcp : public RtpRtcp {
   MOCK_METHOD2(SetStorePacketsStatus,
       int32_t(const bool enable, const uint16_t numberToStore));
   MOCK_CONST_METHOD0(StorePackets, bool());
+  MOCK_METHOD1(RegisterSendChannelRtcpStatisticsCallback,
+               void(RtcpStatisticsCallback*));
+  MOCK_METHOD0(GetSendChannelRtcpStatisticsCallback,
+               RtcpStatisticsCallback*());
   MOCK_METHOD1(RegisterAudioCallback,
       int32_t(RtpAudioFeedback* messagesCallback));
   MOCK_METHOD1(SetAudioPacketSize,
@@ -244,6 +250,10 @@ class MockRtpRtcp : public RtpRtcp {
       void(FrameCountObserver*));
   MOCK_CONST_METHOD0(GetSendFrameCountObserver,
       FrameCountObserver*(void));
+  MOCK_METHOD1(RegisterSendChannelRtpStatisticsCallback,
+      void(StreamDataCountersCallback*));
+  MOCK_CONST_METHOD0(GetSendChannelRtpStatisticsCallback,
+      StreamDataCountersCallback*(void));
   // Members.
   unsigned int remote_ssrc_;
 };
