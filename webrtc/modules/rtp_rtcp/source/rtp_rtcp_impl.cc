@@ -269,15 +269,13 @@ int32_t ModuleRtpRtcpImpl::Process() {
   return 0;
 }
 
-int32_t ModuleRtpRtcpImpl::SetRTXSendStatus(RtxMode mode, bool set_ssrc,
+int32_t ModuleRtpRtcpImpl::SetRTXSendStatus(int mode, bool set_ssrc,
                                             uint32_t ssrc) {
   rtp_sender_.SetRTXStatus(mode, set_ssrc, ssrc);
-
-
   return 0;
 }
 
-int32_t ModuleRtpRtcpImpl::RTXSendStatus(RtxMode* mode, uint32_t* ssrc,
+int32_t ModuleRtpRtcpImpl::RTXSendStatus(int* mode, uint32_t* ssrc,
                                          int* payload_type) const {
   rtp_sender_.RTXStatus(mode, ssrc, payload_type);
   return 0;
@@ -1628,7 +1626,7 @@ int64_t ModuleRtpRtcpImpl::RtcpReportInterval() {
 void ModuleRtpRtcpImpl::SetRtcpReceiverSsrcs(uint32_t main_ssrc) {
   std::set<uint32_t> ssrcs;
   ssrcs.insert(main_ssrc);
-  RtxMode rtx_mode = kRtxOff;
+  int rtx_mode = kRtxOff;
   uint32_t rtx_ssrc = 0;
   int rtx_payload_type = 0;
   rtp_sender_.RTXStatus(&rtx_mode, &rtx_ssrc, &rtx_payload_type);
@@ -1645,6 +1643,15 @@ void ModuleRtpRtcpImpl::set_rtt_ms(uint32_t rtt_ms) {
 uint32_t ModuleRtpRtcpImpl::rtt_ms() const {
   CriticalSectionScoped cs(critical_section_rtt_.get());
   return rtt_ms_;
+}
+
+void ModuleRtpRtcpImpl::RegisterSendFrameCountObserver(
+    FrameCountObserver* observer) {
+  rtp_sender_.RegisterFrameCountObserver(observer);
+}
+
+FrameCountObserver* ModuleRtpRtcpImpl::GetSendFrameCountObserver() const {
+  return rtp_sender_.GetFrameCountObserver();
 }
 
 }  // Namespace webrtc

@@ -326,6 +326,8 @@ class ViEChannel
   void RegisterPreDecodeImageCallback(
       EncodedImageCallback* pre_decode_callback);
 
+  void RegisterSendFrameCountObserver(FrameCountObserver* observer);
+
  protected:
   static bool ChannelDecodeThreadFunction(void* obj);
   bool ChannelDecodeProcess();
@@ -403,6 +405,7 @@ class ViEChannel
   int nack_history_size_sender_;
   int max_nack_reordering_threshold_;
   I420FrameCallback* pre_render_callback_;
+  const Config& config_;
 };
 
 }  // namespace webrtc

@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "webrtc/call.h"
+#include "webrtc/common.h"
 #include "webrtc/modules/rtp_rtcp/interface/rtp_header_parser.h"
 #include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 #include "webrtc/system_wrappers/interface/rw_lock_wrapper.h"
@@ -148,7 +149,7 @@ namespace internal {
 TraceDispatcher* global_trace_dispatcher = NULL;
 }  // internal
 
-Call* Call::Create(const Call::Config& config) {
+void CreateTraceDispatcher() {
   if (internal::global_trace_dispatcher == NULL) {
     TraceDispatcher* dispatcher = new TraceDispatcher();
     // TODO(pbos): Atomic compare and exchange.
@@ -158,8 +159,13 @@ Call* Call::Create(const Call::Config& config) {
       delete dispatcher;
     }
   }
+}
 
-  VideoEngine* video_engine = VideoEngine::Create();
+Call* Call::Create(const Call::Config& config) {
+  CreateTraceDispatcher();
+
+  VideoEngine* video_engine = config.webrtc_config != NULL ?
+      VideoEngine::Create(*config.webrtc_config) : VideoEngine::Create();
   assert(video_engine != NULL);
 
   return new internal::Call(video_engine, config);
@@ -260,8 +266,8 @@ VideoReceiveStream* Call::CreateVideoReceiveStream(
       video_engine_, config, config_.send_transport, config_.voice_engine);
 
   WriteLockScoped write_lock(*receive_lock_);
-  assert(receive_ssrcs_.find(config.rtp.ssrc) == receive_ssrcs_.end());
-  receive_ssrcs_[config.rtp.ssrc] = receive_stream;
+  assert(receive_ssrcs_.find(config.rtp.remote_ssrc) == receive_ssrcs_.end());
+  receive_ssrcs_[config.rtp.remote_ssrc] = receive_stream;
   return receive_stream;
 }
 

@@ -95,11 +95,11 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
 
   virtual uint32_t ByteCountSent() const;
 
-  virtual int32_t SetRTXSendStatus(const RtxMode mode,
+  virtual int32_t SetRTXSendStatus(const int mode,
                                    const bool set_ssrc,
                                    const uint32_t ssrc) OVERRIDE;
 
-  virtual int32_t RTXSendStatus(RtxMode* mode, uint32_t* ssrc,
+  virtual int32_t RTXSendStatus(int* mode, uint32_t* ssrc,
                                 int* payloadType) const OVERRIDE;
 
 
@@ -362,6 +362,10 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   void OnReceivedNACK(const std::list<uint16_t>& nack_sequence_numbers);
 
   void OnRequestSendReport();
+
+  virtual void RegisterSendFrameCountObserver(
+      FrameCountObserver* observer) OVERRIDE;
+  virtual FrameCountObserver* GetSendFrameCountObserver() const OVERRIDE;
 
  protected:
   void RegisterChildModule(RtpRtcp* module);
