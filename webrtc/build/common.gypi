@@ -161,6 +161,9 @@
           'WEBRTC_MOZILLA_BUILD',
          ],
       }],
+      ['enable_video==1', {
+        'defines': ['WEBRTC_MODULE_UTILITY_VIDEO',],
+      }],
       ['build_with_chromium==1', {
         'defines': [
           # Changes settings for Chromium build.
@@ -189,7 +192,7 @@
           'WEBRTC_ARCH_ARM',
         ],
         'conditions': [
-          ['armv7==1', {
+          ['arm_version==7', {
             'defines': ['WEBRTC_ARCH_ARM_V7',],
             'conditions': [
               ['arm_neon==1', {
