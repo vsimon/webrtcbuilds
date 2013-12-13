@@ -349,6 +349,11 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
                            uint32_t* fec_rate,
                            uint32_t* nackRate) const OVERRIDE;
 
+  virtual void RegisterVideoBitrateObserver(BitrateStatisticsObserver* observer)
+      OVERRIDE;
+
+  virtual BitrateStatisticsObserver* GetVideoBitrateObserver() const OVERRIDE;
+
   virtual uint32_t SendTimeOfSendReport(const uint32_t send_report);
 
   virtual bool SendTimeOfXrRrReport(uint32_t mid_ntp, int64_t* time_ms) const;
@@ -405,7 +410,6 @@ class ModuleRtpRtcpImpl : public RtpRtcp {
   Clock*                    clock_;
 
  private:
-  FRIEND_TEST_ALL_PREFIXES(RtpRtcpImplTest, Rtt);
   FRIEND_TEST_ALL_PREFIXES(RtpRtcpImplTest, RttForReceiverOnly);
   int64_t RtcpReportInterval();
   void SetRtcpReceiverSsrcs(uint32_t main_ssrc);

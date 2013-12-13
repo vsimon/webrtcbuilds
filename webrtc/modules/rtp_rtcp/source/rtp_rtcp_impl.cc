@@ -1135,13 +1135,10 @@ int32_t ModuleRtpRtcpImpl::SendNACK(const uint16_t* nack_list,
                id_,
                "SendNACK(size:%u)", size);
 
-  // Use RTT from RtcpRttStats class if provided.
-  uint16_t rtt = rtt_ms();
-  if (rtt == 0) {
-    rtcp_receiver_.RTT(rtcp_receiver_.RemoteSSRC(), NULL, &rtt, NULL, NULL);
-  }
+  uint16_t avg_rtt = 0;
+  rtcp_receiver_.RTT(rtcp_receiver_.RemoteSSRC(), NULL, &avg_rtt, NULL, NULL);
 
-  int64_t wait_time = 5 + ((rtt * 3) >> 1);  // 5 + RTT * 1.5.
+  int64_t wait_time = 5 + ((avg_rtt * 3) >> 1);  // 5 + RTT * 1.5.
   if (wait_time == 5) {
     wait_time = 100;  // During startup we don't have an RTT.
   }
@@ -1559,13 +1556,38 @@ void ModuleRtpRtcpImpl::BitrateSent(uint32_t* total_rate,
     return;
   }
   if (total_rate != NULL)
-    *total_rate = rtp_sender_.BitrateLast();
+    *total_rate = rtp_sender_.BitrateSent();
   if (video_rate != NULL)
     *video_rate = rtp_sender_.VideoBitrateSent();
   if (fec_rate != NULL)
     *fec_rate = rtp_sender_.FecOverheadRate();
   if (nack_rate != NULL)
     *nack_rate = rtp_sender_.NackOverheadRate();
+}
+
+void ModuleRtpRtcpImpl::RegisterVideoBitrateObserver(
+    BitrateStatisticsObserver* observer) {
+  {
+    CriticalSectionScoped cs(critical_section_module_ptrs_.get());
+    if (!child_modules_.empty()) {
+      for (std::list<ModuleRtpRtcpImpl*>::const_iterator it =
+               child_modules_.begin();
+           it != child_modules_.end();
+           ++it) {
+        RtpRtcp* module = *it;
+        if (module)
+          module->RegisterVideoBitrateObserver(observer);
+        ++it;
+      }
+      return;
+    }
+  }
+
+  rtp_sender_.RegisterBitrateObserver(observer);
+}
+
+BitrateStatisticsObserver* ModuleRtpRtcpImpl::GetVideoBitrateObserver() const {
+  return rtp_sender_.GetBitrateObserver();
 }
 
 // Bad state of RTP receiver request a keyframe.
@@ -1600,12 +1622,9 @@ void ModuleRtpRtcpImpl::OnReceivedNACK(
       nack_sequence_numbers.size() == 0) {
     return;
   }
-  // Use RTT from RtcpRttStats class if provided.
-  uint16_t rtt = rtt_ms();
-  if (rtt == 0) {
-    rtcp_receiver_.RTT(rtcp_receiver_.RemoteSSRC(), NULL, &rtt, NULL, NULL);
-  }
-  rtp_sender_.OnReceivedNACK(nack_sequence_numbers, rtt);
+  uint16_t avg_rtt = 0;
+  rtcp_receiver_.RTT(rtcp_receiver_.RemoteSSRC(), NULL, &avg_rtt, NULL, NULL);
+  rtp_sender_.OnReceivedNACK(nack_sequence_numbers, avg_rtt);
 }
 
 int32_t ModuleRtpRtcpImpl::LastReceivedNTP(

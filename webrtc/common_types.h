@@ -285,14 +285,11 @@ class StreamDataCountersCallback {
 
 // Rate statistics for a stream
 struct BitrateStatistics {
-  BitrateStatistics()
-    : bitrate_(0),
-      packet_rate(0),
-      now(0) {}
+  BitrateStatistics() : bitrate_bps(0), packet_rate(0), timestamp_ms(0) {}
 
-  uint32_t bitrate_;
-  uint32_t packet_rate;
-  uint64_t now;
+  uint32_t bitrate_bps;   // Bitrate in bits per second.
+  uint32_t packet_rate;   // Packet rate in packets per second.
+  uint64_t timestamp_ms;  // Ntp timestamp in ms at time of rate estimation.
 };
 
 // Callback, used to notify an observer whenever new rates have been estimated.
@@ -383,6 +380,25 @@ struct NetworkStatistics           // NETEQ statistics
     int maxWaitingTimeMs;
     // added samples in off mode due to packet loss
     int addedSamples;
+};
+
+// Statistics for calls to AudioCodingModule::PlayoutData10Ms().
+struct AudioDecodingCallStats {
+  AudioDecodingCallStats()
+      : calls_to_silence_generator(0),
+        calls_to_neteq(0),
+        decoded_normal(0),
+        decoded_plc(0),
+        decoded_cng(0),
+        decoded_plc_cng(0) {}
+
+  int calls_to_silence_generator;  // Number of calls where silence generated,
+                                   // and NetEq was disengaged from decoding.
+  int calls_to_neteq;  // Number of calls to NetEq.
+  int decoded_normal;  // Number of calls where audio RTP packet decoded.
+  int decoded_plc;  // Number of calls resulted in PLC.
+  int decoded_cng;  // Number of calls where comfort noise generated due to DTX.
+  int decoded_plc_cng;  // Number of calls resulted where PLC faded to CNG.
 };
 
 typedef struct
