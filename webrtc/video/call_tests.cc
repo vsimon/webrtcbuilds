@@ -49,7 +49,7 @@ class CallTest : public ::testing::Test {
         receive_stream_(NULL),
         fake_encoder_(Clock::GetRealTimeClock()) {}
 
-  ~CallTest() {
+  virtual ~CallTest() {
     EXPECT_EQ(NULL, send_stream_);
     EXPECT_EQ(NULL, receive_stream_);
   }
@@ -853,15 +853,15 @@ TEST_F(CallTest, SendsAndReceivesMultipleStreams) {
 
   for (size_t i = 0; i < kNumStreams; ++i) {
     frame_generators[i]->Stop();
-    delete frame_generators[i];
     sender_call->DestroyVideoSendStream(send_streams[i]);
     receiver_call->DestroyVideoReceiveStream(receive_streams[i]);
+    delete frame_generators[i];
     delete observers[i];
   }
 
   sender_transport.StopSending();
   receiver_transport.StopSending();
-}
+};
 
 TEST_F(CallTest, ObserversEncodedFrames) {
   class EncodedFrameTestObserver : public EncodedFrameObserver {
