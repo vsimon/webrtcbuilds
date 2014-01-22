@@ -174,9 +174,6 @@ class WebRtcVoiceEngine
   bool SetAudioDeviceModule(webrtc::AudioDeviceModule* adm,
                             webrtc::AudioDeviceModule* adm_sc);
 
-  // Starts AEC dump using existing file.
-  bool StartAecDump(FILE* file);
-
   // Check whether the supplied trace should be ignored.
   bool ShouldIgnoreTrace(const std::string& trace);
 

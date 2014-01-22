@@ -1433,22 +1433,6 @@ bool WebRtcVoiceEngine::SetAudioDeviceModule(webrtc::AudioDeviceModule* adm,
   return true;
 }
 
-bool WebRtcVoiceEngine::StartAecDump(FILE* file) {
-#ifdef USE_WEBRTC_DEV_BRANCH
-  StopAecDump();
-  if (voe_wrapper_->processing()->StartDebugRecording(file) !=
-      webrtc::AudioProcessing::kNoError) {
-    LOG_RTCERR1(StartDebugRecording, "FILE*");
-    fclose(file);
-    return false;
-  }
-  is_dumping_aec_ = true;
-  return true;
-#else
-  return false;
-#endif
-}
-
 bool WebRtcVoiceEngine::RegisterProcessor(
     uint32 ssrc,
     VoiceProcessor* voice_processor,
@@ -1606,7 +1590,7 @@ void WebRtcVoiceEngine::StartAecDump(const std::string& filename) {
     // Start dumping AEC when we are not dumping.
     if (voe_wrapper_->processing()->StartDebugRecording(
         filename.c_str()) != webrtc::AudioProcessing::kNoError) {
-      LOG_RTCERR1(StartDebugRecording, filename.c_str());
+      LOG_RTCERR0(StartDebugRecording);
     } else {
       is_dumping_aec_ = true;
     }
