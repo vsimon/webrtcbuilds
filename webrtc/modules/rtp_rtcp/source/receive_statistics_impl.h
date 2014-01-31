@@ -45,7 +45,7 @@ class StreamStatisticianImpl : public StreamStatistician {
 
  private:
   bool InOrderPacketInternal(uint16_t sequence_number) const;
-  RtcpStatistics CalculateStatistics();
+  RtcpStatistics CalculateRtcpStatistics();
 
   Clock* clock_;
   scoped_ptr<CriticalSectionWrapper> stream_lock_;

@@ -176,6 +176,7 @@ void StreamStatisticianImpl::SetMaxReorderingThreshold(
 
 bool StreamStatisticianImpl::GetStatistics(RtcpStatistics* statistics,
                                            bool reset) {
+  uint32_t ssrc;
   {
     CriticalSectionScoped cs(stream_lock_.get());
     if (received_seq_first_ == 0 && received_byte_count_ == 0) {
@@ -193,14 +194,16 @@ bool StreamStatisticianImpl::GetStatistics(RtcpStatistics* statistics,
       return true;
     }
 
-    *statistics = CalculateStatistics();
+    *statistics = CalculateRtcpStatistics();
+    ssrc = ssrc_;
   }
 
-  rtcp_callback_->StatisticsUpdated(*statistics, ssrc_);
+  rtcp_callback_->StatisticsUpdated(*statistics, ssrc);
+
   return true;
 }
 
-RtcpStatistics StreamStatisticianImpl::CalculateStatistics() {
+RtcpStatistics StreamStatisticianImpl::CalculateRtcpStatistics() {
   RtcpStatistics stats;
 
   if (last_report_inorder_packets_ == 0) {
