@@ -169,7 +169,7 @@ void ScreenCapturerWin::Capture(const DesktopRegion& region) {
 
   const DesktopFrame* current_frame = queue_.current_frame();
   const DesktopFrame* last_frame = queue_.previous_frame();
-  if (last_frame) {
+  if (last_frame && last_frame->size().equals(current_frame->size())) {
     // Make sure the differencer is set up correctly for these previous and
     // current screens.
     if (!differ_.get() ||
