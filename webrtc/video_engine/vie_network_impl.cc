@@ -197,4 +197,33 @@ int ViENetworkImpl::SetMTU(int video_channel, unsigned int mtu) {
   }
   return 0;
 }
+
+int ViENetworkImpl::ReceivedBWEPacket(const int video_channel,
+    int64_t arrival_time_ms, int payload_size, const RTPHeader& header) {
+  WEBRTC_TRACE(kTraceStream, kTraceVideo,
+               ViEId(shared_data_->instance_id(), video_channel),
+               "%s(channel: %d, time: %d, size: %d, ssrc: %u)", __FUNCTION__,
+               video_channel, arrival_time_ms, payload_size, header.ssrc);
+  ViEChannelManagerScoped cs(*(shared_data_->channel_manager()));
+  ViEChannel* vie_channel = cs.Channel(video_channel);
+  if (!vie_channel) {
+    WEBRTC_TRACE(kTraceError, kTraceVideo,
+                 ViEId(shared_data_->instance_id(), video_channel),
+                 "Channel doesn't exist");
+    shared_data_->SetLastError(kViENetworkInvalidChannelId);
+    return -1;
+  }
+
+  vie_channel->ReceivedBWEPacket(arrival_time_ms, payload_size, header);
+  return 0;
+}
+
+bool ViENetworkImpl::SetBandwidthEstimationConfig(
+    int video_channel, const webrtc::Config& config) {
+  WEBRTC_TRACE(kTraceApiCall, kTraceVideo,
+               ViEId(shared_data_->instance_id(), video_channel),
+               "%s(channel: %d)", __FUNCTION__, video_channel);
+  return shared_data_->channel_manager()->SetBandwidthEstimationConfig(
+      video_channel, config);
+}
 }  // namespace webrtc

@@ -11,9 +11,9 @@
 #include "webrtc/modules/desktop_capture/window_capturer.h"
 
 #include <assert.h>
-#include <windows.h>
 
 #include "webrtc/modules/desktop_capture/desktop_frame_win.h"
+#include "webrtc/modules/desktop_capture/win/window_capture_utils.h"
 #include "webrtc/system_wrappers/interface/logging.h"
 #include "webrtc/system_wrappers/interface/scoped_ptr.h"
 
@@ -89,6 +89,7 @@ class WindowCapturerWin : public WindowCapturer {
   // WindowCapturer interface.
   virtual bool GetWindowList(WindowList* windows) OVERRIDE;
   virtual bool SelectWindow(WindowId id) OVERRIDE;
+  virtual bool BringSelectedWindowToFront() OVERRIDE;
 
   // DesktopCapturer interface.
   virtual void Start(Callback* callback) OVERRIDE;
@@ -157,6 +158,16 @@ bool WindowCapturerWin::SelectWindow(WindowId id) {
   return true;
 }
 
+bool WindowCapturerWin::BringSelectedWindowToFront() {
+  if (!window_)
+    return false;
+
+  if (!IsWindow(window_) || !IsWindowVisible(window_) || IsIconic(window_))
+    return false;
+
+  return SetForegroundWindow(window_) != 0;
+}
+
 void WindowCapturerWin::Start(Callback* callback) {
   assert(!callback_);
   assert(callback);
@@ -177,9 +188,10 @@ void WindowCapturerWin::Capture(const DesktopRegion& region) {
     return;
   }
 
-  RECT rect;
-  if (!GetWindowRect(window_, &rect)) {
-    LOG(LS_WARNING) << "Failed to get window size: " << GetLastError();
+  DesktopRect original_rect;
+  DesktopRect cropped_rect;
+  if (!GetCroppedWindowRect(window_, &cropped_rect, &original_rect)) {
+    LOG(LS_WARNING) << "Failed to get window info: " << GetLastError();
     callback_->OnCaptureCompleted(NULL);
     return;
   }
@@ -192,8 +204,7 @@ void WindowCapturerWin::Capture(const DesktopRegion& region) {
   }
 
   scoped_ptr<DesktopFrameWin> frame(DesktopFrameWin::Create(
-      DesktopSize(rect.right - rect.left, rect.bottom - rect.top),
-      NULL, window_dc));
+      cropped_rect.size(), NULL, window_dc));
   if (!frame.get()) {
     ReleaseDC(window_, window_dc);
     callback_->OnCaptureCompleted(NULL);
@@ -228,7 +239,10 @@ void WindowCapturerWin::Capture(const DesktopRegion& region) {
   // Aero is enabled or PrintWindow() failed, use BitBlt.
   if (!result) {
     result = BitBlt(mem_dc, 0, 0, frame->size().width(), frame->size().height(),
-                    window_dc, 0, 0, SRCCOPY);
+                    window_dc,
+                    cropped_rect.left() - original_rect.left(),
+                    cropped_rect.top() - original_rect.top(),
+                    SRCCOPY);
   }
 
   SelectObject(mem_dc, previous_object);

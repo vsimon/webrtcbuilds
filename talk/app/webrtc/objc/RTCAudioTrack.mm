@@ -29,9 +29,9 @@
 #error "This file requires ARC support."
 #endif
 
-#import "RTCAudioTrack+internal.h"
+#import "RTCAudioTrack+Internal.h"
 
-#import "RTCMediaStreamTrack+internal.h"
+#import "RTCMediaStreamTrack+Internal.h"
 
 @implementation RTCAudioTrack
 @end
@@ -39,7 +39,7 @@
 @implementation RTCAudioTrack (Internal)
 
 - (talk_base::scoped_refptr<webrtc::AudioTrackInterface>)audioTrack {
-  return static_cast<webrtc::AudioTrackInterface *>(self.mediaTrack.get());
+  return static_cast<webrtc::AudioTrackInterface*>(self.mediaTrack.get());
 }
 
 @end

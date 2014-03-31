@@ -227,6 +227,15 @@ void OpusTest::Run(TestPackStereo* channel, int channels, int bitrate,
   EXPECT_EQ(0, WebRtcOpus_SetBitRate(opus_mono_encoder_, bitrate));
   EXPECT_EQ(0, WebRtcOpus_SetBitRate(opus_stereo_encoder_, bitrate));
 
+#if defined(WEBRTC_ANDROID) || defined(WEBRTC_IOS) || defined(WEBRTC_ARCH_ARM)
+  // If we are on Android, iOS and/or ARM, use a lower complexity setting as
+  // default.
+  const int kOpusComplexity5 = 5;
+  EXPECT_EQ(0, WebRtcOpus_SetComplexity(opus_mono_encoder_, kOpusComplexity5));
+  EXPECT_EQ(0, WebRtcOpus_SetComplexity(opus_stereo_encoder_,
+                                        kOpusComplexity5));
+#endif
+
   // Make sure the runtime is less than 60 seconds to pass Android test.
   for (size_t audio_length = 0; audio_length < 10000; audio_length += 10) {
     bool lost_packet = false;
@@ -333,6 +342,11 @@ void OpusTest::Run(TestPackStereo* channel, int channels, int bitrate,
 
     // Write stand-alone speech to file.
     out_file_standalone_.Write10MsData(out_audio, decoded_samples * channels);
+
+    // Number of channels should be the same for both stand-alone and
+    // ACM-decoding.
+    EXPECT_EQ(audio_frame.num_channels_, channels);
+
     decoded_samples = 0;
   }
 

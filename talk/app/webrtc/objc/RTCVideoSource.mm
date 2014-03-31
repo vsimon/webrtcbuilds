@@ -29,8 +29,8 @@
 #error "This file requires ARC support."
 #endif
 
-#import "RTCVideoSource+internal.h"
-#import "RTCMediaSource+internal.h"
+#import "RTCVideoSource+Internal.h"
+#import "RTCMediaSource+Internal.h"
 
 @implementation RTCVideoSource
 @end
@@ -38,7 +38,7 @@
 @implementation RTCVideoSource (Internal)
 
 - (talk_base::scoped_refptr<webrtc::VideoSourceInterface>)videoSource {
-  return static_cast<webrtc::VideoSourceInterface *>(self.mediaSource.get());
+  return static_cast<webrtc::VideoSourceInterface*>(self.mediaSource.get());
 }
 
 @end

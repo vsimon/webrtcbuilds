@@ -8,6 +8,12 @@
  *  be found in the AUTHORS file in the root of the source tree.
  */
 
+#if !defined(__has_feature) || !__has_feature(objc_arc)
+#error "This file requires ARC support."
+#endif
+
+#import <UIKit/UIKit.h>
+
 #import "webrtc/modules/video_capture/ios/device_info_ios_objc.h"
 #import "webrtc/modules/video_capture/ios/rtc_video_capture_ios_objc.h"
 
@@ -18,10 +24,17 @@ using namespace webrtc::videocapturemodule;
 
 @interface RTCVideoCaptureIosObjC (hidden)
 - (int)changeCaptureInputWithName:(NSString*)captureDeviceName;
-
 @end
 
-@implementation RTCVideoCaptureIosObjC
+@implementation RTCVideoCaptureIosObjC {
+  webrtc::videocapturemodule::VideoCaptureIos* _owner;
+  webrtc::VideoCaptureCapability _capability;
+  AVCaptureSession* _captureSession;
+  int _captureId;
+  AVCaptureConnection* _connection;
+  BOOL _captureStarting;  // Guarded by _captureStartingCondition.
+  NSCondition* _captureStartingCondition;
+}
 
 @synthesize frameRotation = _framRotation;
 
@@ -30,8 +43,10 @@ using namespace webrtc::videocapturemodule;
     _owner = owner;
     _captureId = captureId;
     _captureSession = [[AVCaptureSession alloc] init];
+    _captureStarting = NO;
+    _captureStartingCondition = [[NSCondition alloc] init];
 
-    if (!_captureSession) {
+    if (!_captureSession || !_captureStartingCondition) {
       return nil;
     }
 
@@ -81,7 +96,6 @@ using namespace webrtc::videocapturemodule;
 
 - (void)dealloc {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
-  [super dealloc];
 }
 
 - (BOOL)setCaptureDeviceByUniqueId:(NSString*)uniqueId {
@@ -139,6 +153,17 @@ using namespace webrtc::videocapturemodule;
     return NO;
   }
 
+  AVCaptureVideoDataOutput* currentOutput =
+      (AVCaptureVideoDataOutput*)[currentOutputs objectAtIndex:0];
+
+  dispatch_async(
+      dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+      ^(void) { [self startCaptureInBackgroundWithOutput:currentOutput]; });
+  return YES;
+}
+
+- (void)startCaptureInBackgroundWithOutput:
+            (AVCaptureVideoDataOutput*)currentOutput {
   NSString* captureQuality =
       [NSString stringWithString:AVCaptureSessionPresetLow];
   if (_capability.width >= 1920 || _capability.height >= 1080) {
@@ -151,9 +176,6 @@ using namespace webrtc::videocapturemodule;
   } else if (_capability.width >= 352 || _capability.height >= 288) {
     captureQuality = [NSString stringWithString:AVCaptureSessionPreset352x288];
   }
-
-  AVCaptureVideoDataOutput* currentOutput =
-      (AVCaptureVideoDataOutput*)[currentOutputs objectAtIndex:0];
 
   // begin configuration for the AVCaptureSession
   [_captureSession beginConfiguration];
@@ -174,9 +196,10 @@ using namespace webrtc::videocapturemodule;
 
   [_captureSession startRunning];
 
-  [captureQuality release];
-
-  return YES;
+  [_captureStartingCondition lock];
+  _captureStarting = NO;
+  [_captureStartingCondition signal];
+  [_captureStartingCondition unlock];
 }
 
 - (void)setRelativeVideoOrientation {
@@ -199,7 +222,8 @@ using namespace webrtc::videocapturemodule;
   }
 }
 
-- (void)onVideoError {
+- (void)onVideoError:(NSNotification*)notification {
+  NSLog(@"onVideoError: %@", notification);
   // TODO(sjlee): make the specific error handling with this notification.
   WEBRTC_TRACE(kTraceError,
                kTraceVideoCapture,
@@ -211,6 +235,7 @@ using namespace webrtc::videocapturemodule;
 }
 
 - (BOOL)stopCapture {
+  [self waitForCaptureStartToFinish];
   if (!_captureSession) {
     return NO;
   }
@@ -316,4 +341,11 @@ using namespace webrtc::videocapturemodule;
   CVPixelBufferUnlockBaseAddress(videoFrame, kFlags);
 }
 
+- (void)waitForCaptureStartToFinish {
+  [_captureStartingCondition lock];
+  while (_captureStarting) {
+    [_captureStartingCondition wait];
+  }
+  [_captureStartingCondition unlock];
+}
 @end

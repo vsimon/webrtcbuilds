@@ -78,19 +78,19 @@ deps = {
     From("chromium_deps", "src/third_party/libsrtp"),
 
   "third_party/libvpx":
-    Var("chromium_trunk") + "/deps/third_party/libvpx@254609",
+    Var("chromium_trunk") + "/deps/third_party/libvpx@259973",
 
   "third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@979",
+    (Var("googlecode_url") % "libyuv") + "/trunk@985",
 
   "third_party/opus":
-    Var("chromium_trunk") + "/src/third_party/opus@245176",
+    Var("chromium_trunk") + "/src/third_party/opus@258909",
 
   "third_party/opus/src":
-    Var("chromium_trunk") + "/deps/third_party/opus@239448",
+    Var("chromium_trunk") + "/deps/third_party/opus@256783",
 
   "third_party/protobuf":
-    Var("chromium_trunk") + "/src/third_party/protobuf@" + Var("chromium_revision"),
+    Var("chromium_trunk") + "/src/third_party/protobuf@251211",
 
   "third_party/sqlite/":
     Var("chromium_trunk") + "/src/third_party/sqlite@" + Var("chromium_revision"),

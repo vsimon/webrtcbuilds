@@ -302,7 +302,8 @@ class RTPSender : public RTPSenderInterface, public Bitrate::Observer {
   bool PrepareAndSendPacket(uint8_t* buffer,
                             uint16_t length,
                             int64_t capture_time_ms,
-                            bool send_over_rtx);
+                            bool send_over_rtx,
+                            bool is_retransmit);
 
   int SendRedundantPayloads(int payload_type, int bytes);
 
@@ -325,6 +326,9 @@ class RTPSender : public RTPSenderInterface, public Bitrate::Observer {
                       bool is_retransmit);
   bool IsFecPacket(const uint8_t* buffer, const RTPHeader& header) const;
 
+  void SetTargetBitrateKbps(uint16_t bitrate_kbps);
+  uint16_t GetTargetBitrateKbps();
+
   Clock* clock_;
   Bitrate bitrate_sent_;
 
@@ -340,10 +344,9 @@ class RTPSender : public RTPSenderInterface, public Bitrate::Observer {
   bool sending_media_ GUARDED_BY(send_critsect_);
 
   uint16_t max_payload_length_;
-  uint16_t target_send_bitrate_;
   uint16_t packet_over_head_;
 
-  int8_t payload_type_;
+  int8_t payload_type_ GUARDED_BY(send_critsect_);
   std::map<int8_t, ModuleRTPUtility::Payload *> payload_type_map_;
 
   RtpHeaderExtensionMap rtp_header_extension_map_;
@@ -387,6 +390,13 @@ class RTPSender : public RTPSenderInterface, public Bitrate::Observer {
   int rtx_;
   uint32_t ssrc_rtx_;
   int payload_type_rtx_;
+
+  // Note: Don't access this variable directly, always go through
+  // SetTargetBitrateKbps or GetTargetBitrateKbps. Also remember
+  // that by the time the function returns there is no guarantee
+  // that the target bitrate is still valid.
+  scoped_ptr<CriticalSectionWrapper> target_bitrate_critsect_;
+  uint16_t target_bitrate_kbps_ GUARDED_BY(target_bitrate_critsect_);
 };
 
 }  // namespace webrtc

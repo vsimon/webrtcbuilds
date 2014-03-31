@@ -48,64 +48,61 @@
 @interface RTCPeerConnectionTest : NSObject
 
 // Returns whether the two sessions are of the same type.
-+ (BOOL)isSession:(RTCSessionDescription *)session1
-    ofSameTypeAsSession:(RTCSessionDescription *)session2;
++ (BOOL)isSession:(RTCSessionDescription*)session1
+    ofSameTypeAsSession:(RTCSessionDescription*)session2;
 
 // Create and add tracks to pc, with the given source, label, and IDs
-- (RTCMediaStream *)
-    addTracksToPeerConnection:(RTCPeerConnection *)pc
-                  withFactory:(RTCPeerConnectionFactory *)factory
-                  videoSource:(RTCVideoSource *)videoSource
-                  streamLabel:(NSString *)streamLabel
-                 videoTrackID:(NSString *)videoTrackID
-                 audioTrackID:(NSString *)audioTrackID;
+- (RTCMediaStream*)addTracksToPeerConnection:(RTCPeerConnection*)pc
+                                 withFactory:(RTCPeerConnectionFactory*)factory
+                                 videoSource:(RTCVideoSource*)videoSource
+                                 streamLabel:(NSString*)streamLabel
+                                videoTrackID:(NSString*)videoTrackID
+                                audioTrackID:(NSString*)audioTrackID;
 
-- (void)testCompleteSession;
+- (void)testCompleteSessionWithFactory:(RTCPeerConnectionFactory*)factory;
 
 @end
 
 @implementation RTCPeerConnectionTest
 
-+ (BOOL)isSession:(RTCSessionDescription *)session1
-    ofSameTypeAsSession:(RTCSessionDescription *)session2 {
++ (BOOL)isSession:(RTCSessionDescription*)session1
+    ofSameTypeAsSession:(RTCSessionDescription*)session2 {
   return [session1.type isEqual:session2.type];
 }
 
-- (RTCMediaStream *)
-    addTracksToPeerConnection:(RTCPeerConnection *)pc
-                  withFactory:(RTCPeerConnectionFactory *)factory
-                  videoSource:(RTCVideoSource *)videoSource
-                  streamLabel:(NSString *)streamLabel
-                 videoTrackID:(NSString *)videoTrackID
-                 audioTrackID:(NSString *)audioTrackID {
-  RTCMediaStream *localMediaStream = [factory mediaStreamWithLabel:streamLabel];
-  RTCVideoTrack *videoTrack =
+- (RTCMediaStream*)addTracksToPeerConnection:(RTCPeerConnection*)pc
+                                 withFactory:(RTCPeerConnectionFactory*)factory
+                                 videoSource:(RTCVideoSource*)videoSource
+                                 streamLabel:(NSString*)streamLabel
+                                videoTrackID:(NSString*)videoTrackID
+                                audioTrackID:(NSString*)audioTrackID {
+  RTCMediaStream* localMediaStream = [factory mediaStreamWithLabel:streamLabel];
+  RTCVideoTrack* videoTrack =
       [factory videoTrackWithID:videoTrackID source:videoSource];
-  RTCVideoRenderer *videoRenderer =
+  RTCVideoRenderer* videoRenderer =
       [[RTCVideoRenderer alloc] initWithDelegate:nil];
   [videoTrack addRenderer:videoRenderer];
   [localMediaStream addVideoTrack:videoTrack];
   // Test that removal/re-add works.
   [localMediaStream removeVideoTrack:videoTrack];
   [localMediaStream addVideoTrack:videoTrack];
-  RTCAudioTrack *audioTrack = [factory audioTrackWithID:audioTrackID];
+  RTCAudioTrack* audioTrack = [factory audioTrackWithID:audioTrackID];
   [localMediaStream addAudioTrack:audioTrack];
-  RTCMediaConstraints *constraints = [[RTCMediaConstraints alloc] init];
+  RTCMediaConstraints* constraints = [[RTCMediaConstraints alloc] init];
   [pc addStream:localMediaStream constraints:constraints];
   return localMediaStream;
 }
 
-- (void)testCompleteSession {
-  RTCPeerConnectionFactory *factory = [[RTCPeerConnectionFactory alloc] init];
-  RTCMediaConstraints *constraints = [[RTCMediaConstraints alloc] init];
-  RTCPeerConnectionSyncObserver *offeringExpectations =
+- (void)testCompleteSessionWithFactory:(RTCPeerConnectionFactory*)factory {
+  RTCMediaConstraints* constraints = [[RTCMediaConstraints alloc] init];
+  RTCPeerConnectionSyncObserver* offeringExpectations =
       [[RTCPeerConnectionSyncObserver alloc] init];
   RTCPeerConnection* pcOffer =
       [factory peerConnectionWithICEServers:nil
                                 constraints:constraints
                                    delegate:offeringExpectations];
 
-  RTCPeerConnectionSyncObserver *answeringExpectations =
+  RTCPeerConnectionSyncObserver* answeringExpectations =
       [[RTCPeerConnectionSyncObserver alloc] init];
 
   RTCPeerConnection* pcAnswer =
@@ -113,51 +110,48 @@
                                 constraints:constraints
                                    delegate:answeringExpectations];
   // TODO(hughv): Create video capturer
-  RTCVideoCapturer *capturer = nil;
-  RTCVideoSource *videoSource =
+  RTCVideoCapturer* capturer = nil;
+  RTCVideoSource* videoSource =
       [factory videoSourceWithCapturer:capturer constraints:constraints];
 
   // Here and below, "oLMS" refers to offerer's local media stream, and "aLMS"
   // refers to the answerer's local media stream, with suffixes of "a0" and "v0"
   // for audio and video tracks, resp.  These mirror chrome historical naming.
-  RTCMediaStream *oLMSUnused =
-      [self addTracksToPeerConnection:pcOffer
-                          withFactory:factory
-                          videoSource:videoSource
-                          streamLabel:@"oLMS"
-                         videoTrackID:@"oLMSv0"
-                         audioTrackID:@"oLMSa0"];
-  RTCSessionDescriptionSyncObserver *sdpObserver =
+  RTCMediaStream* oLMSUnused = [self addTracksToPeerConnection:pcOffer
+                                                   withFactory:factory
+                                                   videoSource:videoSource
+                                                   streamLabel:@"oLMS"
+                                                  videoTrackID:@"oLMSv0"
+                                                  audioTrackID:@"oLMSa0"];
+  RTCSessionDescriptionSyncObserver* sdpObserver =
       [[RTCSessionDescriptionSyncObserver alloc] init];
   [pcOffer createOfferWithDelegate:sdpObserver constraints:constraints];
   [sdpObserver wait];
   EXPECT_TRUE(sdpObserver.success);
-  RTCSessionDescription *offerSDP = sdpObserver.sessionDescription;
+  RTCSessionDescription* offerSDP = sdpObserver.sessionDescription;
   EXPECT_EQ([@"offer" compare:offerSDP.type options:NSCaseInsensitiveSearch],
             NSOrderedSame);
   EXPECT_GT([offerSDP.description length], 0);
 
   sdpObserver = [[RTCSessionDescriptionSyncObserver alloc] init];
-  [answeringExpectations
-      expectSignalingChange:RTCSignalingHaveRemoteOffer];
+  [answeringExpectations expectSignalingChange:RTCSignalingHaveRemoteOffer];
   [answeringExpectations expectAddStream:@"oLMS"];
   [pcAnswer setRemoteDescriptionWithDelegate:sdpObserver
                           sessionDescription:offerSDP];
   [sdpObserver wait];
 
-  RTCMediaStream *aLMSUnused =
-      [self addTracksToPeerConnection:pcAnswer
-                          withFactory:factory
-                          videoSource:videoSource
-                          streamLabel:@"aLMS"
-                         videoTrackID:@"aLMSv0"
-                         audioTrackID:@"aLMSa0"];
+  RTCMediaStream* aLMSUnused = [self addTracksToPeerConnection:pcAnswer
+                                                   withFactory:factory
+                                                   videoSource:videoSource
+                                                   streamLabel:@"aLMS"
+                                                  videoTrackID:@"aLMSv0"
+                                                  audioTrackID:@"aLMSa0"];
 
   sdpObserver = [[RTCSessionDescriptionSyncObserver alloc] init];
   [pcAnswer createAnswerWithDelegate:sdpObserver constraints:constraints];
   [sdpObserver wait];
   EXPECT_TRUE(sdpObserver.success);
-  RTCSessionDescription *answerSDP = sdpObserver.sessionDescription;
+  RTCSessionDescription* answerSDP = sdpObserver.sessionDescription;
   EXPECT_EQ([@"answer" compare:answerSDP.type options:NSCaseInsensitiveSearch],
             NSOrderedSame);
   EXPECT_GT([answerSDP.description length], 0);
@@ -203,12 +197,12 @@
   EXPECT_TRUE([offerSDP.type isEqual:pcAnswer.remoteDescription.type]);
   EXPECT_TRUE([answerSDP.type isEqual:pcAnswer.localDescription.type]);
 
-  for (RTCICECandidate *candidate in
-       offeringExpectations.releaseReceivedICECandidates) {
+  for (RTCICECandidate* candidate in offeringExpectations
+           .releaseReceivedICECandidates) {
     [pcAnswer addICECandidate:candidate];
   }
-  for (RTCICECandidate *candidate in
-       answeringExpectations.releaseReceivedICECandidates) {
+  for (RTCICECandidate* candidate in answeringExpectations
+           .releaseReceivedICECandidates) {
     [pcOffer addICECandidate:candidate];
   }
 
@@ -221,7 +215,24 @@
   [[NSRunLoop currentRunLoop]
       runUntilDate:[NSDate dateWithTimeIntervalSinceNow:2]];
 
-  // TODO(hughv): Implement orderly shutdown.
+  [offeringExpectations expectICEConnectionChange:RTCICEConnectionClosed];
+  [answeringExpectations expectICEConnectionChange:RTCICEConnectionClosed];
+  [offeringExpectations expectSignalingChange:RTCSignalingClosed];
+  [answeringExpectations expectSignalingChange:RTCSignalingClosed];
+
+  [pcOffer close];
+  [pcAnswer close];
+
+  [offeringExpectations waitForAllExpectationsToBeSatisfied];
+  [answeringExpectations waitForAllExpectationsToBeSatisfied];
+
+  capturer = nil;
+  videoSource = nil;
+  pcOffer = nil;
+  pcAnswer = nil;
+  // TODO(fischman): be stricter about shutdown checks; ensure thread
+  // counts return to where they were before the test kicked off, and
+  // that all objects have in fact shut down.
 }
 
 @end
@@ -230,8 +241,20 @@
 // RTCPeerConnectionTest and avoid the appearance of RTCPeerConnectionTest being
 // a TestBase since it's not.
 TEST(RTCPeerConnectionTest, SessionTest) {
-  talk_base::InitializeSSL();
-  RTCPeerConnectionTest *pcTest = [[RTCPeerConnectionTest alloc] init];
-  [pcTest testCompleteSession];
-  talk_base::CleanupSSL();
+  @autoreleasepool {
+    talk_base::InitializeSSL();
+    // Since |factory| will own the signaling & worker threads, it's important
+    // that it outlive the created PeerConnections since they self-delete on the
+    // signaling thread, and if |factory| is freed first then a last refcount on
+    // the factory will expire during this teardown, causing the signaling
+    // thread to try to Join() with itself.  This is a hack to ensure that the
+    // factory outlives RTCPeerConnection:dealloc.
+    // See https://code.google.com/p/webrtc/issues/detail?id=3100.
+    RTCPeerConnectionFactory* factory = [[RTCPeerConnectionFactory alloc] init];
+    @autoreleasepool {
+      RTCPeerConnectionTest* pcTest = [[RTCPeerConnectionTest alloc] init];
+      [pcTest testCompleteSessionWithFactory:factory];
+    }
+    talk_base::CleanupSSL();
+  }
 }

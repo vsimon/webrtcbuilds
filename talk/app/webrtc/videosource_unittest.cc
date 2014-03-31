@@ -370,8 +370,6 @@ TEST_F(VideoSourceTest, SetValidOptionValues) {
       MediaConstraintsInterface::kTemporalLayeredScreencast, "false");
   constraints.AddOptional(
       MediaConstraintsInterface::kLeakyBucket, "true");
-  constraints.AddOptional(
-      MediaConstraintsInterface::kCpuOveruseDetection, "true");
 
   CreateVideoSource(&constraints);
 
@@ -383,8 +381,6 @@ TEST_F(VideoSourceTest, SetValidOptionValues) {
   EXPECT_FALSE(value);
   EXPECT_TRUE(source_->options()->video_leaky_bucket.Get(&value));
   EXPECT_TRUE(value);
-  EXPECT_TRUE(source_->options()->
-      cpu_overuse_detection.GetWithDefaultIfUnset(false));
 }
 
 TEST_F(VideoSourceTest, OptionNotSet) {
@@ -392,7 +388,6 @@ TEST_F(VideoSourceTest, OptionNotSet) {
   CreateVideoSource(&constraints);
   bool value;
   EXPECT_FALSE(source_->options()->video_noise_reduction.Get(&value));
-  EXPECT_FALSE(source_->options()->cpu_overuse_detection.Get(&value));
 }
 
 TEST_F(VideoSourceTest, MandatoryOptionOverridesOptional) {

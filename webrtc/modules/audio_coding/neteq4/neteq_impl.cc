@@ -512,6 +512,19 @@ int NetEqImpl::InsertPacketInternal(const WebRtcRTPHeader& rtp_header,
     memcpy(&main_header, &packet_list.front()->header, sizeof(main_header));
   }
 
+  // Check for FEC in packets, and separate payloads into several packets.
+  int ret = payload_splitter_->SplitFec(&packet_list, decoder_database_.get());
+  if (ret != PayloadSplitter::kOK) {
+    LOG_FERR1(LS_WARNING, SplitFec, packet_list.size());
+    PacketBuffer::DeleteAllPackets(&packet_list);
+    switch (ret) {
+      case PayloadSplitter::kUnknownPayloadType:
+        return kUnknownRtpPayloadType;
+      default:
+        return kOtherError;
+    }
+  }
+
   // Check payload types.
   if (decoder_database_->CheckPayloadTypes(packet_list) ==
       DecoderDatabase::kDecoderNotFound) {
@@ -561,7 +574,7 @@ int NetEqImpl::InsertPacketInternal(const WebRtcRTPHeader& rtp_header,
   // Split payloads into smaller chunks. This also verifies that all payloads
   // are of a known payload type. SplitAudio() method is protected against
   // sync-packets.
-  int ret = payload_splitter_->SplitAudio(&packet_list, *decoder_database_);
+  ret = payload_splitter_->SplitAudio(&packet_list, *decoder_database_);
   if (ret != PayloadSplitter::kOK) {
     LOG_FERR1(LS_WARNING, SplitAudio, packet_list.size());
     PacketBuffer::DeleteAllPackets(&packet_list);
@@ -1132,12 +1145,11 @@ int NetEqImpl::Decode(PacketList* packet_list, Operations* operation,
           PacketBuffer::DeleteAllPackets(packet_list);
           return kDecoderNotFound;
         }
-        // We should have correct sampling rate and number of channels. They
-        // are set when packets are inserted.
+        // If sampling rate or number of channels has changed, we need to make
+        // a reset.
         if (decoder_info->fs_hz != fs_hz_ ||
             decoder->channels() != algorithm_buffer_->Channels()) {
-          LOG_F(LS_ERROR) << "Sampling rate or number of channels mismatch.";
-          assert(false);
+          // TODO(tlegrand): Add unittest to cover this event.
           SetSampleRateAndChannels(decoder_info->fs_hz, decoder->channels());
         }
         sync_buffer_->set_end_timestamp(timestamp_);
@@ -1777,8 +1789,14 @@ int NetEqImpl::ExtractPackets(int required_samples, PacketList* packet_list) {
     AudioDecoder* decoder = decoder_database_->GetDecoder(
         packet->header.payloadType);
     if (decoder) {
-      packet_duration = packet->sync_packet ? decoder_frame_length_ :
-          decoder->PacketDuration(packet->payload, packet->payload_length);
+      if (packet->sync_packet) {
+        packet_duration = decoder_frame_length_;
+      } else {
+        packet_duration = packet->primary ?
+            decoder->PacketDuration(packet->payload, packet->payload_length) :
+            decoder->PacketDurationRedundant(packet->payload,
+                                             packet->payload_length);
+      }
     } else {
       LOG_FERR1(LS_WARNING, GetDecoder, packet->header.payloadType) <<
           "Could not find a decoder for a packet about to be extracted.";

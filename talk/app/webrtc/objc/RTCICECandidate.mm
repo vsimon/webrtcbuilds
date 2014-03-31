@@ -29,7 +29,7 @@
 #error "This file requires ARC support."
 #endif
 
-#import "RTCICECandidate+internal.h"
+#import "RTCICECandidate+Internal.h"
 
 @implementation RTCICECandidate
 
@@ -37,9 +37,9 @@
 @synthesize sdpMLineIndex = _sdpMLineIndex;
 @synthesize sdp = _sdp;
 
-- (id)initWithMid:(NSString *)sdpMid
+- (id)initWithMid:(NSString*)sdpMid
             index:(NSInteger)sdpMLineIndex
-              sdp:(NSString *)sdp {
+              sdp:(NSString*)sdp {
   if (!sdpMid || !sdp) {
     NSAssert(NO, @"nil arguments not allowed");
     return nil;
@@ -52,18 +52,18 @@
   return self;
 }
 
-- (NSString *)description {
+- (NSString*)description {
   return [NSString stringWithFormat:@"%@:%ld:%@",
-          self.sdpMid,
-          (long)self.sdpMLineIndex,
-          self.sdp];
+                                    self.sdpMid,
+                                    (long)self.sdpMLineIndex,
+                                    self.sdp];
 }
 
 @end
 
 @implementation RTCICECandidate (Internal)
 
-- (id)initWithCandidate:(const webrtc::IceCandidateInterface *)candidate {
+- (id)initWithCandidate:(const webrtc::IceCandidateInterface*)candidate {
   if ((self = [super init])) {
     std::string sdp;
     if (candidate->ToString(&sdp)) {

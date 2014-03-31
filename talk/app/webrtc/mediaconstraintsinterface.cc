@@ -69,9 +69,29 @@ const char MediaConstraintsInterface::kNoiseReduction[] = "googNoiseReduction";
 const char MediaConstraintsInterface::kLeakyBucket[] = "googLeakyBucket";
 const char MediaConstraintsInterface::kTemporalLayeredScreencast[] =
     "googTemporalLayeredScreencast";
+
+// Google-specific PeerConnection constraint keys.
+const char MediaConstraintsInterface::kImprovedWifiBwe[] =
+    "googImprovedWifiBwe";
+const char MediaConstraintsInterface::kScreencastMinBitrate[] =
+    "googScreencastMinBitrate";
+const char MediaConstraintsInterface::kSkipEncodingUnusedStreams[] =
+    "googSkipEncodingUnusedStreams";
 // TODO(ronghuawu): Remove once cpu overuse detection is stable.
 const char MediaConstraintsInterface::kCpuOveruseDetection[] =
     "googCpuOveruseDetection";
+const char MediaConstraintsInterface::kCpuUnderuseThreshold[] =
+    "googCpuUnderuseThreshold";
+const char MediaConstraintsInterface::kCpuOveruseThreshold[] =
+    "googCpuOveruseThreshold";
+const char MediaConstraintsInterface::kCpuOveruseEncodeUsage[] =
+    "googCpuOveruseEncodeUsage";
+const char MediaConstraintsInterface::kHighStartBitrate[] =
+    "googHighStartBitrate";
+const char MediaConstraintsInterface::kHighBitrate[] =
+    "googHighBitrate";
+const char MediaConstraintsInterface::kVeryHighBitrate[] =
+    "googVeryHighBitrate";
 
 // Constraint keys for CreateOffer / CreateAnswer defined in W3C specification.
 const char MediaConstraintsInterface::kOfferToReceiveAudio[] =
@@ -93,6 +113,8 @@ const char MediaConstraintsInterface::kEnableRtpDataChannels[] =
     "RtpDataChannels";
 const char MediaConstraintsInterface::kEnableDscp[] = "googDscp";
 const char MediaConstraintsInterface::kEnableIPv6[] = "googIPv6";
+const char MediaConstraintsInterface::kEnableVideoSuspendBelowMinBitrate[] =
+    "googSuspendBelowMinBitrate";
 
 // Set |value| to the value associated with the first appearance of |key|, or
 // return false if |key| is not found.

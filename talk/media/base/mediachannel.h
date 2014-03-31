@@ -62,6 +62,7 @@ class VideoRenderer;
 const int kMinRtpHeaderExtensionId = 1;
 const int kMaxRtpHeaderExtensionId = 255;
 const int kScreencastDefaultFps = 5;
+const int kHighStartBitrate = 1500;
 
 // Used in AudioOptions and VideoOptions to signify "unset" values.
 template <class T>
@@ -307,7 +308,7 @@ struct VideoOptions {
     video_noise_reduction.SetFrom(change.video_noise_reduction);
     video_one_layer_screencast.SetFrom(change.video_one_layer_screencast);
     video_high_bitrate.SetFrom(change.video_high_bitrate);
-    video_watermark.SetFrom(change.video_watermark);
+    video_start_bitrate.SetFrom(change.video_start_bitrate);
     video_temporal_layer_screencast.SetFrom(
         change.video_temporal_layer_screencast);
     video_temporal_layer_realtime.SetFrom(
@@ -315,6 +316,9 @@ struct VideoOptions {
     video_leaky_bucket.SetFrom(change.video_leaky_bucket);
     video_highest_bitrate.SetFrom(change.video_highest_bitrate);
     cpu_overuse_detection.SetFrom(change.cpu_overuse_detection);
+    cpu_underuse_threshold.SetFrom(change.cpu_underuse_threshold);
+    cpu_overuse_threshold.SetFrom(change.cpu_overuse_threshold);
+    cpu_overuse_encode_usage.SetFrom(change.cpu_overuse_encode_usage);
     conference_mode.SetFrom(change.conference_mode);
     process_adaptation_threshhold.SetFrom(change.process_adaptation_threshhold);
     system_low_adaptation_threshhold.SetFrom(
@@ -327,6 +331,10 @@ struct VideoOptions {
     suspend_below_min_bitrate.SetFrom(change.suspend_below_min_bitrate);
     unsignalled_recv_stream_limit.SetFrom(change.unsignalled_recv_stream_limit);
     use_simulcast_adapter.SetFrom(change.use_simulcast_adapter);
+    skip_encoding_unused_streams.SetFrom(change.skip_encoding_unused_streams);
+    screencast_min_bitrate.SetFrom(change.screencast_min_bitrate);
+    use_improved_wifi_bandwidth_estimator.SetFrom(
+        change.use_improved_wifi_bandwidth_estimator);
   }
 
   bool operator==(const VideoOptions& o) const {
@@ -338,12 +346,15 @@ struct VideoOptions {
         video_noise_reduction == o.video_noise_reduction &&
         video_one_layer_screencast == o.video_one_layer_screencast &&
         video_high_bitrate == o.video_high_bitrate &&
-        video_watermark == o.video_watermark &&
+        video_start_bitrate == o.video_start_bitrate &&
         video_temporal_layer_screencast == o.video_temporal_layer_screencast &&
         video_temporal_layer_realtime == o.video_temporal_layer_realtime &&
         video_leaky_bucket == o.video_leaky_bucket &&
         video_highest_bitrate == o.video_highest_bitrate &&
         cpu_overuse_detection == o.cpu_overuse_detection &&
+        cpu_underuse_threshold == o.cpu_underuse_threshold &&
+        cpu_overuse_threshold == o.cpu_overuse_threshold &&
+        cpu_overuse_encode_usage == o.cpu_overuse_encode_usage &&
         conference_mode == o.conference_mode &&
         process_adaptation_threshhold == o.process_adaptation_threshhold &&
         system_low_adaptation_threshhold ==
@@ -355,7 +366,11 @@ struct VideoOptions {
         dscp == o.dscp &&
         suspend_below_min_bitrate == o.suspend_below_min_bitrate &&
         unsignalled_recv_stream_limit == o.unsignalled_recv_stream_limit &&
-        use_simulcast_adapter == o.use_simulcast_adapter;
+        use_simulcast_adapter == o.use_simulcast_adapter &&
+        skip_encoding_unused_streams == o.skip_encoding_unused_streams &&
+        screencast_min_bitrate == o.screencast_min_bitrate &&
+        use_improved_wifi_bandwidth_estimator ==
+            o.use_improved_wifi_bandwidth_estimator;
   }
 
   std::string ToString() const {
@@ -369,7 +384,7 @@ struct VideoOptions {
     ost << ToStringIfSet("noise reduction", video_noise_reduction);
     ost << ToStringIfSet("1 layer screencast", video_one_layer_screencast);
     ost << ToStringIfSet("high bitrate", video_high_bitrate);
-    ost << ToStringIfSet("watermark", video_watermark);
+    ost << ToStringIfSet("start bitrate", video_start_bitrate);
     ost << ToStringIfSet("video temporal layer screencast",
                          video_temporal_layer_screencast);
     ost << ToStringIfSet("video temporal layer realtime",
@@ -377,6 +392,10 @@ struct VideoOptions {
     ost << ToStringIfSet("leaky bucket", video_leaky_bucket);
     ost << ToStringIfSet("highest video bitrate", video_highest_bitrate);
     ost << ToStringIfSet("cpu overuse detection", cpu_overuse_detection);
+    ost << ToStringIfSet("cpu underuse threshold", cpu_underuse_threshold);
+    ost << ToStringIfSet("cpu overuse threshold", cpu_overuse_threshold);
+    ost << ToStringIfSet("cpu overuse encode usage",
+                         cpu_overuse_encode_usage);
     ost << ToStringIfSet("conference mode", conference_mode);
     ost << ToStringIfSet("process", process_adaptation_threshhold);
     ost << ToStringIfSet("low", system_low_adaptation_threshhold);
@@ -389,6 +408,11 @@ struct VideoOptions {
     ost << ToStringIfSet("num channels for early receive",
                          unsignalled_recv_stream_limit);
     ost << ToStringIfSet("use simulcast adapter", use_simulcast_adapter);
+    ost << ToStringIfSet("skip encoding unused streams",
+                         skip_encoding_unused_streams);
+    ost << ToStringIfSet("screencast min bitrate", screencast_min_bitrate);
+    ost << ToStringIfSet("improved wifi bwe",
+                         use_improved_wifi_bandwidth_estimator);
     ost << "}";
     return ost.str();
   }
@@ -409,8 +433,8 @@ struct VideoOptions {
   Settable<bool> video_one_layer_screencast;
   // Experimental: Enable WebRtc higher bitrate?
   Settable<bool> video_high_bitrate;
-  // Experimental: Add watermark to the rendered video image.
-  Settable<bool> video_watermark;
+  // Experimental: Enable WebRtc higher start bitrate?
+  Settable<int> video_start_bitrate;
   // Experimental: Enable WebRTC layered screencast.
   Settable<bool> video_temporal_layer_screencast;
   // Experimental: Enable WebRTC temporal layer strategy for realtime video.
@@ -418,11 +442,17 @@ struct VideoOptions {
   // Enable WebRTC leaky bucket when sending media packets.
   Settable<bool> video_leaky_bucket;
   // Set highest bitrate mode for video.
-  Settable<int> video_highest_bitrate;
+  Settable<HighestBitrate> video_highest_bitrate;
   // Enable WebRTC Cpu Overuse Detection, which is a new version of the CPU
   // adaptation algorithm. So this option will override the
   // |adapt_input_to_cpu_usage|.
   Settable<bool> cpu_overuse_detection;
+  // Low threshold for cpu overuse adaptation in ms.  (Adapt up)
+  Settable<int> cpu_underuse_threshold;
+  // High threshold for cpu overuse adaptation in ms.  (Adapt down)
+  Settable<int> cpu_overuse_threshold;
+  // Use encode usage for cpu detection.
+  Settable<bool> cpu_overuse_encode_usage;
   // Use conference mode?
   Settable<bool> conference_mode;
   // Threshhold for process cpu adaptation.  (Process limit)
@@ -444,6 +474,13 @@ struct VideoOptions {
   Settable<int> unsignalled_recv_stream_limit;
   // Enable use of simulcast adapter.
   Settable<bool> use_simulcast_adapter;
+  // Enables the encoder to skip encoding stream not actually sent due to too
+  // low available bit rate.
+  Settable<bool> skip_encoding_unused_streams;
+  // Force screencast to use a minimum bitrate
+  Settable<int> screencast_min_bitrate;
+  // Enable improved bandwidth estiamtor on wifi.
+  Settable<bool> use_improved_wifi_bandwidth_estimator;
 };
 
 // A class for playing out soundclips.

@@ -181,9 +181,7 @@ bool NewFormatWithConstraints(
   } else if (constraint.key == MediaConstraintsInterface::kNoiseReduction ||
              constraint.key == MediaConstraintsInterface::kLeakyBucket ||
              constraint.key ==
-                 MediaConstraintsInterface::kTemporalLayeredScreencast ||
-             constraint.key ==
-                 MediaConstraintsInterface::kCpuOveruseDetection) {
+                 MediaConstraintsInterface::kTemporalLayeredScreencast) {
     // These are actually options, not constraints, so they can be satisfied
     // regardless of the format.
     return true;
@@ -297,9 +295,6 @@ bool ExtractVideoOptions(const MediaConstraintsInterface* all_constraints,
   all_valid &= ExtractOption(all_constraints,
       MediaConstraintsInterface::kTemporalLayeredScreencast,
       &(options->video_temporal_layer_screencast));
-  all_valid &= ExtractOption(all_constraints,
-      MediaConstraintsInterface::kCpuOveruseDetection,
-      &(options->cpu_overuse_detection));
 
   return all_valid;
 }
