@@ -1706,7 +1706,9 @@ int AudioCodingModuleImpl::PlayoutData10Ms(int desired_freq_hz,
   }
 
   audio_frame->id_ = id_;
-  audio_frame->energy_ = 0;
+  // The energy must be -1 in order to have the energy calculated later on in
+  // the AudioConferenceMixer module.
+  audio_frame->energy_ = static_cast<uint32_t>(-1);
   audio_frame->timestamp_ = 0;
   return 0;
 }
