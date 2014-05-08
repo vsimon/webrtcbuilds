@@ -11,7 +11,7 @@ vars = {
   "googlecode_url": "http://%s.googlecode.com/svn",
   "sourceforge_url": "http://svn.code.sf.net/p/%(repo)s/code",
   "chromium_trunk" : "http://src.chromium.org/svn/trunk",
-  "chromium_revision": "260462",
+  "chromium_revision": "245382",
 
   # A small subset of WebKit is needed for the Android Python test framework.
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
@@ -45,9 +45,6 @@ deps = {
   "third_party/clang_format":
     Var("chromium_trunk") + "/src/third_party/clang_format@" + Var("chromium_revision"),
 
-  "third_party/clang_format/script":
-    From("chromium_deps", "src/third_party/clang_format/script"),
-
   "third_party/expat":
     Var("chromium_trunk") + "/src/third_party/expat@" + Var("chromium_revision"),
 
@@ -78,7 +75,7 @@ deps = {
     From("chromium_deps", "src/third_party/libsrtp"),
 
   "third_party/libvpx":
-    Var("chromium_trunk") + "/deps/third_party/libvpx@259973",
+    Var("chromium_trunk") + "/deps/third_party/libvpx@241571",
 
   "third_party/libyuv":
     (Var("googlecode_url") % "libyuv") + "/trunk@994",
