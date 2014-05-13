@@ -1192,11 +1192,6 @@ void ViEChannel::RegisterSendBitrateObserver(
   }
 }
 
-void ViEChannel::GetEstimatedReceiveBandwidth(
-    uint32_t* estimated_bandwidth) const {
-  vie_receiver_.EstimatedReceiveBandwidth(estimated_bandwidth);
-}
-
 void ViEChannel::GetReceiveBandwidthEstimatorStats(
     ReceiveBandwidthEstimatorStats* output) const {
   vie_receiver_.GetReceiveBandwidthEstimatorStats(output);
