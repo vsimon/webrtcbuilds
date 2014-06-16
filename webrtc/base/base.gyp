@@ -40,6 +40,7 @@
         'asynchttprequest.h',
         'asyncinvoker.cc',
         'asyncinvoker.h',
+        'asyncinvoker-inl.h',
         'asyncpacketsocket.h',
         'asyncresolverinterface.h',
         'asyncsocket.cc',
@@ -58,11 +59,13 @@
         'basicdefs.h',
         'basictypes.h',
         'bind.h',
+        'bind.h.pump',
         'buffer.h',
         'bytebuffer.cc',
         'bytebuffer.h',
         'byteorder.h',
         'callback.h',
+        'callback.h.pump',
         'checks.cc',
         'checks.h',
         'common.cc',
@@ -113,12 +116,15 @@
         'json.cc',
         'json.h',
         'latebindingsymboltable.cc',
+        'latebindingsymboltable.cc.def',
         'latebindingsymboltable.h',
+        'latebindingsymboltable.h.def',
         'libdbusglibsymboltable.cc',
         'libdbusglibsymboltable.h',
         'linux.cc',
         'linux.h',
         'linuxfdwalk.c',
+        'linuxfdwalk.h',
         'linuxwindowpicker.cc',
         'linuxwindowpicker.h',
         'linked_ptr.h',
@@ -197,6 +203,8 @@
         'refcount.h',
         'referencecountedsingletonfactory.h',
         'rollingaccumulator.h',
+        'safe_conversions.h',
+        'safe_conversions_impl.h',
         'schanneladapter.cc',
         'schanneladapter.h',
         'scoped_autorelease_pool.h',
@@ -260,6 +268,9 @@
         'testclient.h',
         'thread.cc',
         'thread.h',
+        'thread_checker.h',
+        'thread_checker_impl.cc',
+        'thread_checker_impl.h',
         'timeutils.cc',
         'timeutils.h',
         'timing.cc',
@@ -351,10 +362,6 @@
             'dbus.h',
             'diskcache_win32.cc',
             'diskcache_win32.h',
-            'fakecpumonitor.h',
-            'fakenetwork.h',
-            'fakesslidentity.h',
-            'faketaskrunner.h',
             'filelock.cc',
             'filelock.h',
             'fileutils_mock.h',
@@ -389,7 +396,6 @@
             'multipart.h',
             'natserver.cc',
             'natserver.h',
-            'natserver_main.cc',
             'natsocketfactory.cc',
             'natsocketfactory.h',
             'nattypes.cc',
@@ -419,8 +425,6 @@
             'testbase64.h',
             'testclient.cc',
             'testclient.h',
-            'testechoserver.h',
-            'testutils.h',
             'transformadapter.cc',
             'transformadapter.h',
             'versionparsing.cc',
@@ -433,7 +437,6 @@
             'win32socketinit.h',
             'win32socketserver.cc',
             'win32socketserver.h',
-            'win32toolhelp.h',
             'window.h',
             'windowpickerfactory.h',
             'windowpicker.h',
@@ -449,8 +452,22 @@
             ],
           },
         }, {
-          'dependencies': [
-            '<(DEPTH)/third_party/jsoncpp/jsoncpp.gyp:jsoncpp',
+          'conditions': [
+            ['external_libraries==0', {
+              'dependencies': [
+                '<(DEPTH)/third_party/jsoncpp/jsoncpp.gyp:jsoncpp',
+              ],
+            }, {
+              'include_dirs': [
+                '<(json_root)',
+              ],
+              'defines': [
+                # When defined changes the include path for json.h to where it
+                # is expected to be when building json outside of the standalone
+                # build.
+                'WEBRTC_EXTERNAL',
+              ],
+            }],
           ],
           'sources!': [
             '../overrides/webrtc/base/basictypes.h',
@@ -471,8 +488,16 @@
               'HAVE_OPENSSL_SSL_H',
             ],
           },
-          'dependencies': [
-            '<(DEPTH)/third_party/openssl/openssl.gyp:openssl',
+          'conditions': [
+            ['external_libraries==0', {
+              'dependencies': [
+                '<(DEPTH)/third_party/openssl/openssl.gyp:openssl',
+              ],
+            }, {
+              'include_dirs': [
+                '<(ssl_root)',
+              ],
+            }],
           ],
         }, {
           'defines': [
@@ -530,8 +555,16 @@
               ],
             },
           },
-          'dependencies': [
-            '<(DEPTH)/net/third_party/nss/ssl.gyp:libssl',
+           'conditions': [
+            ['external_libraries==0', {
+              'dependencies': [
+                '<(DEPTH)/net/third_party/nss/ssl.gyp:libssl',
+              ]
+            }, {
+              'include_dirs': [
+                '<(ssl_root)',
+              ],
+            }],
           ],
         }],
         ['OS=="linux"', {
@@ -690,15 +723,31 @@
           ],
         }],
         ['OS == "mac" or OS == "ios" or OS == "win"', {
-          'dependencies': [
-            '<(DEPTH)/net/third_party/nss/ssl.gyp:libssl',
-            '<(DEPTH)/third_party/nss/nss.gyp:nspr',
-            '<(DEPTH)/third_party/nss/nss.gyp:nss',
+          'conditions': [
+            ['external_libraries==0', {
+              'dependencies': [
+                '<(DEPTH)/net/third_party/nss/ssl.gyp:libssl',
+                '<(DEPTH)/third_party/nss/nss.gyp:nspr',
+                '<(DEPTH)/third_party/nss/nss.gyp:nss',
+              ],
+            }, {
+              'include_dirs': [
+                '<(ssl_root)',
+              ],
+            }],
           ],
         }],
         ['os_posix == 1 and OS != "mac" and OS != "ios" and OS != "android"', {
-          'dependencies': [
-            '<(DEPTH)/build/linux/system.gyp:ssl',
+          'conditions': [
+            ['external_libraries==0', {
+              'dependencies': [
+                '<(DEPTH)/build/linux/system.gyp:ssl',
+              ],
+            }, {
+              'include_dirs': [
+                '<(ssl_root)',
+              ],
+            }],
           ],
         }],
       ],
