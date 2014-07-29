@@ -387,7 +387,7 @@ class RtpSendingTest : public ::testing::Test {
   VideoCodec codec_;
 };
 
-TEST_F(RtpSendingTest, RoundRobinPadding) {
+TEST_F(RtpSendingTest, DISABLED_RoundRobinPadding) {
   // We have to send on an SSRC to be allowed to pad, since a marker bit must
   // be sent prior to padding packets.
   const uint8_t payload[200] = {0};
@@ -409,7 +409,7 @@ TEST_F(RtpSendingTest, RoundRobinPadding) {
   ExpectPadding(expected_padding);
 }
 
-TEST_F(RtpSendingTest, RoundRobinPaddingRtx) {
+TEST_F(RtpSendingTest, DISABLED_RoundRobinPaddingRtx) {
   // Enable RTX to allow padding to be sent prior to media.
   for (int i = 1; i < codec_.numberOfSimulcastStreams + 1; ++i) {
     senders_[i]->SetRtxSendPayloadType(96);
@@ -435,7 +435,7 @@ TEST_F(RtpSendingTest, RoundRobinPaddingRtx) {
   ExpectPadding(expected_padding);
 }
 
-TEST_F(RtpSendingTest, RoundRobinPaddingRtxRedundantPayloads) {
+TEST_F(RtpSendingTest, DISABLED_RoundRobinPaddingRtxRedundantPayloads) {
   for (int i = 1; i < codec_.numberOfSimulcastStreams + 1; ++i) {
     senders_[i]->SetRtxSendPayloadType(96);
     senders_[i]->SetRtxSsrc(kSenderRtxSsrc + i);
