@@ -502,18 +502,22 @@
             }],
           ],
         }, {
-          'defines': [
-            'SSL_USE_NSS',
-            'HAVE_NSS_SSL_H',
-            'SSL_USE_NSS_RNG',
+          'conditions': [
+            ['use_legacy_ssl_defaults!=1', {
+              'defines': [
+                'SSL_USE_NSS',
+                'HAVE_NSS_SSL_H',
+                'SSL_USE_NSS_RNG',
+              ],
+              'direct_dependent_settings': {
+                'defines': [
+                  'SSL_USE_NSS',
+                  'HAVE_NSS_SSL_H',
+                  'SSL_USE_NSS_RNG',
+                ],
+              },
+            }],
           ],
-          'direct_dependent_settings': {
-            'defines': [
-              'SSL_USE_NSS',
-              'HAVE_NSS_SSL_H',
-              'SSL_USE_NSS_RNG',
-            ],
-          },
         }],
         ['OS == "android"', {
           'defines': [
@@ -531,16 +535,20 @@
             ],
           },
         }, {
-          'defines': [
-            'HAVE_NSS_SSL_H'
-            'SSL_USE_NSS_RNG',
+          'conditions': [
+            ['use_legacy_ssl_defaults!=1', {
+              'defines': [
+                'HAVE_NSS_SSL_H',
+                'SSL_USE_NSS_RNG',
+              ],
+              'direct_dependent_settings': {
+                'defines': [
+                  'HAVE_NSS_SSL_H',
+                  'SSL_USE_NSS_RNG',
+                ],
+              },
+            }],
           ],
-          'direct_dependent_settings': {
-            'defines': [
-              'HAVE_NSS_SSL_H'
-              'SSL_USE_NSS_RNG',
-            ],
-          },
           'sources!': [
             'ifaddrs-android.cc',
             'ifaddrs-android.h',

@@ -112,6 +112,11 @@
     'mips_fpu%' : 1,
     'enable_android_opensl%': 1,
 
+    # Defer ssl perference to that specified through sslconfig.h instead of
+    # choosing openssl or nss directly.  In practice, this can be used to
+    # enable schannel on windows.
+    'use_legacy_ssl_defaults%': 0,
+
     'conditions': [
       ['build_with_chromium==1', {
         # Exclude pulse audio on Chromium since its prerequisites don't require
