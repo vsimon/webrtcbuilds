@@ -149,7 +149,7 @@ deps = {
     Var("chromium_trunk") + "/src/tools/python@" + Var("chromium_revision"),
 
   "tools/sanitizer_options":
-    File(Var("chromium_trunk") + "/src/build/sanitizers/sanitizer_options.cc@291168"),
+    File(Var("chromium_trunk") + "/src/build/sanitizers/sanitizer_options.cc@" + Var("chromium_revision")),
 
   "tools/swarming_client":
     From("chromium_deps", "src/tools/swarming_client"),
