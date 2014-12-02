@@ -108,7 +108,6 @@
 
     # Define MIPS architecture variant, MIPS DSP variant and MIPS FPU
     # This may be subject to change in accordance to Chromium's MIPS flags
-    'mips_arch_variant%': 'r1',
     'mips_dsp_rev%': 0,
     'mips_fpu%' : 1,
     'enable_android_opensl%': 1,
@@ -252,7 +251,7 @@
           }],
         ],
       }],
-      ['target_arch=="mipsel" and mips_arch_variant!="r6"', {
+      ['target_arch=="mipsel" and mips_arch_variant!="r6" and android_webview_build==0', {
         'defines': [
           'MIPS32_LE',
         ],
