@@ -3908,14 +3908,8 @@ bool WebRtcVideoMediaChannel::SetSendParams(
   }
   engine()->vie()->rtp()->SetTransmissionSmoothingStatus(channel_id, true);
 
-  // If the set of SSRCs isn't populated, then don't apply them. If we
-  // do, we'll cause a bug where adding a stream, then removing a
-  // stream, then re-adding a stream with the same primary SSRC will
-  // cause the sequence numbers to change and confuse the sender.
-  if (send_params.stream.first_ssrc() != 0) {
-    if (!SetSendSsrcs(channel_id, send_params.stream, codec)) {
-      return false;
-    }
+  if (!SetSendSsrcs(channel_id, send_params.stream, codec)) {
+    return false;
   }
 
   // NOTE: SetRtxSendPayloadType must be called after all SSRCs are
