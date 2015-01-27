@@ -904,6 +904,7 @@ void AllocationSequence::CreateUDPPorts() {
     // UDPPort.
     if (IsFlagSet(PORTALLOCATOR_ENABLE_SHARED_SOCKET)) {
       udp_port_ = port;
+      port->SignalDestroyed.connect(this, &AllocationSequence::OnPortDestroyed);
 
       // If STUN is not disabled, setting stun server address to port.
       if (!IsFlagSet(PORTALLOCATOR_DISABLE_STUN)) {
@@ -924,7 +925,6 @@ void AllocationSequence::CreateUDPPorts() {
     }
 
     session_->AddAllocatedPort(port, this, true);
-    port->SignalDestroyed.connect(this, &AllocationSequence::OnPortDestroyed);
   }
 }
 
@@ -1119,7 +1119,13 @@ void AllocationSequence::OnPortDestroyed(PortInterface* port) {
     return;
   }
 
-  turn_ports_.erase(std::find(turn_ports_.begin(), turn_ports_.end(), port));
+  auto it = std::find(turn_ports_.begin(), turn_ports_.end(), port);
+  if (it != turn_ports_.end()) {
+    turn_ports_.erase(it);
+  } else {
+    LOG(LS_ERROR) << "Unexpected OnPortDestroyed for nonexistent port.";
+    ASSERT(false);
+  }
 }
 
 // PortConfiguration
