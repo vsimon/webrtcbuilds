@@ -4,8 +4,7 @@
   "pending_ref_prefix": "refs/pending",
   "enabled_refglobs": [
     "refs/heads/master",
-    "refs/branch-heads/*",
-    "refs/internal/*"
+    "refs/branch-heads/*"
   ]
 }
 
