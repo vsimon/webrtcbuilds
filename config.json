@@ -1,0 +1,11 @@
+{
+  "git_svn_mode": true,
+  "interval": 5,
+  "pending_ref_prefix": "refs/pending",
+  "enabled_refglobs": [
+    "refs/heads/master",
+    "refs/branch-heads/*",
+    "refs/internal/*"
+  ]
+}
+
