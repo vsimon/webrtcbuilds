@@ -1,0 +1,11 @@
+{
+  "base_url": "https://chromium.googlesource.com/external/webrtc/trunk",
+  "enabled_paths": [
+    "talk",
+    "webrtc",
+  ],
+  "enabled_refglobs": [
+    "refs/heads/master"
+  ]
+}
+
