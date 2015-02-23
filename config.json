@@ -5,7 +5,8 @@
     "webrtc"
   ],
   "enabled_refglobs": [
-    "refs/heads/master"
+    "refs/heads/master",
+    "refs/branch-heads/*"
   ]
 }
 
