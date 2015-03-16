@@ -1351,8 +1351,8 @@ void ACMGenericCodecWrapper::ResetAudioEncoder() {
       config.payload_type = codec_inst.pltype;
       enc_dec = new AudioEncoderDecoderIsacFix(config);
     }
-    audio_encoder_.reset(enc_dec);
     decoder_proxy_.SetDecoder(enc_dec);
+    audio_encoder_.reset(enc_dec);
 #endif
 #ifdef WEBRTC_CODEC_ISAC
   } else if (!STR_CASE_CMP(codec_inst.plname, "ISAC")) {
@@ -1384,8 +1384,8 @@ void ACMGenericCodecWrapper::ResetAudioEncoder() {
         config.red_payload_type = red_payload_type_;
         enc_dec = new AudioEncoderDecoderIsacRed(config);
       }
-      audio_encoder_.reset(enc_dec);
       decoder_proxy_.SetDecoder(enc_dec);
+      audio_encoder_.reset(enc_dec);
     } else {
       AudioEncoderDecoderIsac* enc_dec;
       if (codec_inst.rate == -1) {
@@ -1410,8 +1410,8 @@ void ACMGenericCodecWrapper::ResetAudioEncoder() {
         config.payload_type = codec_inst.pltype;
         enc_dec = new AudioEncoderDecoderIsac(config);
       }
-      audio_encoder_.reset(enc_dec);
       decoder_proxy_.SetDecoder(enc_dec);
+      audio_encoder_.reset(enc_dec);
     }
 #endif
   } else {
