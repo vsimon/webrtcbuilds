@@ -1,4 +1,7 @@
 # webrtcbuilds-builder
+=======
+[![Build Status](https://travis-ci.org/vsimon/webrtcbuilds-builder.svg?branch=master)](https://travis-ci.org/vsimon/webrtcbuilds-builder)
+
 How [webrtcbuilds](https://github.com/vsimon/webrtcbuilds) gets built. The goal of [webrtcbuilds](https://github.com/vsimon/webrtcbuilds) is to provide a single standalone WebRTC static library and package.
 
 ## Current Platforms and Prerequsities
@@ -21,4 +24,4 @@ OPTIONS:
 
 ## Where is the package
 `out/webrtcbuilds-<rev>-<sha>-<plat>.zip`
-where <rev> is the revision number of the commit, <sha> is the short git SHA of the commit, and <plat> is the platform (linux64, windows, osx).
+where `<rev>` is the revision number of the commit, `<sha>` is the short git SHA of the commit, and `<plat>` is the platform (linux64, windows, osx).

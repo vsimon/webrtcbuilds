@@ -1,0 +1,15 @@
+language: cpp
+
+sudo: true
+
+compiler:
+  - gcc
+
+os:
+  - linux
+
+before_install:
+  - unset CXX
+  - unset CC
+
+script: bash build.sh
