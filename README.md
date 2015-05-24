@@ -4,15 +4,15 @@
 
 How [webrtcbuilds](https://github.com/vsimon/webrtcbuilds) gets built. The goal of [webrtcbuilds](https://github.com/vsimon/webrtcbuilds) is to provide a single standalone WebRTC static library and package.
 
-## Current Platforms and Prerequsities
+## Current Platforms and Prerequisites
 * OSX (highly recommend [Homebrew](http://brew.sh/) is installed)
 * Windows (highly recommend [Visual Studio Community 2013](http://www.chromium.org/developers/how-tos/build-instructions-windows) at least and a [Bash shell such as Git for Windows](https://msysgit.github.io) is installed)
 * Linux (tested on Ubuntu 12.04/14.04 64-bit)
 
 ## How to run
-`./build.sh` to build the latest version of WebRTC
+`./build.sh` to build the latest version of WebRTC.
 
-Or optionally another version specified by git SHA
+Or optionally another version specified by git SHA:
 
 ```
 ./build.sh options

@@ -19,7 +19,7 @@ elif [ "$UNAME" = "Linux" ]; then
     curl \
     wget \
     git \
-    subversion \
+    jq \
     python \
     python-pip \
     openjdk-7-jdk \

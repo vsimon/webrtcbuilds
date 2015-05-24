@@ -4,9 +4,9 @@ set -x
 
 # This checks out a specific revision
 
-# win req: depot_tools
-# lin req: depot_tools
-# osx req: depot_tools
+# win deps: depot_tools
+# lin deps: depot_tools
+# osx deps: depot_tools
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh
@@ -48,10 +48,12 @@ if [ -z "$BUILD_DIR" -o -z "$REVISION" ]; then
    exit 1
 fi
 
+retry() { until "$@" ; do sleep 60; done; }
+
 # gclient only works from the build directory
 pushd $BUILD_DIR
 
-fetch webrtc
+retry bash -c "rm -rf src && fetch webrtc"
 gclient sync --force --revision $REVISION
 
 popd

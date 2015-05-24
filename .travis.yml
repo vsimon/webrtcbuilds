@@ -1,15 +1,16 @@
 language: cpp
-
 sudo: true
-
 compiler:
-  - gcc
-
+- gcc
 os:
-  - linux
-
+- linux
 before_install:
-  - unset CXX
-  - unset CC
-
+- unset CXX
+- unset CC
 script: bash build.sh
+env:
+  global:
+    secure: "NfO93N/M/Igovh+OHQzskhPUSRzT1GIb8iW37rR2jPX0jH2B4wl767BJEMk0AbcvfQ6CPLGHQT+V4OIqgypSiY5HQl5ss6SQKLtyQPz/r2mnSidc6wEMcWLIptnEX7PqCpXHLZWsl2agMY9eb3Aa2HhQ17G/dSqdi0sot13az+EmUhQXiOEAcIdVOmFuLTpJV4KrAPkY51FQxhfPk/urYl1Ss+q9917vsoGY2gTj6p9ORHEQvXkiNsIh+HbewGMizbR58Z6sPrCPMFtMO/e+gRjBxhsdOUWuggyQnal+5AhkEVbvZ4JsRRF7I+ngunszL1F3JfBK4hPv2pelX5ZOhjbmpbfFaV6nxAwDjuzl14jC8f3NclKHnDOOYnbqCf6kOt7uXOhzC/TBbg3fB04iRTXEzdys7vO2NzN5dYAkVT2vQB5YppXv/PxNuovFXiYPs4WySfMxn8JWtRhFZOofksiHoWfcsHBlsPk+l//MiHWDqGCchjd/HItwLbv4SNfAxfFdd0xhZSabFpEklNEEw8PgMqeXUxRt8oVvMRCXQfX5merdQ9PHs35XUybTAMw71GvImhBUB8/FOEhTFn813qnn4bqLiu/unDW9WWE+Y0OwKcYGrXtoLXgV64wYtxGRvCpawoI7RMMV//0WApSrOSfgsMWBog9CNwBvA5yiEKM="
+after_success:
+  - .travis/github-mirror.sh "vsimon/webrtcbuilds" `cat out/revision_number` out/src
+  - .travis/github-release.sh "vsimon/webrtcbuilds" `cat out/revision_number` out/*.zip

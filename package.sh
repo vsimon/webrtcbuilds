@@ -4,9 +4,9 @@ set -x
 
 # This packages a completed build resulting in a zip file in the build directory
 
-# win req: 7z
-# lin req: zip
-# osx req: zip
+# win deps: 7z
+# lin deps: zip
+# osx deps: zip
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh
@@ -121,5 +121,8 @@ if [ $UNAME = 'Windows_NT' ]; then
 else
   zip -r $BUILDLABEL.zip $BUILDLABEL
 fi
+
+# archive revision_number
+echo $REVISION_NUMBER > revision_number
 
 popd

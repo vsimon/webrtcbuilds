@@ -4,9 +4,9 @@ set -x
 
 # This cleans up all the builds in the output directory
 
-# win req: rmdir, rm
-# lin req: rm
-# osx req: rm
+# win deps: rmdir, rm
+# lin deps: rm
+# osx deps: rm
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh

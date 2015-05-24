@@ -4,8 +4,8 @@ set -x
 
 # This compiles a single build
 
-# win req: gclient, ninja
-# lin req: gclient, ninja
+# win deps: gclient, ninja
+# lin deps: gclient, ninja
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh

@@ -4,9 +4,9 @@ set -x
 
 # This goes through the entire build sequence
 
-# win req: git, tee
-# lin req: git, tee
-# osx req: git, tee
+# win deps: git, tee
+# lin deps: git, tee
+# osx deps: git, tee
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh
