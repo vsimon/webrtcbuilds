@@ -1,0 +1,10 @@
+prefix=$WEBRTCBUILDS_PATH
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libwebrtc_full
+Description: The WebRTC library
+Version: 0.0.1
+Cflags: -DWEBRTC_POSIX -I${includedir}
+Libs: -L${libdir}/Debug -lwebrtc_full -lpthread -lrt -std=gnu++0x -ldl
