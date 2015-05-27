@@ -1,6 +1,6 @@
 #!/bin/bash
-
-set -e
+set -eo pipefail
+set -x
 
 REPO=$1 && shift
 RELEASE=$1 && shift
