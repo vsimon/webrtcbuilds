@@ -1,6 +1,5 @@
 #!/bin/bash
 set -eo pipefail
-set -x
 
 REPO=$1 && shift
 RELEASE=$1 && shift
@@ -12,15 +11,18 @@ if [[ -z "$MIRRORREPO" ]]; then
   exit 1
 fi
 
-[ -e "$DIR/GITHUBTOKEN" ] && . "$DIR/GITHUBTOKEN"
+set +x
 if [[ -z "$GITHUBTOKEN" ]]; then
   echo "Error: GITHUBTOKEN is not set"
   exit 1
 fi
+set -x
 
 pushd $MIRRORREPO
 
+set +x
 git remote add github "https://$GITHUBTOKEN@github.com/vsimon/webrtcbuilds.git"
+set -x
 git fetch github
 
 echo -n "Checking tag already exists exists for $RELEASE..."

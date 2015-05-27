@@ -12,17 +12,20 @@ if [[ -z "$RELEASEFILES" ]]; then
   exit 1
 fi
 
-[ -e "$DIR/GITHUBTOKEN" ] && . "$DIR/GITHUBTOKEN"
+set +x
 if [[ -z "$GITHUBTOKEN" ]]; then
   echo "Error: GITHUBTOKEN is not set"
   exit 1
 fi
+set -x
 
 echo -n "Checking release exists for $RELEASE..."
 
+set +x
 RESULT=`curl -s -w "\n%{http_code}\n"     \
   -H "Authorization: token $GITHUBTOKEN"  \
   "https://api.github.com/repos/$REPO/releases/tags/$TAG"`
+set -x
 
 RELEASEID=`echo "$RESULT" | jq -s '.[0]? | .id'`
 
@@ -41,10 +44,12 @@ JSON=$(cat <<EOF
 }
 EOF
 )
+  set +x
   RESULT=`curl -s -w "\n%{http_code}\n"     \
     -H "Authorization: token $GITHUBTOKEN"  \
     -d "$JSON"                              \
     "https://api.github.com/repos/$REPO/releases"`
+  set -x
   if [ "`echo "$RESULT" | tail -1`" != "201" ]; then
     echo FAILED
     echo "$RESULT"
@@ -73,9 +78,11 @@ for FILE in $RELEASEFILES; do
   URL=`echo "$RESULT" | jq -r -s ".[0]? | .assets[] | select(.browser_download_url | endswith(\"$FILENAME\")) | .url"`
   if [ ! -z $URL ]; then
     echo -n "Deleting $FILENAME..."
+    set +x
     RESULT=`curl -s -w "%{http_code}\n"                    \
        -H "Authorization: token $GITHUBTOKEN"              \
        -X DELETE $URL`
+    set -x
     if [[ "`echo "$RESULT"`" != "204" ]]; then
       echo FAILED
       echo "$RESULT"
@@ -85,12 +92,14 @@ for FILE in $RELEASEFILES; do
   fi
 
   echo -n "Uploading $FILENAME... "
+  set +x
   RESULT=`curl -s -w "\n%{http_code}\n"                   \
     -H "Authorization: token $GITHUBTOKEN"                \
     -H "Accept: application/vnd.github.manifold-preview"  \
     -H "Content-Type: application/zip"                    \
     --data-binary "@$FILE"                                \
     "https://uploads.github.com/repos/$REPO/releases/$RELEASEID/assets?name=$FILENAME&size=$FILESIZE"`
+  set -x
   if [ "`echo "$RESULT" | tail -1`" != "201" ]; then
     echo FAILED
     echo "$RESULT"
