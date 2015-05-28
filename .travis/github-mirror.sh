@@ -29,9 +29,9 @@ echo -n "Checking tag already exists exists for $RELEASE..."
 
 if ! git show-ref --tags | egrep -q $RELEASE ; then
   echo NO
-  git push github master
+  git push -q github master
   git tag $RELEASE
-  git push github --tags
+  git push -q github --tags
 fi
 echo YES
 
