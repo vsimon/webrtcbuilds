@@ -6,6 +6,7 @@ set -x
 
 # osx deps: homebrew
 # lin deps: apt-get
+# win deps: curl
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh
@@ -42,6 +43,9 @@ elif [ "$UNAME" = "Linux" ]; then
     libgnome-keyring-dev \
     libpci-dev \
     libgl1-mesa-dev
+else
+  # put jq in depot_tools
+  curl -o $DEPOT_TOOLS/jq.exe 'http://stedolan.github.io/jq/download/win32/jq.exe'
 fi
 
 # for extensibility

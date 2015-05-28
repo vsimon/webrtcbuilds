@@ -58,5 +58,5 @@ $DIR/package.sh -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/package.log
 
 # for extensibility
 if [ -f $DIR/build.local ]; then
-  $DIR/build.local -r $REVISION -d $BUILD_DIR
+  $DIR/build.local -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/build.local.log
 fi

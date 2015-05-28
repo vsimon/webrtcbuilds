@@ -72,7 +72,6 @@ for FILE in $RELEASEFILES; do
     echo "Warning: $FILE not a file"
     continue
   fi
-  FILESIZE=`stat -c '%s' "$FILE"`
   FILENAME=`basename $FILE`
 
   URL=`echo "$RESULT" | jq -r -s ".[0]? | .assets[] | select(.browser_download_url | endswith(\"$FILENAME\")) | .url"`
@@ -98,7 +97,7 @@ for FILE in $RELEASEFILES; do
     -H "Accept: application/vnd.github.manifold-preview"  \
     -H "Content-Type: application/zip"                    \
     --data-binary "@$FILE"                                \
-    "https://uploads.github.com/repos/$REPO/releases/$RELEASEID/assets?name=$FILENAME&size=$FILESIZE"`
+    "https://uploads.github.com/repos/$REPO/releases/$RELEASEID/assets?name=$FILENAME"`
   set -x
   if [ "`echo "$RESULT" | tail -1`" != "201" ]; then
     echo FAILED

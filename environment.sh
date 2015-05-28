@@ -35,6 +35,7 @@ export DEPOT_TOOLS=$DIR/depot_tools
 export PATH=$DEPOT_TOOLS:$PATH
 if [ "$UNAME" = "Windows_NT" ]; then
   export DEPOT_TOOLS_WIN_TOOLCHAIN=0
+  export PATH=$DEPOT_TOOLS/python276_bin:$PATH
   if [ -d $DEPOT_TOOLS ]; then
     export WIN_DEPOT_TOOLS=`cd $DEPOT_TOOLS; pwd -W`
   else
