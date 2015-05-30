@@ -2,7 +2,7 @@
 
 # These are some common environment variables
 
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+ENVDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 export PROJECT_NAME=webrtcbuilds
 export REPO_URL="https://chromium.googlesource.com/external/webrtc"
@@ -19,19 +19,19 @@ fi
 
 if [ "$UNAME" = "Linux" ]; then
   export PLATFORM=linux64
-  export OUT_DIR=$DIR/out
+  export OUT_DIR=$ENVDIR/out
   export JAVA_HOME=/usr/lib/jvm/java-7-openjdk-amd64
 elif [ "$UNAME" = "Windows_NT" ]; then
   export PLATFORM=windows
-  export OUT_DIR=$DIR/out
+  export OUT_DIR=$ENVDIR/out
 elif [ "$UNAME" = "Darwin" ]; then
   export PLATFORM=osx
-  export OUT_DIR=$DIR/out
+  export OUT_DIR=$ENVDIR/out
 fi
 
 mkdir -p $OUT_DIR
 
-export DEPOT_TOOLS=$DIR/depot_tools
+export DEPOT_TOOLS=$ENVDIR/depot_tools
 export PATH=$DEPOT_TOOLS:$PATH
 if [ "$UNAME" = "Windows_NT" ]; then
   export DEPOT_TOOLS_WIN_TOOLCHAIN=0
@@ -44,6 +44,6 @@ if [ "$UNAME" = "Windows_NT" ]; then
 fi
 
 # for extensibility
-if [ -f $DIR/environment.local ]; then
-  source $DIR/environment.local
+if [ -f $ENVDIR/environment.local ]; then
+  source $ENVDIR/environment.local
 fi
