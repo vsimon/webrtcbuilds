@@ -15,7 +15,7 @@ if [ ! -d $DEPOT_TOOLS ]; then
   git clone -q https://chromium.googlesource.com/chromium/tools/depot_tools.git $DEPOT_TOOLS
 fi
 
-if [ "$UNAME" = 'Windows_NT' ]; then
+if [ "$UNAME" = 'Windows' ]; then
   # set up task to run gclient.bat to get python
   schtasks //Create //tn init_gclient //tr `cd $DEPOT_TOOLS; pwd -W`/gclient.bat //sc onstart //f //RU system
   schtasks //Run //tn init_gclient

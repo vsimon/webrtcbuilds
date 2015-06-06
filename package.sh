@@ -116,7 +116,7 @@ if [ "$UNAME" = "Linux" ]; then
 fi
 
 # zip up the package
-if [ $UNAME = 'Windows_NT' ]; then
+if [ $UNAME = 'Windows' ]; then
   $DEPOT_TOOLS/win_toolchain/7z/7z.exe a -tzip $BUILDLABEL.zip $BUILDLABEL
 else
   zip -r $BUILDLABEL.zip $BUILDLABEL

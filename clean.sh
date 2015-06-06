@@ -11,7 +11,7 @@ set -x
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh
 
-if [ $UNAME = 'Windows_NT' ]; then
+if [ $UNAME = 'Windows' ]; then
   pushd $OUT_DIR
   # windows rmdir
   cmd //c "for /D %f in (*) do rmdir /s /q %f" || true

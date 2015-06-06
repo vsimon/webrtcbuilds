@@ -53,7 +53,7 @@ pushd $BUILD_DIR
 # start with no tests
 export GYP_DEFINES='include_tests=0'
 
-if [ $UNAME = 'Windows_NT' ]; then
+if [ $UNAME = 'Windows' ]; then
   export DEPOT_TOOLS_WIN_TOOLCHAIN=0
   gclient sync --force --revision $REVISION
 

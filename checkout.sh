@@ -1,5 +1,4 @@
 #!/bin/bash
-set -eo pipefail
 set -x
 
 # This checks out a specific revision
@@ -48,12 +47,12 @@ if [ -z "$BUILD_DIR" -o -z "$REVISION" ]; then
    exit 1
 fi
 
-retry() { until "$@" ; do sleep 60; done; }
-
 # gclient only works from the build directory
 pushd $BUILD_DIR
 
-retry bash -c "rm -rf src && fetch webrtc"
-gclient sync --force --revision $REVISION
+fetch webrtc
+while [ $? -ne 0 ]; do
+  gclient sync --force --revision $REVISION
+done
 
 popd
