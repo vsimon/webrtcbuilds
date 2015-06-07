@@ -15,6 +15,7 @@ if [ "$UNAME" = "Darwin" ]; then
   # for GNU version of cp: gcp and jq
   brew install \
     coreutils \
+    gnu-sed \
     jq
 elif [ "$UNAME" = "Linux" ]; then
   sudo apt-get update && \

@@ -55,7 +55,6 @@ export GYP_DEFINES='include_tests=0'
 
 if [ $UNAME = 'Windows' ]; then
   export DEPOT_TOOLS_WIN_TOOLCHAIN=0
-  gclient sync --force --revision $REVISION
 
   # patch for directx not found
   sed -i 's|\(#include <d3dx9.h>\)|//\1|' $BUILD_DIR/src/webrtc/modules/video_render/windows/video_render_direct3d9.h
@@ -87,13 +86,21 @@ if [ $UNAME = 'Windows' ]; then
   "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Release_x64/webrtc_full.lib src/out/Release_x64/*.lib 
 else
   # linux and osx
-  
-  gclient sync --force --revision $REVISION
+
+  # sed
+  if [ $UNAME = 'Darwin' ]; then
+    SED='gsed'
+  else
+    SED='sed'
+  fi
 
   # patch all platforms to build standalone libs
-  find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
+  find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec $SED -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
   # for icu only; icu_use_data_file_flag is 1 on linux
-  find src/chromium/src/third_party/icu/icu.gyp \( -name *.gyp -o  -name *.gypi \) -exec sed -i "s|\('type': 'none',\)|\1 'standalone_static_library': 0,|" '{}' ';'
+  find src/chromium/src/third_party/icu/icu.gyp \( -name *.gyp -o  -name *.gypi \) -exec $SED -i "s|\('type': 'none',\)|\1 'standalone_static_library': 0,|" '{}' ';'
+  # enable rtti for osx and linux
+  $SED -i "s|'GCC_ENABLE_CPP_RTTI': 'NO'|'GCC_ENABLE_CPP_RTTI': 'YES'|" src/chromium/src/build/common.gypi
+  $SED -i "s|^          '-fno-rtti'|          '-frtti'|" src/chromium/src/build/common.gypi
   gclient runhooks
   
   # do the build
