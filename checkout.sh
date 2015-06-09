@@ -52,7 +52,10 @@ pushd $BUILD_DIR
 
 fetch webrtc
 while [ $? -ne 0 ]; do
+  # cannot fetch twice if an error occured use gclient sync to try again
   gclient sync --force --revision $REVISION
 done
+# check out the revision on successful fetch
+gclient sync --force --revision $REVISION
 
 popd
