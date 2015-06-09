@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 set -x
 
 # This checks out a specific revision
@@ -22,7 +23,7 @@ Checkout script.
 OPTIONS:
    -h   Show this message
    -d   Top level build dir
-   -r   Revision represented as a git SHA
+   -r   Revision represented as a git SHA (optional, checks out latest revision if omitted)
 EOF
 }
 
@@ -42,20 +43,23 @@ do
    esac
 done
 
-if [ -z "$BUILD_DIR" -o -z "$REVISION" ]; then
+if [ -z "$BUILD_DIR" ]; then
    usage
    exit 1
+fi
+
+if [ -z $REVISION ]; then
+  # If no revision given, then get the latest revision from git ls-remote
+  REVISION=`git ls-remote $REPO_URL HEAD | cut -f1`
 fi
 
 # gclient only works from the build directory
 pushd $BUILD_DIR
 
+# first fetch
 fetch webrtc
-while [ $? -ne 0 ]; do
-  # cannot fetch twice if an error occured use gclient sync to try again
-  gclient sync --force --revision $REVISION
-done
-# check out the revision on successful fetch
+
+# check out the specific revision after fetch
 gclient sync --force --revision $REVISION
 
 popd

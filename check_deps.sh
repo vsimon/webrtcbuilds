@@ -33,7 +33,7 @@ elif [ "$UNAME" = "Linux" ]; then
     libnss3-dev \
     libasound2-dev \
     libpulse-dev \
-    libjpeg62-dev \
+    libjpeg-dev \
     libxv-dev \
     libgtk2.0-dev \
     libexpat1-dev \

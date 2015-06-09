@@ -22,7 +22,7 @@ Build script.
 
 OPTIONS:
    -h   Show this message
-   -r   Revision represented as a git SHA
+   -r   Revision represented as a git SHA (optional, builds latest revision if omitted)
 EOF
 }
 
