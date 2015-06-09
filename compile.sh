@@ -22,18 +22,14 @@ Compile script.
 OPTIONS:
    -h   Show this message
    -d   Top level build dir
-   -r   Revision represented as a git SHA
 EOF
 }
 
-while getopts :d:r: OPTION
+while getopts :d: OPTION
 do
    case $OPTION in
        d)
            BUILD_DIR=$OPTARG
-           ;;
-       r)
-           REVISION=$OPTARG
            ;;
        ?)
            usage
@@ -42,7 +38,7 @@ do
    esac
 done
 
-if [ -z "$BUILD_DIR" -o -z "$REVISION" ]; then
+if [ -z "$BUILD_DIR" ]; then
    usage
    exit 1
 fi
@@ -56,25 +52,16 @@ export GYP_DEFINES='include_tests=0'
 if [ $UNAME = 'Windows' ]; then
   export DEPOT_TOOLS_WIN_TOOLCHAIN=0
 
-  # patch for directx not found
-  sed -i 's|\(#include <d3dx9.h>\)|//\1|' $BUILD_DIR/src/webrtc/modules/video_render/windows/video_render_direct3d9.h
-  sed -i 's|\(D3DXMATRIX\)|//\1|' $BUILD_DIR/src/webrtc/modules/video_render/windows/video_render_direct3d9.cc
-
-  # patch all platforms to build standalone libs
-  find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
-  # also for the libs that say 'type': '<(component)' like nss and icu
-  find src/chromium/src/third_party src/net/third_party/nss \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': '<(component)',\)|\1 'standalone_static_library': 1,|" '{}' ';'
-  cmd //c "$WIN_DEPOT_TOOLS\gclient.bat runhooks"
-  
   # do the build
+  cmd //c "$WIN_DEPOT_TOOLS\gclient.bat runhooks"
   ninja -C src/out/Debug
   ninja -C src/out/Release
 
   # 64-bit build
   export GYP_DEFINES="target_arch=x64 $GYP_DEFINES"
-  cmd //c "$WIN_DEPOT_TOOLS\gclient.bat runhooks"
 
   # do the build
+  cmd //c "$WIN_DEPOT_TOOLS\gclient.bat runhooks"
   ninja -C src/out/Debug_x64
   ninja -C src/out/Release_x64
 
@@ -86,24 +73,9 @@ if [ $UNAME = 'Windows' ]; then
   "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Release_x64/webrtc_full.lib src/out/Release_x64/*.lib 
 else
   # linux and osx
-
-  # sed
-  if [ $UNAME = 'Darwin' ]; then
-    SED='gsed'
-  else
-    SED='sed'
-  fi
-
-  # patch all platforms to build standalone libs
-  find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec $SED -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
-  # for icu only; icu_use_data_file_flag is 1 on linux
-  find src/chromium/src/third_party/icu/icu.gyp \( -name *.gyp -o  -name *.gypi \) -exec $SED -i "s|\('type': 'none',\)|\1 'standalone_static_library': 0,|" '{}' ';'
-  # enable rtti for osx and linux
-  $SED -i "s|'GCC_ENABLE_CPP_RTTI': 'NO'|'GCC_ENABLE_CPP_RTTI': 'YES'|" src/chromium/src/build/common.gypi
-  $SED -i "s|^          '-fno-rtti'|          '-frtti'|" src/chromium/src/build/common.gypi
-  gclient runhooks
   
   # do the build
+  gclient runhooks
   ninja -C src/out/Debug
   ninja -C src/out/Release
 

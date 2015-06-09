@@ -50,10 +50,11 @@ if [ -z $REVISION ]; then
   REVISION=`git ls-remote $REPO_URL HEAD | cut -f1`
 fi
 
-$DIR/check_depot_tools.sh -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/check_depot_tools.log
-$DIR/check_deps.sh -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/check_deps.log
+$DIR/check_depot_tools.sh 2>&1 | tee $BUILD_DIR/check_depot_tools.log
+$DIR/check_deps.sh 2>&1 | tee $BUILD_DIR/check_deps.log
 $DIR/checkout.sh -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/checkout.log
-$DIR/compile.sh -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/compile.log
+$DIR/patch.sh -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/patch.log
+$DIR/compile.sh -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/compile.log
 $DIR/package.sh -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/package.log
 
 # for extensibility
