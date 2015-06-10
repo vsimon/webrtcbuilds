@@ -75,22 +75,18 @@ else
   # linux and osx
   
   # do the build
-  gclient runhooks
-  ninja -C src/out/Debug
-  ninja -C src/out/Release
+  configs=( "Debug" "Release" )
+  for c in "${configs[@]}"; do
+    gclient runhooks
+    ninja -C src/out/$c
 
-  # combine all the static libraries into one called webrtc_full
-  pushd src/out/Debug
-  find . -name '*.a' -exec ar -x '{}' ';'
-  ar -crs libwebrtc_full.a *.o
-  rm *.o
-  popd
-
-  pushd src/out/Release
-  find . -name '*.a' -exec ar -x '{}' ';'
-  ar -crs libwebrtc_full.a *.o
-  rm *.o
-  popd
+    # combine all the static libraries into one called webrtc_full
+    pushd src/out/$c
+    find . -name '*.a' -exec ar -x '{}' ';'
+    ar -crs libwebrtc_full.a *.o
+    rm *.o
+    popd
+  done
 fi
 
 popd
