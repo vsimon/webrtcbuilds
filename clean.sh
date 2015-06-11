@@ -16,8 +16,8 @@ if [ $UNAME = 'Windows' ]; then
   # windows rmdir
   cmd //c "for /D %f in (*) do rmdir /s /q %f" || true
   # and again, for any stragglers
-  rm -rf *
+  rm -rf * .gclient
   popd
 else
-  rm -rf $OUT_DIR/*
+  rm -rf $OUT_DIR/* $OUT_DIR/.gclient
 fi
