@@ -59,7 +59,7 @@ fi
 
 # go into the webrtc repo to get the revision number from git log
 pushd src
-REVISION_NUMBER=`git log -1 | grep 'Cr-Commit-Position: refs/heads/master@{#' | sed "s|Cr-Commit-Position: refs/heads/master@{#||" | tr -d '}' | tr -d ' ' | tail -1`
+REVISION_NUMBER=`git log -1 | sed -ne 's|.*@\W*\([0-9]\+\).*$|\1|p'`
 REVISION_SHORT=`git rev-parse --short $REVISION`
 popd
 
