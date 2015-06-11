@@ -4,9 +4,9 @@ set -x
 
 # This packages a completed build resulting in a zip file in the build directory
 
-# win deps: 7z
-# lin deps: zip
-# osx deps: zip
+# win deps: sed, 7z
+# lin deps: sed, zip
+# osx deps: gsed, zip
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh
@@ -59,7 +59,13 @@ fi
 
 # go into the webrtc repo to get the revision number from git log
 pushd src
-REVISION_NUMBER=`git log -1 | sed -ne 's|.*@\W*\([0-9]\+\).*$|\1|p'`
+# sed
+if [ $UNAME = 'Darwin' ]; then
+  SED='gsed'
+else
+  SED='sed'
+fi
+REVISION_NUMBER=`git log -1 | $SED -ne 's|.*@\W*\([0-9]\+\).*$|\1|p'`
 REVISION_SHORT=`git rev-parse --short $REVISION`
 popd
 
@@ -79,20 +85,20 @@ mkdir -p $BUILDLABEL/bin $BUILDLABEL/include $BUILDLABEL/lib
 find src/out/Release -maxdepth 1 -type f \
   -not -name *.so -not -name *.a -not -name *.jar -not -name *.lib \
   -not -name *.isolated \
-	-not -name *.state \
-	-not -name *.ninja \
+  -not -name *.state \
+  -not -name *.ninja \
   -not -name *.tmp \
-	-not -name *.pdb \
-	-not -name *.res \
-	-not -name *.rc \
-	-not -name *.x64 \
-	-not -name *.x86 \
-	-not -name *.ilk \
+  -not -name *.pdb \
+  -not -name *.res \
+  -not -name *.rc \
+  -not -name *.x64 \
+  -not -name *.x86 \
+  -not -name *.ilk \
   -not -name *.TOC \
-	-not -name gyp-win-tool \
-	-not -name *.manifest \
-	-not -name \\.* \
-	-exec $CP '{}' $BUILDLABEL/bin ';'
+  -not -name gyp-win-tool \
+  -not -name *.manifest \
+  -not -name \\.* \
+  -exec $CP '{}' $BUILDLABEL/bin ';'
 
 # find and copy header files
 find src/webrtc src/talk src/chromium/src/third_party/jsoncpp -name *.h \
