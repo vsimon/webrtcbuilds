@@ -47,7 +47,7 @@ fi
 pushd $BUILD_DIR
 
 # start with no tests
-export GYP_DEFINES='include_tests=0 disable_glibcxx_debug=1'
+export GYP_DEFINES='include_tests=0 disable_glibcxx_debug=1 linux_use_debug_fission=0'
 
 if [ $UNAME = 'Windows' ]; then
   export DEPOT_TOOLS_WIN_TOOLCHAIN=0
