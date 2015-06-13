@@ -73,7 +73,7 @@ else
   $SED -i "s|'GCC_ENABLE_CPP_RTTI': 'NO'|'GCC_ENABLE_CPP_RTTI': 'YES'|" src/chromium/src/build/common.gypi
   $SED -i "s|^          '-fno-rtti'|          '-frtti'|" src/chromium/src/build/common.gypi
   # don't make thin archives
-  $SED -i "s|, 'alink_thin'|, 'alink'" src/tools/gyp/pylib/gyp/generator/ninja.py
+  $SED -i "s|, 'alink_thin'|, 'alink'|" src/tools/gyp/pylib/gyp/generator/ninja.py
 fi
 
 popd
