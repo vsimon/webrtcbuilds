@@ -57,7 +57,11 @@ fi
 pushd $BUILD_DIR
 
 # first fetch
-fetch webrtc
+if [ $PLATFORM = 'android' ]; then
+  fetch webrtc_android
+else
+  fetch webrtc
+fi
 
 # check out the specific revision after fetch
 gclient sync --force --revision $REVISION

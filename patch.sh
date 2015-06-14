@@ -58,22 +58,26 @@ if [ $UNAME = 'Windows' ]; then
 else
   # linux and osx
 
-  # sed
-  if [ $UNAME = 'Darwin' ]; then
-    SED='gsed'
+  if [ $PLATFORM = 'android' ]; then
+    echo "nothing to patch"
   else
-    SED='sed'
-  fi
+    # sed
+    if [ $UNAME = 'Darwin' ]; then
+      SED='gsed'
+    else
+      SED='sed'
+    fi
 
-  # patch all platforms to build standalone libs
-  find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec $SED -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
-  # for icu only; icu_use_data_file_flag is 1 on linux
-  find src/chromium/src/third_party/icu/icu.gyp \( -name *.gyp -o  -name *.gypi \) -exec $SED -i "s|\('type': 'none',\)|\1 'standalone_static_library': 0,|" '{}' ';'
-  # enable rtti for osx and linux
-  $SED -i "s|'GCC_ENABLE_CPP_RTTI': 'NO'|'GCC_ENABLE_CPP_RTTI': 'YES'|" src/chromium/src/build/common.gypi
-  $SED -i "s|^          '-fno-rtti'|          '-frtti'|" src/chromium/src/build/common.gypi
-  # don't make thin archives
-  $SED -i "s|, 'alink_thin'|, 'alink'|" src/tools/gyp/pylib/gyp/generator/ninja.py
+    # patch all platforms to build standalone libs
+    find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec $SED -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
+    # for icu only; icu_use_data_file_flag is 1 on linux
+    find src/chromium/src/third_party/icu/icu.gyp \( -name *.gyp -o  -name *.gypi \) -exec $SED -i "s|\('type': 'none',\)|\1 'standalone_static_library': 0,|" '{}' ';'
+    # enable rtti for osx and linux
+    $SED -i "s|'GCC_ENABLE_CPP_RTTI': 'NO'|'GCC_ENABLE_CPP_RTTI': 'YES'|" src/chromium/src/build/common.gypi
+    $SED -i "s|^          '-fno-rtti'|          '-frtti'|" src/chromium/src/build/common.gypi
+    # don't make thin archives
+    $SED -i "s|, 'alink_thin'|, 'alink'|" src/tools/gyp/pylib/gyp/generator/ninja.py
+  fi
 fi
 
 popd

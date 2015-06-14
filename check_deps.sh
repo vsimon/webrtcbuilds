@@ -11,13 +11,13 @@ set -x
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source $DIR/environment.sh
 
-if [ "$UNAME" = "Darwin" ]; then
+if [ $UNAME = 'Darwin' ]; then
   # for GNU version of cp: gcp and jq
   brew install \
     coreutils \
     gnu-sed \
     jq
-elif [ "$UNAME" = "Linux" ]; then
+elif [ $UNAME = 'Linux' ]; then
   sudo apt-get update && \
   sudo apt-get install -y --no-install-recommends \
     curl \

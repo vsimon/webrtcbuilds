@@ -54,7 +54,7 @@ pushd $BUILD_DIR
 if [ ! -d src/out ]; then
   popd
   echo "nothing to package"
-  exit 1
+  exit 2
 fi
 
 # go into the webrtc repo to get the revision number from git log
@@ -66,13 +66,17 @@ else
   SED='sed'
 fi
 REVISION_NUMBER=`git log -1 | $SED -ne 's|.*@\W*\([0-9]\+\).*$|\1|p'`
+if [ -z $REVISION_NUMBER ]; then
+  echo "Could not get revision number for packaging"
+  exit 3
+fi
 REVISION_SHORT=`git rev-parse --short $REVISION`
 popd
 
 # create a build label
 BUILDLABEL=$PROJECT_NAME-$REVISION_NUMBER-$REVISION_SHORT-$PLATFORM
 
-if [ "$UNAME" = "Darwin" ]; then
+if [ $UNAME = 'Darwin' ]; then
   CP="gcp"
 else
   CP="cp"
@@ -108,14 +112,13 @@ mv $BUILDLABEL/include/chromium/src/third_party/jsoncpp/source/include/* $BUILDL
 rm -rf $BUILDLABEL/include/src $BUILDLABEL/include/chromium
 
 # find and copy libraries
-find src/out -maxdepth 2 \( -name *.so -o -name *webrtc_full* -o -name *.jar \) \
+find src/out -maxdepth 3 \( -name *.so -o -name *webrtc_full* -o -name *.jar \) \
   -exec $CP --parents '{}' $BUILDLABEL/lib ';'
 mv $BUILDLABEL/lib/src/out/* $BUILDLABEL/lib
-rmdir $BUILDLABEL/lib/src/out
-rmdir $BUILDLABEL/lib/src
+rmdir $BUILDLABEL/lib/src/out $BUILDLABEL/lib/src
 
-# for linux, add pkgconfig files
-if [ "$UNAME" = "Linux" ]; then
+# for linux64, add pkgconfig files
+if [ $UNAME = "linux64" ]; then
   mkdir -p $BUILDLABEL/lib/Debug/pkgconfig $BUILDLABEL/lib/Release/pkgconfig
   $CP $DIR/resources/pkgconfig/libwebrtc_full-debug.pc $BUILDLABEL/lib/Debug/pkgconfig/libwebrtc_full.pc
   $CP $DIR/resources/pkgconfig/libwebrtc_full-release.pc $BUILDLABEL/lib/Release/pkgconfig/libwebrtc_full.pc

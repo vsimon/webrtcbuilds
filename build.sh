@@ -48,6 +48,10 @@ BUILD_DIR=$OUT_DIR
 if [ -z $REVISION ]; then
   # If no revision given, then get the latest revision from git ls-remote
   REVISION=`git ls-remote $REPO_URL HEAD | cut -f1`
+  if [ -z $REVISION ]; then
+    echo "Could not get latest revision"
+    exit 2
+  fi
 fi
 
 $DIR/check_depot_tools.sh 2>&1 | tee $BUILD_DIR/check_depot_tools.log

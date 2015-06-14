@@ -73,10 +73,16 @@ if [ $UNAME = 'Windows' ]; then
   "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Debug/webrtc_full.lib src/out/Debug/*.lib
   "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Release/webrtc_full.lib src/out/Release/*.lib
   "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Debug_x64/webrtc_full.lib src/out/Debug_x64/*.lib
-  "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Release_x64/webrtc_full.lib src/out/Release_x64/*.lib 
+  "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Release_x64/webrtc_full.lib src/out/Release_x64/*.lib
 else
   # linux and osx
-  
+
+  # for android, which gets built on linux
+  if [ $PLATFORM = 'android' ]; then
+    export GYP_DEFINES="OS=android $GYP_DEFINES"
+    . src/build/android/envsetup.sh
+  fi
+
   # do the build
   configs=( "Debug" "Release" )
   for c in "${configs[@]}"; do
