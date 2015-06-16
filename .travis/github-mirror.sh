@@ -29,7 +29,7 @@ echo -n "Checking tag already exists exists for $RELEASE..."
 
 if ! git show-ref --tags | egrep -q refs/tags/$RELEASE ; then
   echo NO
-  git stash
+  git reset --hard
   git tag $RELEASE
   git checkout master
   git pull origin master
