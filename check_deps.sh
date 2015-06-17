@@ -45,8 +45,8 @@ elif [ $UNAME = 'Linux' ]; then
     libpci-dev \
     libgl1-mesa-dev
 else
-  # put jq in depot_tools
-  curl -o $DEPOT_TOOLS/jq.exe 'http://stedolan.github.io/jq/download/win32/jq.exe'
+  # put jq in python_bin in depot_tools because it is ignored by git
+  curl -o $DEPOT_TOOLS/python276_bin/jq.exe 'http://stedolan.github.io/jq/download/win32/jq.exe'
 fi
 
 # for extensibility
