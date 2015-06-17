@@ -65,7 +65,7 @@ if [ $UNAME = 'Darwin' ]; then
 else
   SED='sed'
 fi
-REVISION_NUMBER=`git log -1 | $SED -ne 's|.*@\W*\([0-9]\+\).*$|\1|p'`
+REVISION_NUMBER=`git log -1 | tail -1 | $SED -ne 's|.*@\W*\([0-9]\+\).*$|\1|p'`
 if [ -z $REVISION_NUMBER ]; then
   echo "Could not get revision number for packaging"
   exit 3
