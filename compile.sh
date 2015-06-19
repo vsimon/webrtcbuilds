@@ -81,6 +81,8 @@ else
   if [ $PLATFORM = 'android' ]; then
     export GYP_DEFINES="OS=android $GYP_DEFINES"
     . src/build/android/envsetup.sh
+  elif [ $PLATFORM = 'osx' ]; then
+    export GYP_DEFINES="target_arch=x64 $GYP_DEFINES"
   fi
 
   # do the build
