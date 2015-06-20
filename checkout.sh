@@ -64,9 +64,11 @@ if [ -z $USE_PICKLE ]; then
     fetch webrtc
   fi
 else
-  curl -o /tmp/pickle.tar.gz https://dl.dropboxusercontent.com/u/14570408/pickle.tar.gz
-  tar zxf /tmp/pickle.tar.gz -C .
-  rm /tmp/pickle.tar.gz
+  curl -L -o /tmp/pickle.tar.gz.aa https://github.com/vsimon/webrtcbuilds-builder/releases/download/pickle/pickle.tar.gz.aa
+  curl -L -o /tmp/pickle.tar.gz.ab https://github.com/vsimon/webrtcbuilds-builder/releases/download/pickle/pickle.tar.gz.ab
+  curl -L -o /tmp/pickle.tar.gz.ac https://github.com/vsimon/webrtcbuilds-builder/releases/download/pickle/pickle.tar.gz.ac
+  cat /tmp/pickle.tar.gz.* | tar xzpvf -
+  rm /tmp/pickle.tar.gz.*
 fi
 
 # check out the specific revision after fetch
