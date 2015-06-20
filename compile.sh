@@ -89,7 +89,8 @@ else
   configs=( "Debug" "Release" )
   for c in "${configs[@]}"; do
     gclient runhooks
-    ninja -C src/out/$c
+    # ninja uses all cores. can optionally take a -j argument via USE_JOBS_OVERRIDE
+    ninja $USE_JOBS_OVERRIDE -C src/out/$c
 
     # combine all the static libraries into one called webrtc_full
     pushd src/out/$c
