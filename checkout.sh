@@ -56,11 +56,17 @@ fi
 # gclient only works from the build directory
 pushd $BUILD_DIR
 
-# first fetch
-if [ $PLATFORM = 'android' ]; then
-  fetch webrtc_android
+if [ -z $USE_PICKLE ]; then
+  # first fetch
+  if [ $PLATFORM = 'android' ]; then
+    fetch webrtc_android
+  else
+    fetch webrtc
+  fi
 else
-  fetch webrtc
+  curl -o /tmp/pickle.tar.gz https://dl.dropboxusercontent.com/u/14570408/pickle.tar.gz
+  tar zxf /tmp/pickle.tar.gz -C .
+  rm /tmp/pickle.tar.gz
 fi
 
 # check out the specific revision after fetch
