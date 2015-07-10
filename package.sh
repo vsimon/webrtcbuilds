@@ -118,7 +118,7 @@ mv $BUILDLABEL/lib/src/out/* $BUILDLABEL/lib
 rmdir $BUILDLABEL/lib/src/out $BUILDLABEL/lib/src
 
 # for linux64, add pkgconfig files
-if [ $UNAME = "linux64" ]; then
+if [ $UNAME = "Linux" ]; then
   mkdir -p $BUILDLABEL/lib/Debug/pkgconfig $BUILDLABEL/lib/Release/pkgconfig
   $CP $DIR/resources/pkgconfig/libwebrtc_full-debug.pc $BUILDLABEL/lib/Debug/pkgconfig/libwebrtc_full.pc
   $CP $DIR/resources/pkgconfig/libwebrtc_full-release.pc $BUILDLABEL/lib/Release/pkgconfig/libwebrtc_full.pc
