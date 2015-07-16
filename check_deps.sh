@@ -13,10 +13,9 @@ source $DIR/environment.sh
 
 if [ $UNAME = 'Darwin' ]; then
   # for GNU version of cp: gcp and jq
-  brew install \
-    coreutils \
-    gnu-sed \
-    jq
+  which jq || brew install jq
+  which gsed || brew install gnu-sed
+  which gcp || brew install coreutils
 elif [ $UNAME = 'Linux' ]; then
   sudo apt-get update && \
   sudo apt-get install -y --no-install-recommends \
