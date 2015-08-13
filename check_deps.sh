@@ -47,7 +47,7 @@ elif [ $UNAME = 'Linux' ]; then
     lib32z1
 else
   # put jq in python_bin in depot_tools because it is ignored by git
-  curl -o $DEPOT_TOOLS/python276_bin/jq.exe 'http://stedolan.github.io/jq/download/win32/jq.exe'
+  curl -L -o $DEPOT_TOOLS/python276_bin/jq.exe https://github.com/stedolan/jq/releases/download/jq-1.4/jq-win32.exe
 fi
 
 # for extensibility
