@@ -64,7 +64,7 @@ if [ -z $USE_PICKLE ]; then
     fetch webrtc
   fi
 else
-  curl -L -O --silent https://github.com/vsimon/webrtcbuilds-builder/releases/download/pickle/pickle.tar.gz.0[0-4]
+  curl -L -O --silent https://github.com/vsimon/webrtcbuilds-builder/releases/download/pickle/pickle.tar.gz.0[0-5]
   cat pickle.tar.gz.* | tar xzpf -
 fi
 
