@@ -1,67 +1,58 @@
 #!/bin/bash
-set -eo pipefail
-set -x
 
-# This goes through the entire build sequence
-
-# win deps: git, tee
-# lin deps: git, tee
-# osx deps: git, tee
+set -o errexit
+set -o nounset
+set -o pipefail
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-source $DIR/environment.sh
+source $DIR/util.sh
 
 usage ()
 {
 cat << EOF
 
-usage:
-   $0 options
+Usage:
+   $0 [OPTIONS]
 
-Build script.
+WebRTC build script.
 
 OPTIONS:
-   -h   Show this message
-   -r   Revision represented as a git SHA (optional, builds latest revision if omitted)
+   -h            Show this message
+   -o OUTDIR     Output directory. Default is 'out'
+   -r REVISION   Git SHA revision. Default is latest revision.
 EOF
 }
 
-while getopts :r: OPTION
-do
-   case $OPTION in
-       r)
-           REVISION=$OPTARG
-           ;;
-       ?)
-           usage
-           exit 1
-           ;;
-   esac
+while getopts :o:r: OPTION; do
+  case $OPTION in
+  o) OUTDIR=$OPTARG ;;
+  r) REVISION=$OPTARG ;;
+  ?) usage; exit 1 ;;
+  esac
 done
 
-# clean first
-$DIR/clean.sh 2>&1
+OUTDIR=${OUTDIR:-out}
+PROJECT_NAME=webrtcbuilds
+REPO_URL="https://chromium.googlesource.com/external/webrtc"
+DEPOT_TOOLS_URL="https://chromium.googlesource.com/chromium/tools/depot_tools.git"
+DEPOT_TOOLS_DIR=$DIR/depot_tools
+DEPOT_TOOLS_WIN_TOOLCHAIN=0
+PATH=$DEPOT_TOOLS_DIR:$DEPOT_TOOLS_DIR/python276_bin:$PATH
 
-# generate directory to build in
-BUILD_DIR=$OUT_DIR
+mkdir -p $OUTDIR
+OUTDIR=$(readlink -f $OUTDIR)
 
-if [ -z $REVISION ]; then
-  # If no revision given, then get the latest revision from git ls-remote
-  REVISION=`git ls-remote $REPO_URL HEAD | cut -f1`
-  if [ -z $REVISION ]; then
-    echo "Could not get latest revision"
-    exit 2
-  fi
-fi
+set-platform
+clean $OUTDIR
+check::deps $PLATFORM $DEPOT_TOOLS_DIR
+check::depot-tools $PLATFORM $DEPOT_TOOLS_URL $DEPOT_TOOLS_DIR
 
-$DIR/check_depot_tools.sh 2>&1 | tee $BUILD_DIR/check_depot_tools.log
-$DIR/check_deps.sh 2>&1 | tee $BUILD_DIR/check_deps.log
-$DIR/checkout.sh -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/checkout.log
-$DIR/patch.sh -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/patch.log
-$DIR/compile.sh -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/compile.log
-$DIR/package.sh -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/package.log
+# If no revision given, then get the latest revision from git ls-remote
+REVISION=${REVISION:-$(git ls-remote $REPO_URL HEAD | cut -f1)} || \
+  { echo "Could not get latest revision" && exit 1; }
+echo "Building revision: $REVISION"
 
-# for extensibility
-if [ -f $DIR/build.local ]; then
-  $DIR/build.local -r $REVISION -d $BUILD_DIR 2>&1 | tee $BUILD_DIR/build.local.log
-fi
+checkout $PLATFORM $OUTDIR $REVISION
+patch $PLATFORM $OUTDIR
+compile $PLATFORM $OUTDIR
+package $PLATFORM $OUTDIR $REVISION $DIR/resource

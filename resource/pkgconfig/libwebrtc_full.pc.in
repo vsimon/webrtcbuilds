@@ -1,0 +1,10 @@
+prefix=${WEBRTC_LOCAL}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: libwebrtc_full
+Description: The WebRTC library
+Version: 0.0.1
+Requires: libcrypto, nss
+Cflags: -DWEBRTC_POSIX -I${includedir} -std=gnu++11
+Libs: ${libdir}/$CONFIG/libwebrtc_full.a -ldl
