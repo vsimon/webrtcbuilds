@@ -1,0 +1,27 @@
+before_script:
+- apt-get update
+- apt-get install -y --no-install-recommends ca-certificates sudo
+
+stages:
+- build
+- test
+
+build-webrtc:
+  stage: build
+  script:
+  - ./build.sh $REVISION
+  artifacts:
+    paths:
+    - out/*.zip
+
+test-webrtc:
+  stage: test
+  before_script:
+  - apt-get update
+  - apt-get install -y --no-install-recommends unzip pkg-config g++ libssl-dev
+    libnss3-dev
+  script:
+  - cd out; unzip *.zip; cd -
+  - test/run_tests.sh $(ls -d -1 out/webrtc*/)
+  dependencies:
+  - build-webrtc
