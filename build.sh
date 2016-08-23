@@ -44,8 +44,8 @@ OUTDIR=$(readlink -f $OUTDIR)
 
 set-platform
 clean $OUTDIR
-check::deps $PLATFORM $DEPOT_TOOLS_DIR
 check::depot-tools $PLATFORM $DEPOT_TOOLS_URL $DEPOT_TOOLS_DIR
+check::deps $PLATFORM $DEPOT_TOOLS_DIR
 
 # If no revision given, then get the latest revision from git ls-remote
 REVISION=${REVISION:-$(git ls-remote $REPO_URL HEAD | cut -f1)} || \

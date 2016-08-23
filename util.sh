@@ -1,12 +1,14 @@
 # Set what platform type to build.
 # Set PLATFORM environment variable to override default behavior.
 # Supported platform types - 'linux64', 'windows', 'osx', 'android'
+# 'msys' is the git bash shell, built using mingw-w64, running under Microsoft Windows.
 function set-platform() {
   # set PLATFORM to android on linux host to build android
   case "$OSTYPE" in
   darwin*)  PLATFORM=${PLATFORM:-osx} ;;
   linux*)   PLATFORM=${PLATFORM:-linux64} ;;
   win32*)   PLATFORM=${PLATFORM:-windows} ;;
+  msys*)   PLATFORM=${PLATFORM:-windows} ;;
   *)        echo "Building on unsupported OS: $OSTYPE"; exit 1; ;;
   esac
 }
@@ -30,14 +32,10 @@ function check::depot-tools() {
   if [ ! -d $depot_tools_dir ]; then
     git clone -q $depot_tools_url $depot_tools_dir
     if [ $platform = 'windows' ]; then
-      # set up task to run gclient.bat to get python
-      schtasks //Create //tn init_gclient //tr `cd $depot_tools_dir; pwd -W`/gclient.bat //sc onstart //f //RU system
-      schtasks //Run //tn init_gclient
-      sleep 1
-      schtasks //Delete //tn init_gclient //f
-      while [ ! -f $depot_tools_dir/python276_bin/python.exe ]; do
-        sleep 5
-      done
+      # run gclient.bat to get python
+      pushd $depot_tools_dir
+      ./gclient.bat
+      popd
     fi
   fi
 }
@@ -81,8 +79,10 @@ function check::deps() {
     done
     ;;
   windows)
+    # force creation of the output directory, because curl --create-dirs does not seem to work
+    mkdir --parents $depot_tools_dir/python276_bin
     # put jq in python_bin in depot_tools because it is ignored by git
-    curl -L -o $depot_tools_dir/python276_bin/jq.exe https://github.com/stedolan/jq/releases/download/jq-1.4/jq-win32.exe
+    curl --location --create-dirs --output $depot_tools_dir/python276_bin/jq.exe https://github.com/stedolan/jq/releases/download/jq-1.4/jq-win32.exe
     ;;
   esac
 }
@@ -167,6 +167,9 @@ function compile() {
   case $platform in
   windows)
     # do the build
+    # This is a hack to force use of Microsoft Visual C++ 2013.
+    # More sophisticated code would look first for Visual C++ 2015, then 2013.
+    GYP_MSVS_VERSION = '2013'
     cmd //c "$WIN_DEPOT_TOOLS\gclient.bat runhooks"
     ninja -C src/out/Debug
     ninja -C src/out/Release
