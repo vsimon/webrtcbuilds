@@ -169,7 +169,8 @@ function compile() {
     # do the build
     # This is a hack to force use of Microsoft Visual C++ 2013.
     # More sophisticated code would look first for Visual C++ 2015, then 2013.
-    GYP_MSVS_VERSION = '2013'
+    export GYP_MSVS_VERSION='2013'
+    echo GYP_MSVS_VERSION $GYP_MSVS_VERSION
     cmd //c "$WIN_DEPOT_TOOLS\gclient.bat runhooks"
     ninja -C src/out/Debug
     ninja -C src/out/Release
