@@ -48,7 +48,7 @@ export GYP_MSVS_VERSION='2013'
 echo GYP_MSVS_VERSION $GYP_MSVS_VERSION
 
 set-platform
-#DTB clean $OUTDIR
+clean $OUTDIR
 check::depot-tools $PLATFORM $DEPOT_TOOLS_URL $DEPOT_TOOLS_DIR
 check::deps $PLATFORM $DEPOT_TOOLS_DIR
 
