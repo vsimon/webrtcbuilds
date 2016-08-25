@@ -42,8 +42,13 @@ PATH=$DEPOT_TOOLS_DIR:$DEPOT_TOOLS_DIR/python276_bin:$PATH
 mkdir -p $OUTDIR
 OUTDIR=$(readlink -f $OUTDIR)
 
+# This is a hack to force use of Microsoft Visual C++ 2013.
+# More sophisticated code would look first for Visual C++ 2015, then 2013.
+export GYP_MSVS_VERSION='2013'
+echo GYP_MSVS_VERSION $GYP_MSVS_VERSION
+
 set-platform
-clean $OUTDIR
+#DTB clean $OUTDIR
 check::depot-tools $PLATFORM $DEPOT_TOOLS_URL $DEPOT_TOOLS_DIR
 check::deps $PLATFORM $DEPOT_TOOLS_DIR
 
