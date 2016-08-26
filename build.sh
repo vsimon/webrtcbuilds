@@ -44,11 +44,10 @@ PATH=$DEPOT_TOOLS_DIR:$DEPOT_TOOLS_DIR/python276_bin:$PATH
 mkdir -p $OUTDIR
 OUTDIR=$(readlink -f $OUTDIR)
 
+# If a Microsoft Visual Studio (C++) version is given, override the Chromium build default.
 if [ -v MSVSVER ]; then
   export GYP_MSVS_VERSION=$MSVSVER
 fi
-
-exit
 
 set-platform
 clean $OUTDIR
