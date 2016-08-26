@@ -64,12 +64,11 @@ function check::deps() {
   case $platform in
   osx)
     # for GNU version of cp: gcp and jq
-    which jq || brew install jq
     which gsed || brew install gnu-sed
     which gcp || brew install coreutils
     ;;
   linux*|android)
-    packages="curl wget git jq python python-pip default-jdk g++ ruby
+    packages="curl wget git python python-pip default-jdk g++ ruby
       libnss3-dev libasound2-dev libpulse-dev libjpeg-dev libxv-dev
       libgtk2.0-dev libexpat1-dev libxtst-dev libxss-dev libudev-dev
       libgconf2-dev libgnome-keyring-dev libpci-dev libgl1-mesa-dev lib32stdc++6
@@ -77,12 +76,6 @@ function check::deps() {
     for p in $packages; do
       check::is-package-installed $p || check::install-package $p
     done
-    ;;
-  windows)
-    # force creation of the output directory, because curl --create-dirs does not seem to work
-    mkdir --parents $depot_tools_dir/python276_bin
-    # put jq in python_bin in depot_tools because it is ignored by git
-    curl --location --create-dirs --output $depot_tools_dir/python276_bin/jq.exe https://github.com/stedolan/jq/releases/download/jq-1.4/jq-win32.exe
     ;;
   esac
 }
