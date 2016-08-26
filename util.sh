@@ -1,12 +1,14 @@
 # Set what platform type to build.
 # Set PLATFORM environment variable to override default behavior.
 # Supported platform types - 'linux64', 'windows', 'osx', 'android'
+# 'msys' is the git bash shell, built using mingw-w64, running under Microsoft Windows.
 function set-platform() {
   # set PLATFORM to android on linux host to build android
   case "$OSTYPE" in
   darwin*)  PLATFORM=${PLATFORM:-osx} ;;
   linux*)   PLATFORM=${PLATFORM:-linux64} ;;
   win32*)   PLATFORM=${PLATFORM:-windows} ;;
+  msys*)   PLATFORM=${PLATFORM:-windows} ;;
   *)        echo "Building on unsupported OS: $OSTYPE"; exit 1; ;;
   esac
 }
@@ -30,14 +32,10 @@ function check::depot-tools() {
   if [ ! -d $depot_tools_dir ]; then
     git clone -q $depot_tools_url $depot_tools_dir
     if [ $platform = 'windows' ]; then
-      # set up task to run gclient.bat to get python
-      schtasks //Create //tn init_gclient //tr `cd $depot_tools_dir; pwd -W`/gclient.bat //sc onstart //f //RU system
-      schtasks //Run //tn init_gclient
-      sleep 1
-      schtasks //Delete //tn init_gclient //f
-      while [ ! -f $depot_tools_dir/python276_bin/python.exe ]; do
-        sleep 5
-      done
+      # run gclient.bat to get python
+      pushd $depot_tools_dir
+      ./gclient.bat
+      popd
     fi
   fi
 }
@@ -58,10 +56,8 @@ function check::install-package() {
 
 # Makes sure all build dependencies are present.
 # $1: The platform type.
-# $2: The depot tools directory.
 function check::deps() {
   local platform="$1"
-  local depot_tools_dir="$2"
 
   case $platform in
   osx)
@@ -118,12 +114,14 @@ function patch() {
   case $platform in
   windows)
     # patch for directx not found
-    sed -i 's|\(#include <d3dx9.h>\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.h
-    sed -i 's|\(D3DXMATRIX\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.cc
+    # TODO: These files no longer exist
+#    sed -i 's|\(#include <d3dx9.h>\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.h
+#    sed -i 's|\(D3DXMATRIX\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.cc
     # patch all platforms to build standalone libs
     find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
     # also for the libs that say 'type': '<(component)' like nss and icu
-    find src/chromium/src/third_party src/net/third_party/nss \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': '<(component)',\)|\1 'standalone_static_library': 1,|" '{}' ';'
+    # TODO: These files no longer exist
+    # find src/chromium/src/third_party src/net/third_party/nss \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': '<(component)',\)|\1 'standalone_static_library': 1,|" '{}' ';'
     ;;
   android) ;;
   *)
