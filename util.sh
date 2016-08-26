@@ -114,12 +114,14 @@ function patch() {
   case $platform in
   windows)
     # patch for directx not found
-    sed -i 's|\(#include <d3dx9.h>\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.h
-    sed -i 's|\(D3DXMATRIX\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.cc
+    # TODO: These files no longer exist
+#    sed -i 's|\(#include <d3dx9.h>\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.h
+#    sed -i 's|\(D3DXMATRIX\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.cc
     # patch all platforms to build standalone libs
     find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
     # also for the libs that say 'type': '<(component)' like nss and icu
-    find src/chromium/src/third_party src/net/third_party/nss \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': '<(component)',\)|\1 'standalone_static_library': 1,|" '{}' ';'
+    # TODO: These files no longer exist
+    # find src/chromium/src/third_party src/net/third_party/nss \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': '<(component)',\)|\1 'standalone_static_library': 1,|" '{}' ';'
     ;;
   android) ;;
   *)
