@@ -56,10 +56,8 @@ function check::install-package() {
 
 # Makes sure all build dependencies are present.
 # $1: The platform type.
-# $2: The depot tools directory.
 function check::deps() {
   local platform="$1"
-  local depot_tools_dir="$2"
 
   case $platform in
   osx)
