@@ -18,13 +18,15 @@ WebRTC build script.
 
 OPTIONS:
    -h            Show this message
+   -m MSVSVER    Microsoft Visual Studio (C++) version (e.g. 2013). Default is Chromium build default.
    -o OUTDIR     Output directory. Default is 'out'
    -r REVISION   Git SHA revision. Default is latest revision.
 EOF
 }
 
-while getopts :o:r: OPTION; do
+while getopts :m:o:r: OPTION; do
   case $OPTION in
+  m) MSVSVER=$OPTARG ;;
   o) OUTDIR=$OPTARG ;;
   r) REVISION=$OPTARG ;;
   ?) usage; exit 1 ;;
@@ -42,15 +44,16 @@ PATH=$DEPOT_TOOLS_DIR:$DEPOT_TOOLS_DIR/python276_bin:$PATH
 mkdir -p $OUTDIR
 OUTDIR=$(readlink -f $OUTDIR)
 
-# This is a hack to force use of Microsoft Visual C++ 2013.
-# More sophisticated code would look first for Visual C++ 2015, then 2013.
-export GYP_MSVS_VERSION='2013'
-echo GYP_MSVS_VERSION $GYP_MSVS_VERSION
+if [ -v MSVSVER ]; then
+  export GYP_MSVS_VERSION=$MSVSVER
+fi
+
+exit
 
 set-platform
 clean $OUTDIR
+check::deps $PLATFORM
 check::depot-tools $PLATFORM $DEPOT_TOOLS_URL $DEPOT_TOOLS_DIR
-check::deps $PLATFORM $DEPOT_TOOLS_DIR
 
 # If no revision given, then get the latest revision from git ls-remote
 REVISION=${REVISION:-$(git ls-remote $REPO_URL HEAD | cut -f1)} || \
