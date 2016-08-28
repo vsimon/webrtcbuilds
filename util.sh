@@ -44,14 +44,14 @@ function check::depot-tools() {
 # $1: The package name.
 function check::is-package-installed() {
   local package="$1"
-  dpkg-query --show --showformat='\r' $package
+  dpkg -s $package &>/dev/null
 }
 
 # Installs a given package.
 # $1: The package name.
 function check::install-package() {
   local package="$1"
-  sudo apt-get install -y $package
+  sudo apt-get install -qq $package
 }
 
 # Makes sure all build dependencies are present.
@@ -66,6 +66,9 @@ function check::deps() {
     which gcp || brew install coreutils
     ;;
   linux*|android)
+    if ! which sudo > /dev/null ; then
+      apt-get update -qq && apt-get install -qq sudo
+    fi
     packages="curl wget git python python-pip default-jdk g++ ruby
       libnss3-dev libasound2-dev libpulse-dev libjpeg-dev libxv-dev
       libgtk2.0-dev libexpat1-dev libxtst-dev libxss-dev libudev-dev
