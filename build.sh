@@ -42,7 +42,7 @@ DEPOT_TOOLS_WIN_TOOLCHAIN=0
 PATH=$DEPOT_TOOLS_DIR:$DEPOT_TOOLS_DIR/python276_bin:$PATH
 
 mkdir -p $OUTDIR
-OUTDIR=$(readlink -f $OUTDIR)
+OUTDIR=$(cd $OUTDIR && pwd -P)
 
 # If a Microsoft Visual Studio (C++) version is given, override the Chromium build default.
 MSVSVER=${MSVSVER:-}
