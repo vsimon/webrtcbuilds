@@ -18,7 +18,8 @@ Or optionally another version specified by git SHA:
 
 OPTIONS:
    -h            Show this message
-   -o DIRNAME    Output directory. Default is 'out'
+   -m MSVSVER    Microsoft Visual Studio (C++) version (e.g. 2013). Default is Chromium build default.
+   -o OUTDIR     Output directory. Default is 'out'
    -r REVISION   Git SHA revision. Default is latest revision.
 ```
 
