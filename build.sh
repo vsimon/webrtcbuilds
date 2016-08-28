@@ -45,7 +45,8 @@ mkdir -p $OUTDIR
 OUTDIR=$(readlink -f $OUTDIR)
 
 # If a Microsoft Visual Studio (C++) version is given, override the Chromium build default.
-if [ -v MSVSVER ]; then
+MSVSVER=${MSVSVER:-}
+if [ -n "$MSVSVER" ]; then
   export GYP_MSVS_VERSION=$MSVSVER
 fi
 

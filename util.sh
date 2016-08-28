@@ -160,7 +160,7 @@ function compile() {
   case $platform in
   windows)
     # do the build
-    cmd //c "$WIN_DEPOT_TOOLS\gclient.bat runhooks"
+    python src/webrtc/build/gyp_webrtc.py
     ninja -C src/out/Debug
     ninja -C src/out/Release
 
@@ -168,7 +168,7 @@ function compile() {
     GYP_DEFINES="target_arch=x64 $GYP_DEFINES"
 
     # do the build
-    cmd //c "$WIN_DEPOT_TOOLS\gclient.bat runhooks"
+    python src/webrtc/build/gyp_webrtc.py
     ninja -C src/out/Debug_x64
     ninja -C src/out/Release_x64
 
@@ -189,7 +189,7 @@ function compile() {
     # do the build
     configs="Debug Release"
     for cfg in $configs; do
-      gclient runhooks
+      python src/webrtc/build/gyp_webrtc.py
       ninja -C src/out/$cfg
       # combine all the static libraries into one called webrtc_full
       pushd src/out/$cfg
