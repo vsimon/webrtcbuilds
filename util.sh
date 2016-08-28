@@ -189,7 +189,7 @@ function compile() {
     # do the build
     configs="Debug Release"
     for cfg in $configs; do
-      gclient runhooks
+      python src/webrtc/build/gyp_webrtc.py
       ninja -C src/out/$cfg
       # combine all the static libraries into one called webrtc_full
       pushd src/out/$cfg
