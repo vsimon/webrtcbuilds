@@ -8,7 +8,7 @@ function set-platform() {
   darwin*)  PLATFORM=${PLATFORM:-osx} ;;
   linux*)   PLATFORM=${PLATFORM:-linux64} ;;
   win32*)   PLATFORM=${PLATFORM:-windows} ;;
-  msys*)   PLATFORM=${PLATFORM:-windows} ;;
+  msys*)    PLATFORM=${PLATFORM:-windows} ;;
   *)        echo "Building on unsupported OS: $OSTYPE"; exit 1; ;;
   esac
 }
@@ -33,10 +33,14 @@ function check::depot-tools() {
     git clone -q $depot_tools_url $depot_tools_dir
     if [ $platform = 'windows' ]; then
       # run gclient.bat to get python
-      pushd $depot_tools_dir
+      pushd $depot_tools_dir >/dev/null
       ./gclient.bat
-      popd
+      popd >/dev/null
     fi
+  else
+    pushd $depot_tools_dir >/dev/null
+      git reset --hard
+    popd >/dev/null
   fi
 }
 
@@ -61,8 +65,7 @@ function check::deps() {
 
   case $platform in
   osx)
-    # for GNU version of cp: gcp and jq
-    which gsed || brew install gnu-sed
+    # for GNU version of cp: gcp
     which gcp || brew install coreutils
     ;;
   linux*|android)
@@ -90,7 +93,7 @@ function checkout() {
   local outdir="$2"
   local revision="$3"
 
-  pushd $outdir
+  pushd $outdir >/dev/null
   if [ ! -d src ]; then
     case $platform in
     android)
@@ -103,7 +106,7 @@ function checkout() {
   fi
   # check out the specific revision after fetch
   gclient sync --force --revision $revision
-  popd
+  popd >/dev/null
 }
 
 # Patches a checkout for building static standalone libs
@@ -113,39 +116,28 @@ function patch() {
   local platform="$1"
   local outdir="$2"
 
-  pushd $outdir
-  case $platform in
-  windows)
-    # patch for directx not found
-    # TODO: These files no longer exist
-#    sed -i 's|\(#include <d3dx9.h>\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.h
-#    sed -i 's|\(D3DXMATRIX\)|//\1|' $outdir/src/webrtc/modules/video_render/windows/video_render_direct3d9.cc
-    # patch all platforms to build standalone libs
-    find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
-    # also for the libs that say 'type': '<(component)' like nss and icu
-    # TODO: These files no longer exist
-    # find src/chromium/src/third_party src/net/third_party/nss \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec sed -i "s|\('type': '<(component)',\)|\1 'standalone_static_library': 1,|" '{}' ';'
-    ;;
-  android) ;;
-  *)
-    # sed
-    if [ $platform = 'osx' ]; then
-      SED='gsed'
-    else
-      SED='sed'
-    fi
-    # patch all platforms to build standalone libs
-    find src/webrtc src/talk src/chromium/src/third_party \( -name *.gyp -o  -name *.gypi \) -not -path *libyuv* -exec $SED -i "s|\('type': 'static_library',\)|\1 'standalone_static_library': 1,|" '{}' ';'
-    # for icu only; icu_use_data_file_flag is 1 on linux
-    find src/chromium/src/third_party/icu/icu.gyp \( -name *.gyp -o  -name *.gypi \) -exec $SED -i "s|\('type': 'none',\)|\1 'standalone_static_library': 0,|" '{}' ';'
-    # enable rtti for osx and linux
-    $SED -i "s|'GCC_ENABLE_CPP_RTTI': 'NO'|'GCC_ENABLE_CPP_RTTI': 'YES'|" src/chromium/src/build/common.gypi
-    $SED -i "s|^          '-fno-rtti'|          '-frtti'|" src/chromium/src/build/common.gypi
-    # don't make thin archives
-    $SED -i "s|, 'alink_thin'|, 'alink'|" src/tools/gyp/pylib/gyp/generator/ninja.py
-    ;;
-  esac
-  popd
+  pushd $outdir/src >/dev/null
+  # This removes the examples from being built.
+  sed -i.bak 's|"//webrtc/examples",|#"//webrtc/examples",|' BUILD.gn
+  # This patches a GN error with the video_loopback executable depending on a
+  # test but since we disable building tests GN detects a dependency error.
+  # Replacing the outer conditional with 'rtc_include_tests' works around this.
+  sed -i.bak 's|if (!build_with_chromium)|if (rtc_include_tests)|' webrtc/BUILD.gn
+  popd >/dev/null
+}
+
+# This function combines build artifact objects into one library named by
+# 'outputlib'.
+# $1: The directory containing .ninja_deps and build artifacts.
+# $2: The output library name.
+function combine-objs() {
+  local objs="$1"
+  local outputlib="$2"
+  local blacklist="unittest_main.o"
+
+  # Combine all objects into one static library. Prevent blacklisted objects
+  # such as ones containing a main function from being combined.
+  echo "$objs" | grep -v -E $blacklist | xargs ar crs $outputlib
 }
 
 # This compiles the library.
@@ -154,12 +146,12 @@ function patch() {
 function compile() {
   local platform="$1"
   local outdir="$2"
+  local target_os="" # TODO: one-day support cross-compiling via options
+  local target_cpu="" # TODO: also one-day support this
+  local common_args="is_component_build=false rtc_include_tests=false"
+  local platform_args=""
 
-  pushd $outdir
-  # start with no tests
-  #GYP_DEFINES='build_with_chromium=0 include_tests=0 host_clang=0 disable_glibcxx_debug=1 linux_use_debug_fission=0'
-  GYP_DEFINES='build_with_chromium=0 include_tests=0'
-
+  pushd $outdir/src >/dev/null
   case $platform in
   windows)
     # do the build
@@ -183,67 +175,81 @@ function compile() {
     "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Release_x64/webrtc_full.lib src/out/Release_x64/*.lib
     ;;
   *)
-    if [ $platform = 'android' ]; then
-      GYP_DEFINES="OS=android $GYP_DEFINES"
-      . src/build/android/envsetup.sh
-    elif [ $platform = 'osx' ]; then
-      GYP_DEFINES="target_arch=x64 $GYP_DEFINES"
+    # On Linux, use clang = false and sysroot = false to build using gcc.
+    # Comment this out to use clang.
+    if [ $platform = 'linux64' ]; then
+      platform_args="is_clang=false use_sysroot=false"
     fi
-    # do the build
-    configs="Debug Release"
-    for cfg in $configs; do
-      python src/webrtc/build/gyp_webrtc.py
-      ninja -C src/out/$cfg
-      # combine all the static libraries into one called webrtc_full
-      pushd src/out/$cfg
-      find . -name '*.a' -exec ar -x '{}' ';'
-      ar -crs libwebrtc_full.a *.o
-      rm *.o
-      popd
-    done
+
+    # Debug builds are component builds (shared libraries) by default unless
+    # is_component_build=false is passed to gn gen --args. Release builds are
+    # static by default.
+    gn gen out/Debug --args="$common_args $platform_args"
+    pushd out/Debug >/dev/null
+      ninja -C .
+
+      rm -f libwebrtc_full.a
+      # Produce an ordered objects list by parsing .ninja_deps for strings
+      # matching .o files.
+      local objlist=$(strings .ninja_deps | grep -o '.*\.o')
+      combine-objs "$objlist" libwebrtc_full.a
+
+      # various intrinsics aren't included by default in .ninja_deps
+      local extras=$(find \
+        ./obj/third_party/libvpx/libvpx_* \
+        ./obj/third_party/libjpeg_turbo/simd_asm -name *.o)
+      combine-objs "$extras" libwebrtc_full.a
+    popd >/dev/null
+
+    gn gen out/Release --args="is_debug=false $common_args $platform_args"
+    pushd out/Release >/dev/null
+      ninja -C .
+
+      rm -f libwebrtc_full.a
+      # Produce an ordered objects list by parsing .ninja_deps for strings
+      # matching .o files.
+      local objlist=$(strings .ninja_deps | grep -o '.*\.o')
+      combine-objs "$objlist" libwebrtc_full.a
+
+      # various intrinsics aren't included by default in .ninja_deps
+      local extras=$(find \
+        ./obj/third_party/libvpx/libvpx_* \
+        ./obj/third_party/libjpeg_turbo/simd_asm -name *.o)
+      combine-objs "$extras" libwebrtc_full.a
+    popd >/dev/null
     ;;
   esac
-  popd
+  popd >/dev/null
 }
 
 # This packages a compiled build into a zip file in the output directory.
 # $1: The platform type.
 # $2: The output directory.
-# $3: Revision represented as a git SHA.
+# $3: Label of the package.
 # $4: The project's resource dirctory.
 function package() {
   local platform="$1"
   local outdir="$2"
-  local revision="$3"
+  local label="$3"
   local resourcedir="$4"
 
-  # go into the webrtc repo to be able to get the revision number from git log
-  pushd $outdir
-  if [ $platform = 'Darwin' ]; then
-    SED='gsed'
+  if [ $platform = 'osx' ]; then
     CP='gcp'
   else
-    SED='sed'
     CP='cp'
   fi
-  pushd src
-  local revision_number=$(git log -1 | tail -1 | $SED -ne 's|.*@\W*\([0-9]\+\).*$|\1|p')
-  [[ -n $revision_number ]] || \
-    { echo "Could not get revision number for packaging" && exit 1; }
-
-  local revision_short=$(git rev-parse --short $revision)
-  local label=$PROJECT_NAME-$revision_number-$revision_short-$platform
+  pushd $outdir >/dev/null
   # create directory structure
-  mkdir -p $outdir/$label/include $outdir/$label/lib
+  mkdir -p $label/include $label/lib
   # find and copy header files
-  find webrtc talk chromium/src/third_party/jsoncpp -name *.h \
-    -exec $CP --parents '{}' $outdir/$label/include ';'
+  pushd src >/dev/null
+  find webrtc -name *.h -exec $CP --parents '{}' $outdir/$label/include ';'
+  popd >/dev/null
   # find and copy libraries
-  pushd out
+  pushd src/out >/dev/null
   find . -maxdepth 3 \( -name *.so -o -name *webrtc_full* -o -name *.jar \) \
     -exec $CP --parents '{}' $outdir/$label/lib ';'
-  popd
-  popd
+  popd >/dev/null
 
   # for linux64, add pkgconfig files
   if [ $platform = 'linux64' ]; then
@@ -254,13 +260,42 @@ function package() {
         $label/lib/$cfg/pkgconfig/libwebrtc_full.pc
     done
   fi
+
+  # remove first for cleaner builds
+  rm -f $label.zip
+
   # zip up the package
   if [ $platform = 'windows' ]; then
     $DEPOT_TOOLS/win_toolchain/7z/7z.exe a -tzip $label.zip $label
   else
-    zip -r $label.zip $label
+    zip -r $label.zip $label >/dev/null
   fi
-  # archive revision_number
-  echo $revision_number > revision_number
-  popd
+  popd >/dev/null
+}
+
+# This returns the latest revision from the git repo.
+# $1: The git repo URL
+function latest-rev() {
+  local repo_url="$1"
+  git ls-remote $repo_url HEAD | cut -f1
+}
+
+# This returns the associated revision number for a given git sha revision
+# $1: The git repo URL
+# $2: The revision git sha string
+function revision-number() {
+  local repo_url="$1"
+  local revision="$2"
+  # This says curl the revision log with text format, base64 decode it using
+  # openssl since its more portable than just 'base64', take the last line which
+  # contains the commit revision number and output only the matching {#nnn} part
+  openssl base64 -d -A <<< $(curl --silent $repo_url/+/$revision?format=TEXT) \
+    | tail -1 | egrep -o '{#([0-9]+)}' | tr -d '{}#'
+}
+
+# This returns a short revision sha.
+# $1: The revision string
+function short-rev() {
+  local revision="$1"
+  echo $revision | cut -c -7
 }
