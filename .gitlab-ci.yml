@@ -10,7 +10,11 @@ build-webrtc:
   stage: build
   script:
   - ./build.sh $REVISION
+  cache:
+    paths:
+    - out
   artifacts:
+    expire_in: 6 months
     paths:
     - out/*.zip
 
@@ -19,7 +23,7 @@ test-webrtc:
   before_script:
   - apt-get update
   - apt-get install -qq --no-install-recommends unzip pkg-config g++ libssl-dev
-    libnss3-dev
+    libnss3-dev libx11-dev libexpat1-dev libasound2
   script:
   - cd out; unzip *.zip; cd -
   - test/run_tests.sh $(ls -d -1 out/webrtc*/)
