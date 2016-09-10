@@ -1,4 +1,5 @@
 before_script:
+- sed -i "s#universe#universe multiverse#" /etc/apt/sources.list
 - apt-get update
 - apt-get install -qq --no-install-recommends ca-certificates
 
