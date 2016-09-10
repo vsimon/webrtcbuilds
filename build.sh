@@ -51,16 +51,34 @@ if [ -n "$MSVSVER" ]; then
 fi
 
 set-platform
-clean $OUTDIR
+echo "Platform set: $PLATFORM"
+
+echo Checking dependencies
 check::deps $PLATFORM
+
+echo Checking depot-tools
 check::depot-tools $PLATFORM $DEPOT_TOOLS_URL $DEPOT_TOOLS_DIR
 
 # If no revision given, then get the latest revision from git ls-remote
-REVISION=${REVISION:-$(git ls-remote $REPO_URL HEAD | cut -f1)} || \
+REVISION=${REVISION:-$(latest-rev $REPO_URL)} || \
   { echo "Could not get latest revision" && exit 1; }
+REVISION_NUMBER=$(revision-number $REPO_URL $REVISION) || \
+  { echo "Could not get revision number" && exit 1; }
 echo "Building revision: $REVISION"
+echo "Associated revision number: $REVISION_NUMBER"
 
+echo "Checking out WebRTC revision (this will take awhile): $REVISION"
 checkout $PLATFORM $OUTDIR $REVISION
+
+echo Patching WebRTC source
 patch $PLATFORM $OUTDIR
+
+echo Compiling WebRTC
 compile $PLATFORM $OUTDIR
-package $PLATFORM $OUTDIR $REVISION $DIR/resource
+
+echo Packaging WebRTC
+# label is <projectname>-<rev-number>-<short-rev-sha>-<platform>
+LABEL=$PROJECT_NAME-$REVISION_NUMBER-$(short-rev $REVISION)-$PLATFORM
+package $PLATFORM $OUTDIR $LABEL $DIR/resource
+
+echo Build successful
