@@ -1,15 +1,15 @@
-# Set what platform type to build.
+# Detect host platform.
 # Set PLATFORM environment variable to override default behavior.
-# Supported platform types - 'linux64', 'windows', 'osx', 'android'
-# 'msys' is the git bash shell, built using mingw-w64, running under Microsoft Windows.
-function set-platform() {
+# Supported platform types - 'linux', 'win', 'mac'
+# 'msys' is the git bash shell, built using mingw-w64, running under Microsoft
+# Windows.
+function detect-platform() {
   # set PLATFORM to android on linux host to build android
   case "$OSTYPE" in
-  darwin*)  PLATFORM=${PLATFORM:-osx} ;;
-  linux*)   PLATFORM=${PLATFORM:-linux64} ;;
-  win32*)   PLATFORM=${PLATFORM:-windows} ;;
-  msys*)    PLATFORM=${PLATFORM:-windows} ;;
-  *)        echo "Building on unsupported OS: $OSTYPE"; exit 1; ;;
+  darwin*)      PLATFORM=${PLATFORM:-mac} ;;
+  linux*)       PLATFORM=${PLATFORM:-linux} ;;
+  win32*|msys*) PLATFORM=${PLATFORM:-win} ;;
+  *)            echo "Building on unsupported OS: $OSTYPE"; exit 1; ;;
   esac
 }
 
@@ -31,7 +31,7 @@ function check::depot-tools() {
 
   if [ ! -d $depot_tools_dir ]; then
     git clone -q $depot_tools_url $depot_tools_dir
-    if [ $platform = 'windows' ]; then
+    if [ $platform = 'win' ]; then
       # run gclient.bat to get python
       pushd $depot_tools_dir >/dev/null
       ./gclient.bat
@@ -59,11 +59,11 @@ function check::webrtcbuilds::deps() {
   local platform="$1"
 
   case $platform in
-  osx)
+  mac)
     # for GNU version of cp: gcp
     which gcp || brew install coreutils
     ;;
-  linux*|android)
+  linux|android)
     if ! grep -v \# /etc/apt/sources.list | grep -q multiverse ; then
       echo "*** Warning: The Multiverse repository is probably not enabled ***"
       echo "*** which is required for things like msttcorefonts.           ***"
@@ -87,7 +87,7 @@ function check::webrtc::deps() {
   local outdir="$2"
 
   case $platform in
-  linux*)
+  linux)
     # Automatically accepts ttf-mscorefonts EULA
     echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
     sudo $outdir/src/build/install-build-deps.sh --no-syms --no-arm --no-chromeos-fonts --no-nacl --no-prompt
@@ -169,7 +169,7 @@ function compile() {
 
   pushd $outdir/src >/dev/null
   case $platform in
-  windows)
+  win)
     # do the build
     python src/webrtc/build/gyp_webrtc.py
     ninja -C src/out/Debug
@@ -193,7 +193,7 @@ function compile() {
   *)
     # On Linux, use clang = false and sysroot = false to build using gcc.
     # Comment this out to use clang.
-    if [ $platform = 'linux64' ]; then
+    if [ $platform = 'linux' ]; then
       platform_args="is_clang=false use_sysroot=false"
     fi
 
@@ -249,7 +249,7 @@ function package() {
   local label="$3"
   local resourcedir="$4"
 
-  if [ $platform = 'osx' ]; then
+  if [ $platform = 'mac' ]; then
     CP='gcp'
   else
     CP='cp'
@@ -267,8 +267,8 @@ function package() {
     -exec $CP --parents '{}' $outdir/$label/lib ';'
   popd >/dev/null
 
-  # for linux64, add pkgconfig files
-  if [ $platform = 'linux64' ]; then
+  # for linux, add pkgconfig files
+  if [ $platform = 'linux' ]; then
     configs="Debug Release"
     for cfg in $configs; do
       mkdir -p $label/lib/$cfg/pkgconfig
@@ -281,7 +281,7 @@ function package() {
   rm -f $label.zip
 
   # zip up the package
-  if [ $platform = 'windows' ]; then
+  if [ $platform = 'win' ]; then
     $DEPOT_TOOLS/win_toolchain/7z/7z.exe a -tzip $label.zip $label
   else
     zip -r $label.zip $label >/dev/null

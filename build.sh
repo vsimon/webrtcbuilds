@@ -50,8 +50,8 @@ if [ -n "$MSVSVER" ]; then
   export GYP_MSVS_VERSION=$MSVSVER
 fi
 
-set-platform
-echo "Platform set: $PLATFORM"
+detect-platform
+echo "Host platform: $PLATFORM"
 
 echo Checking webrtcbuilds dependencies
 check::webrtcbuilds::deps $PLATFORM
