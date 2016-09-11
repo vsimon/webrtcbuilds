@@ -44,23 +44,18 @@ function check::depot-tools() {
   fi
 }
 
-# Checks if a given package is installed.
-# $1: The package name.
-function check::is-package-installed() {
-  local package="$1"
-  dpkg -s $package &>/dev/null
+# Makes sure package is installed. Depends on sudo to be installed first.
+# $1: The name of the package
+function ensure-package() {
+  local name="$1"
+  if ! which $name > /dev/null ; then
+    sudo apt-get update -qq && sudo apt-get install -qq $name
+  fi
 }
 
-# Installs a given package.
-# $1: The package name.
-function check::install-package() {
-  local package="$1"
-  sudo apt-get install -qq $package
-}
-
-# Makes sure all build dependencies are present.
+# Makes sure all webrtcbuilds dependencies are present.
 # $1: The platform type.
-function check::deps() {
+function check::webrtcbuilds::deps() {
   local platform="$1"
 
   case $platform in
@@ -69,17 +64,38 @@ function check::deps() {
     which gcp || brew install coreutils
     ;;
   linux*|android)
+    if ! grep -v \# /etc/apt/sources.list | grep -q multiverse ; then
+      echo "*** Warning: The Multiverse repository is probably not enabled ***"
+      echo "*** which is required for things like msttcorefonts.           ***"
+    fi
     if ! which sudo > /dev/null ; then
       apt-get update -qq && apt-get install -qq sudo
     fi
-    packages="curl wget git python python-pip default-jdk g++ ruby
-      libnss3-dev libasound2-dev libpulse-dev libjpeg-dev libxv-dev
-      libgtk2.0-dev libexpat1-dev libxtst-dev libxss-dev libudev-dev
-      libgconf2-dev libgnome-keyring-dev libpci-dev libgl1-mesa-dev lib32stdc++6
-      lib32z1"
-    for p in $packages; do
-      check::is-package-installed $p || check::install-package $p
-    done
+    ensure-package curl
+    ensure-package git
+    ensure-package python
+    ensure-package lbzip2
+    ensure-package lsb-release
+    ;;
+  esac
+}
+
+# Makes sure all WebRTC build dependencies are present.
+# $1: The platform type.
+function check::webrtc::deps() {
+  local platform="$1"
+  local outdir="$2"
+
+  case $platform in
+  linux*)
+    # Automatically accepts ttf-mscorefonts EULA
+    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
+    sudo $outdir/src/build/install-build-deps.sh --no-syms --no-arm --no-chromeos-fonts --no-nacl --no-prompt
+    ;;
+  android)
+    # Automatically accepts ttf-mscorefonts EULA
+    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
+    sudo $outdir/src/build/install-build-deps-android.sh
     ;;
   esac
 }

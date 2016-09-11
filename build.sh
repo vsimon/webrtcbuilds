@@ -53,8 +53,8 @@ fi
 set-platform
 echo "Platform set: $PLATFORM"
 
-echo Checking dependencies
-check::deps $PLATFORM
+echo Checking webrtcbuilds dependencies
+check::webrtcbuilds::deps $PLATFORM
 
 echo Checking depot-tools
 check::depot-tools $PLATFORM $DEPOT_TOOLS_URL $DEPOT_TOOLS_DIR
@@ -69,6 +69,9 @@ echo "Associated revision number: $REVISION_NUMBER"
 
 echo "Checking out WebRTC revision (this will take awhile): $REVISION"
 checkout $PLATFORM $OUTDIR $REVISION
+
+echo Checking WebRTC dependencies
+check::webrtc::deps $PLATFORM $OUTDIR
 
 echo Patching WebRTC source
 patch $PLATFORM $OUTDIR
