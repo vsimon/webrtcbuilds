@@ -17,18 +17,22 @@ Usage:
 WebRTC build script.
 
 OPTIONS:
-   -h            Show this message
-   -m MSVSVER    Microsoft Visual Studio (C++) version (e.g. 2013). Default is Chromium build default.
-   -o OUTDIR     Output directory. Default is 'out'
-   -r REVISION   Git SHA revision. Default is latest revision.
+   -h             Show this message
+   -m MSVSVER     Microsoft Visual Studio (C++) version (e.g. 2013). Default is Chromium build default.
+   -o OUTDIR      Output directory. Default is 'out'
+   -r REVISION    Git SHA revision. Default is latest revision.
+   -t TARGET OS   The target os for cross-compilation. Default is the host OS such as 'linux', 'mac', 'win'. Other values can be 'android', 'ios'.
+   -c TARGET CPU  The target cpu for cross-compilation. Default is 'x64'. Other values can be 'x86', 'arm64', 'arm'.
 EOF
 }
 
-while getopts :m:o:r: OPTION; do
+while getopts :m:o:r:t:c: OPTION; do
   case $OPTION in
   m) MSVSVER=$OPTARG ;;
   o) OUTDIR=$OPTARG ;;
   r) REVISION=$OPTARG ;;
+  t) TARGET_OS=$OPTARG ;;
+  c) TARGET_CPU=$OPTARG ;;
   ?) usage; exit 1 ;;
   esac
 done
@@ -51,7 +55,11 @@ if [ -n "$MSVSVER" ]; then
 fi
 
 detect-platform
-echo "Host platform: $PLATFORM"
+TARGET_OS=${TARGET_OS:-$PLATFORM}
+TARGET_CPU=${TARGET_CPU:-x64}
+echo "Host OS: $PLATFORM"
+echo "Target OS: $TARGET_OS"
+echo "Target CPU: $TARGET_CPU"
 
 echo Checking webrtcbuilds dependencies
 check::webrtcbuilds::deps $PLATFORM
@@ -68,20 +76,20 @@ echo "Building revision: $REVISION"
 echo "Associated revision number: $REVISION_NUMBER"
 
 echo "Checking out WebRTC revision (this will take awhile): $REVISION"
-checkout $PLATFORM $OUTDIR $REVISION
+checkout "$TARGET_OS" $OUTDIR $REVISION
 
 echo Checking WebRTC dependencies
-check::webrtc::deps $PLATFORM $OUTDIR
+check::webrtc::deps $PLATFORM $OUTDIR "$TARGET_OS"
 
 echo Patching WebRTC source
 patch $PLATFORM $OUTDIR
 
 echo Compiling WebRTC
-compile $PLATFORM $OUTDIR
+compile $PLATFORM $OUTDIR "$TARGET_OS" "$TARGET_CPU"
 
 echo Packaging WebRTC
-# label is <projectname>-<rev-number>-<short-rev-sha>-<platform>
-LABEL=$PROJECT_NAME-$REVISION_NUMBER-$(short-rev $REVISION)-$PLATFORM
+# label is <projectname>-<rev-number>-<short-rev-sha>-<target-os>-<target-cpu>
+LABEL=$PROJECT_NAME-$REVISION_NUMBER-$(short-rev $REVISION)-$TARGET_OS-$TARGET_CPU
 package $PLATFORM $OUTDIR $LABEL $DIR/resource
 
 echo Build successful
