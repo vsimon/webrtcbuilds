@@ -155,16 +155,21 @@ function patch() {
 
 # This function combines build artifact objects into one library named by
 # 'outputlib'.
-# $1: The directory containing .ninja_deps and build artifacts.
+# $1: The list of object file paths to be combined
 # $2: The output library name.
 function combine-objs() {
   local objs="$1"
   local outputlib="$2"
-  local blacklist="unittest_main.o"
+  # Blacklist objects from:
+  # video_capture_external and device_info_external so that the video capture
+  # module internal implementations gets linked.
+  # unittest_main because it has a main function defined.
+  local blacklist="unittest_main.o|video_capture_external.o|\
+device_info_external.o"
 
   # Combine all objects into one static library. Prevent blacklisted objects
   # such as ones containing a main function from being combined.
-  echo "$objs" | grep -v -E $blacklist | xargs ar crs $outputlib
+  echo "$objs" | tr ' ' '\n' | grep -v -E $blacklist | xargs ar crs $outputlib
 }
 
 # This compiles the library.
