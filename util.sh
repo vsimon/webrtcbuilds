@@ -39,7 +39,7 @@ function check::depot-tools() {
     fi
   else
     pushd $depot_tools_dir >/dev/null
-      git reset --hard
+      git reset --hard -q
     popd >/dev/null
   fi
 }
