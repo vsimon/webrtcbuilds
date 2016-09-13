@@ -63,7 +63,7 @@ function check::webrtcbuilds::deps() {
     # for GNU version of cp: gcp
     which gcp || brew install coreutils
     ;;
-  linux|android)
+  linux)
     if ! grep -v \# /etc/apt/sources.list | grep -q multiverse ; then
       echo "*** Warning: The Multiverse repository is probably not enabled ***"
       echo "*** which is required for things like msttcorefonts.           ***"
@@ -85,6 +85,7 @@ function check::webrtcbuilds::deps() {
 function check::webrtc::deps() {
   local platform="$1"
   local outdir="$2"
+  local target_os="$3"
 
   case $platform in
   linux)
@@ -92,36 +93,46 @@ function check::webrtc::deps() {
     echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
     sudo $outdir/src/build/install-build-deps.sh --no-syms --no-arm --no-chromeos-fonts --no-nacl --no-prompt
     ;;
-  android)
-    # Automatically accepts ttf-mscorefonts EULA
-    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
-    sudo $outdir/src/build/install-build-deps-android.sh
-    ;;
   esac
+
+  if [ $target_os = 'android' ]; then
+    sudo $outdir/src/build/install-build-deps-android.sh
+  fi
 }
 
 # Checks out a specific revision
-# $1: The platform type.
+# $1: The target OS type.
 # $2: The output directory.
 # $3: Revision represented as a git SHA.
 function checkout() {
-  local platform="$1"
+  local target_os="$1"
   local outdir="$2"
   local revision="$3"
 
   pushd $outdir >/dev/null
+  local prev_target_os=$(cat $outdir/.webrtcbuilds_target_os 2>/dev/null)
+  if [[ -n "$prev_target_os" && "$target_os" != "$prev_target_os" ]]; then
+    echo The target OS has changed. Refetching sources for the new target OS
+    rm -rf src .gclient*
+  fi
+  # Fetch only the first-time, otherwise sync.
   if [ ! -d src ]; then
-    case $platform in
+    case $target_os in
     android)
-      fetch --nohooks webrtc_android
+      yes | fetch --nohooks webrtc_android
+      ;;
+    ios)
+      fetch --nohooks webrtc_ios
       ;;
     *)
       fetch --nohooks webrtc
       ;;
     esac
   fi
-  # check out the specific revision after fetch
+  # Checkout the specific revision after fetch
   gclient sync --force --revision $revision
+  # Cache the target OS
+  echo $target_os > $outdir/.webrtcbuilds_target_os
   popd >/dev/null
 }
 
@@ -162,10 +173,10 @@ function combine-objs() {
 function compile() {
   local platform="$1"
   local outdir="$2"
-  local target_os="" # TODO: one-day support cross-compiling via options
-  local target_cpu="" # TODO: also one-day support this
+  local target_os="$3"
+  local target_cpu="$4"
   local common_args="is_component_build=false rtc_include_tests=false"
-  local platform_args=""
+  local target_args="target_os=\"$target_os\" target_cpu=\"$target_cpu\""
 
   pushd $outdir/src >/dev/null
   case $platform in
@@ -194,13 +205,13 @@ function compile() {
     # On Linux, use clang = false and sysroot = false to build using gcc.
     # Comment this out to use clang.
     if [ $platform = 'linux' ]; then
-      platform_args="is_clang=false use_sysroot=false"
+      target_args+=" is_clang=false use_sysroot=false"
     fi
 
     # Debug builds are component builds (shared libraries) by default unless
     # is_component_build=false is passed to gn gen --args. Release builds are
     # static by default.
-    gn gen out/Debug --args="$common_args $platform_args"
+    gn gen out/Debug --args="$common_args $target_args"
     pushd out/Debug >/dev/null
       ninja -C .
 
@@ -217,7 +228,7 @@ function compile() {
       combine-objs "$extras" libwebrtc_full.a
     popd >/dev/null
 
-    gn gen out/Release --args="is_debug=false $common_args $platform_args"
+    gn gen out/Release --args="is_debug=false $common_args $target_args"
     pushd out/Release >/dev/null
       ninja -C .
 
