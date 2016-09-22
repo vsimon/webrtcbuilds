@@ -77,6 +77,13 @@ function check::webrtcbuilds::deps() {
     ensure-package lbzip2
     ensure-package lsb-release
     ;;
+  win)
+    VISUAL_STUDIO_TOOLS=${VS140COMNTOOLS:-}
+    if [ -z VISUAL_STUDIO_TOOLS ]; then
+      echo "Building under Microsoft Windows requires Microsoft Visual Studio 2015"
+      exit 1
+    fi
+;;
   esac
 }
 
@@ -153,6 +160,45 @@ function patch() {
   popd >/dev/null
 }
 
+# This function compiles a single library using Microsoft Visual C++ for a
+# Microsoft Windows (32/64-bit) target. This function is separate from the
+# other compile functions because of differences using the Microsoft tools:
+#
+# The Microsoft Windows tools use different file extensions than the other tools:
+#  '.obj' as the object file extension, instead of '.o'
+# '.lib' as the static library file extension, instead of '.a'
+# '.dll' as the shared library file extension, instead of '.so'
+#
+# The Microsoft Windows tools have different names than the other tools:
+# 'lib' as the librarian, instead of 'ar'. 'lib' must be found through the path
+# variable $VS140COMNTOOLS.
+#
+# The Microsoft tools that target Microsoft Windows run only under
+# Microsoft Windows, so the build and target systems are the same.
+#
+# $1 the output directory, 'Debug', 'Debug_x64', 'Release', or 'Release_x64'
+# $2 additional gn arguments
+function compile-win() {
+  local outputdir="$1"
+  local gn_args="$2"
+
+  gn gen $outputdir --args="$gn_args"
+  pushd $outputdir >/dev/null
+    ninja -C .
+
+  rm -f libwebrtc_full.lib
+  local objlist=$(strings .ninja_deps | grep -o '.*\.obj')
+  local blacklist="unittest_main.obj|video_capture_external.obj|\
+device_info_external.obj"
+  echo "$objlist" | tr ' ' '\n' | grep -v -E $blacklist >libwebrtc_full.list
+  local extras=$(find \
+    ./obj/third_party/libvpx/libvpx_* \
+    ./obj/third_party/libjpeg_turbo/simd_asm -name *.obj)
+  echo "$extras" | tr ' ' '\n' >>libwebrtc_full.list
+  "$VS140COMNTOOLS../../VC/bin/lib" /OUT:webrtc_full.lib @libwebrtc_full.list
+  popd >/dev/null
+}
+
 # This function combines build artifact objects into one library named by
 # 'outputlib'.
 # $1: The list of object file paths to be combined
@@ -186,25 +232,14 @@ function compile() {
   pushd $outdir/src >/dev/null
   case $platform in
   win)
-    # do the build
-    python src/webrtc/build/gyp_webrtc.py
-    ninja -C src/out/Debug
-    ninja -C src/out/Release
+  # 32-bit build
+    compile-win "out/Debug" "$common_args $target_args"
+    compile-win "out/Release" "$common_args $target_args is_debug=false"
 
     # 64-bit build
     GYP_DEFINES="target_arch=x64 $GYP_DEFINES"
-
-    # do the build
-    python src/webrtc/build/gyp_webrtc.py
-    ninja -C src/out/Debug_x64
-    ninja -C src/out/Release_x64
-
-    # combine all the static libraries into one called webrtc_full
-    # LIB.EXE /OUT:c.lib a.lib b.lib
-    "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Debug/webrtc_full.lib src/out/Debug/*.lib
-    "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Release/webrtc_full.lib src/out/Release/*.lib
-    "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Debug_x64/webrtc_full.lib src/out/Debug_x64/*.lib
-    "$VS120COMNTOOLS../../VC/bin/lib" /OUT:src/out/Release_x64/webrtc_full.lib src/out/Release_x64/*.lib
+    compile-win "out/Debug_x64" "$common_args $target_args"
+    compile-win "out/Release_x64" "$common_args $target_args is_debug=false"
     ;;
   *)
     # On Linux, use clang = false and sysroot = false to build using gcc.
@@ -279,7 +314,7 @@ function package() {
   popd >/dev/null
   # find and copy libraries
   pushd src/out >/dev/null
-  find . -maxdepth 3 \( -name *.so -o -name *webrtc_full* -o -name *.jar \) \
+  find . -maxdepth 3 \( -name *.so -o -name *.dll -o -name *webrtc_full* -o -name *.jar \) \
     -exec $CP --parents '{}' $outdir/$label/lib ';'
   popd >/dev/null
 
