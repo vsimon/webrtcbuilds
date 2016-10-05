@@ -18,6 +18,7 @@ WebRTC build script.
 
 OPTIONS:
    -h             Show this message
+   -d             Debug mode. Print all executed commands.
    -o OUTDIR      Output directory. Default is 'out'
    -b BRANCH      Latest revision on git branch. Overrides -r. Common branch names are 'branch-heads/nn', where 'nn' is the release number.
    -r REVISION    Git SHA revision. Default is latest revision.
@@ -26,25 +27,29 @@ OPTIONS:
 EOF
 }
 
-while getopts :b:o:r:t:c: OPTION; do
+while getopts :b:o:r:t:c:d OPTION; do
   case $OPTION in
   o) OUTDIR=$OPTARG ;;
   b) BRANCH=$OPTARG ;;
   r) REVISION=$OPTARG ;;
   t) TARGET_OS=$OPTARG ;;
   c) TARGET_CPU=$OPTARG ;;
+  d) DEBUG=1 ;;
   ?) usage; exit 1 ;;
   esac
 done
 
 OUTDIR=${OUTDIR:-out}
 BRANCH=${BRANCH:-}
+DEBUG=${DEBUG:-0}
 PROJECT_NAME=webrtcbuilds
 REPO_URL="https://chromium.googlesource.com/external/webrtc"
 DEPOT_TOOLS_URL="https://chromium.googlesource.com/chromium/tools/depot_tools.git"
 DEPOT_TOOLS_DIR=$DIR/depot_tools
 DEPOT_TOOLS_WIN_TOOLCHAIN=0
 PATH=$DEPOT_TOOLS_DIR:$DEPOT_TOOLS_DIR/python276_bin:$PATH
+
+[ "$DEBUG" = 1 ] && set -x
 
 mkdir -p $OUTDIR
 OUTDIR=$(cd $OUTDIR && pwd -P)

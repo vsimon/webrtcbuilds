@@ -25,6 +25,7 @@ Usage:
 
 OPTIONS:
    -h             Show this message
+   -d             Debug mode. Print all executed commands.
    -o OUTDIR      Output directory. Default is 'out'
    -b BRANCH      Latest revision on git branch. Overrides -r. Common branch names are 'branch-heads/nn', where 'n' is the release number.
    -r REVISION    Git SHA revision. Default is latest revision.
