@@ -46,10 +46,13 @@ function check::depot-tools() {
 
 # Makes sure package is installed. Depends on sudo to be installed first.
 # $1: The name of the package
+# $2: Existence check binary. Defaults to name of the package.
 function ensure-package() {
   local name="$1"
-  if ! which $name > /dev/null ; then
-    sudo apt-get update -qq && sudo apt-get install -qq $name
+  local binary="${2:-$1}"
+  if ! which $binary > /dev/null ; then
+    sudo apt-get update -qq
+    sudo apt-get install -y $name
   fi
 }
 
@@ -69,13 +72,14 @@ function check::webrtcbuilds::deps() {
       echo "*** which is required for things like msttcorefonts.           ***"
     fi
     if ! which sudo > /dev/null ; then
-      apt-get update -qq && apt-get install -qq sudo
+      apt-get update -qq
+      apt-get install -y sudo
     fi
     ensure-package curl
     ensure-package git
     ensure-package python
     ensure-package lbzip2
-    ensure-package lsb-release
+    ensure-package lsb-release lsb_release
     ;;
   win)
     VISUAL_STUDIO_TOOLS=${VS140COMNTOOLS:-}
