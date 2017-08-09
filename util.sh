@@ -230,7 +230,7 @@ function compile() {
   local outdir="$2"
   local target_os="$3"
   local target_cpu="$4"
-  local common_args="is_component_build=false rtc_include_tests=false"
+  local common_args="is_component_build=false rtc_include_tests=false treat_warnings_as_errors=false"
   local target_args="target_os=\"$target_os\" target_cpu=\"$target_cpu\""
 
   pushd $outdir/src >/dev/null
