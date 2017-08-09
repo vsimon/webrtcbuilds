@@ -312,6 +312,11 @@ function package() {
   pushd $outdir >/dev/null
   # create directory structure
   mkdir -p $label/include $label/lib
+  local configs="Debug Release"
+  for cfg in $configs; do
+    mkdir -p $label/lib/$cfg
+  done
+
   # find and copy header files
   pushd src >/dev/null
   find webrtc -name *.h -exec $CP --parents '{}' $outdir/$label/include ';'
@@ -324,7 +329,6 @@ function package() {
 
   # for linux, add pkgconfig files
   if [ $platform = 'linux' ]; then
-    configs="Debug Release"
     for cfg in $configs; do
       mkdir -p $label/lib/$cfg/pkgconfig
       CONFIG=$cfg envsubst '$CONFIG' < $resourcedir/pkgconfig/libwebrtc_full.pc.in > \
