@@ -63,8 +63,9 @@ function check::webrtcbuilds::deps() {
 
   case $platform in
   mac)
+    which brew > /dev/null || (echo "Building with 'mac' requires Homebrew. Visit https://brew.sh"; exit 1)
     # for GNU version of cp: gcp
-    which gcp || brew install coreutils
+    which gcp > /dev/null || brew install coreutils
     ;;
   linux)
     if ! grep -v \# /etc/apt/sources.list | grep -q multiverse ; then
@@ -84,7 +85,7 @@ function check::webrtcbuilds::deps() {
   win)
     VISUAL_STUDIO_TOOLS=${VS140COMNTOOLS:-}
     if [ -z VISUAL_STUDIO_TOOLS ]; then
-      echo "Building under Microsoft Windows requires Microsoft Visual Studio 2015"
+      echo "Building with 'win' requires Microsoft Visual Studio 2015"
       exit 1
     fi
 ;;
