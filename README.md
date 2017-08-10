@@ -1,13 +1,12 @@
 # webrtcbuilds
-==============
 
 The goal of webrtcbuilds is to provide a single standalone static library and
 package for WebRTC.
 
 ## Current Platforms and Prerequisites
 
-* OSX (highly recommend [Homebrew](http://brew.sh/) is installed)
-* Windows (highly recommend [Visual Studio Community 2013](http://www.chromium.org/developers/how-tos/build-instructions-windows) at least
+* OSX (requires [Homebrew](http://brew.sh/) is installed)
+* Windows (requires [Visual Studio Community 2013](http://www.chromium.org/developers/how-tos/build-instructions-windows) at least
 and a [Bash shell such as Git for Windows](https://msysgit.github.io) is
 installed)
 * Linux (tested on Ubuntu 16.04 64-bit)
