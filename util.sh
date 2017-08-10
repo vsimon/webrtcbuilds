@@ -157,10 +157,6 @@ function patch() {
   pushd $outdir/src >/dev/null
   # This removes the examples from being built.
   sed -i.bak 's|"//webrtc/examples",|#"//webrtc/examples",|' BUILD.gn
-  # This patches a GN error with the video_loopback executable depending on a
-  # test but since we disable building tests GN detects a dependency error.
-  # Replacing the outer conditional with 'rtc_include_tests' works around this.
-  sed -i.bak 's|if (!build_with_chromium)|if (rtc_include_tests)|' webrtc/BUILD.gn
   popd >/dev/null
 }
 
