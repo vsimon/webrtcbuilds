@@ -158,10 +158,9 @@ function patch() {
   pushd $outdir/src >/dev/null
   # This removes the examples from being built.
   sed -i.bak 's|"//webrtc/examples",|#"//webrtc/examples",|' BUILD.gn
-  # This patches a GN error with the video_loopback executable depending on a
-  # test but since we disable building tests GN detects a dependency error.
-  # Replacing the outer conditional with 'rtc_include_tests' works around this.
-  sed -i.bak 's|if (!build_with_chromium)|if (rtc_include_tests)|' webrtc/BUILD.gn
+  # Force a RTTI build.
+  sed -i.bak 's|"//build/config/compiler:no_rtti",|"//build/config/compiler:rtti",|' \
+    build/config/BUILDCONFIG.gn
   popd >/dev/null
 }
 
@@ -189,7 +188,7 @@ function compile-win() {
 
   gn gen $outputdir --args="$gn_args"
   pushd $outputdir >/dev/null
-    ninja -C .
+  ninja -C .
 
   rm -f libwebrtc_full.lib
   local objlist=$(strings .ninja_deps | grep -o '.*\.obj')
@@ -198,29 +197,42 @@ device_info_external.obj"
   echo "$objlist" | tr ' ' '\n' | grep -v -E $blacklist >libwebrtc_full.list
   local extras=$(find \
     ./obj/third_party/libvpx/libvpx_* \
-    ./obj/third_party/libjpeg_turbo/simd_asm -name *.obj)
+    ./obj/third_party/libjpeg_turbo/simd_asm \
+    ./obj/third_party/boringssl/boringssl_asm -name *.obj)
   echo "$extras" | tr ' ' '\n' >>libwebrtc_full.list
   "$VS140COMNTOOLS../../VC/bin/lib" /OUT:webrtc_full.lib @libwebrtc_full.list
   popd >/dev/null
 }
 
-# This function combines build artifact objects into one library named by
-# 'outputlib'.
-# $1: The list of object file paths to be combined
-# $2: The output library name.
-function combine-objs() {
-  local objs="$1"
-  local outputlib="$2"
-  # Blacklist objects from:
-  # video_capture_external and device_info_external so that the video capture
-  # module internal implementations gets linked.
-  # unittest_main because it has a main function defined.
-  local blacklist="unittest_main.o|video_capture_external.o|\
-device_info_external.o"
+# This function compile and combine build artifact objects into one library.
+# $1 the output directory, 'Debug', 'Release'
+# $2 additional gn arguments
+function compile-unix() {
+  local outputdir="$1"
+  local gn_args="$2"
+  local blacklist="unittest|examples|tools|/yasm|protobuf_lite|main.o|\
+video_capture_external.o|device_info_external.o"
 
-  # Combine all objects into one static library. Prevent blacklisted objects
-  # such as ones containing a main function from being combined.
-  echo "$objs" | tr ' ' '\n' | grep -v -E $blacklist | xargs ar crs $outputlib
+  gn gen $outputdir --args="$gn_args"
+  pushd $outputdir >/dev/null
+  ninja -C .
+
+  rm -f libwebrtc_full.a
+  # Produce an ordered objects list by parsing .ninja_deps for strings
+  # matching .o files.
+  local objlist=$(strings .ninja_deps | grep -o '.*\.o')
+  echo "$objlist" | tr ' ' '\n' | grep -v -E $blacklist >libwebrtc_full.list
+  # various intrinsics aren't included by default in .ninja_deps
+  local extras=$(find \
+    ./obj/third_party/libvpx/libvpx_* \
+    ./obj/third_party/libjpeg_turbo/simd_asm \
+    ./obj/third_party/boringssl/boringssl_asm -name '*\.o')
+  echo "$extras" | tr ' ' '\n' >>libwebrtc_full.list
+  # generate the archive
+  cat libwebrtc_full.list | xargs ar -crs libwebrtc_full.a
+  # generate an index list
+  ranlib libwebrtc_full.a
+  popd >/dev/null
 }
 
 # This compiles the library.
@@ -231,7 +243,7 @@ function compile() {
   local outdir="$2"
   local target_os="$3"
   local target_cpu="$4"
-  local common_args="is_component_build=false rtc_include_tests=false"
+  local common_args="is_component_build=false rtc_include_tests=false treat_warnings_as_errors=false"
   local target_args="target_os=\"$target_os\" target_cpu=\"$target_cpu\""
 
   pushd $outdir/src >/dev/null
@@ -256,39 +268,8 @@ function compile() {
     # Debug builds are component builds (shared libraries) by default unless
     # is_component_build=false is passed to gn gen --args. Release builds are
     # static by default.
-    gn gen out/Debug --args="$common_args $target_args"
-    pushd out/Debug >/dev/null
-      ninja -C .
-
-      rm -f libwebrtc_full.a
-      # Produce an ordered objects list by parsing .ninja_deps for strings
-      # matching .o files.
-      local objlist=$(strings .ninja_deps | grep -o '.*\.o')
-      combine-objs "$objlist" libwebrtc_full.a
-
-      # various intrinsics aren't included by default in .ninja_deps
-      local extras=$(find \
-        ./obj/third_party/libvpx/libvpx_* \
-        ./obj/third_party/libjpeg_turbo/simd_asm -name *.o)
-      combine-objs "$extras" libwebrtc_full.a
-    popd >/dev/null
-
-    gn gen out/Release --args="is_debug=false $common_args $target_args"
-    pushd out/Release >/dev/null
-      ninja -C .
-
-      rm -f libwebrtc_full.a
-      # Produce an ordered objects list by parsing .ninja_deps for strings
-      # matching .o files.
-      local objlist=$(strings .ninja_deps | grep -o '.*\.o')
-      combine-objs "$objlist" libwebrtc_full.a
-
-      # various intrinsics aren't included by default in .ninja_deps
-      local extras=$(find \
-        ./obj/third_party/libvpx/libvpx_* \
-        ./obj/third_party/libjpeg_turbo/simd_asm -name *.o)
-      combine-objs "$extras" libwebrtc_full.a
-    popd >/dev/null
+    compile-unix "out/Debug" "$common_args $target_args"
+    compile-unix "out/Release" "is_debug=false $common_args $target_args"
     ;;
   esac
   popd >/dev/null
@@ -313,6 +294,11 @@ function package() {
   pushd $outdir >/dev/null
   # create directory structure
   mkdir -p $label/include $label/lib
+  local configs="Debug Release"
+  for cfg in $configs; do
+    mkdir -p $label/lib/$cfg
+  done
+
   # find and copy header files
   pushd src >/dev/null
   find webrtc -name *.h -exec $CP --parents '{}' $outdir/$label/include ';'
@@ -325,7 +311,6 @@ function package() {
 
   # for linux, add pkgconfig files
   if [ $platform = 'linux' ]; then
-    configs="Debug Release"
     for cfg in $configs; do
       mkdir -p $label/lib/$cfg/pkgconfig
       CONFIG=$cfg envsubst '$CONFIG' < $resourcedir/pkgconfig/libwebrtc_full.pc.in > \
