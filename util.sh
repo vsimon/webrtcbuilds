@@ -157,6 +157,9 @@ function patch() {
   pushd $outdir/src >/dev/null
   # This removes the examples from being built.
   sed -i.bak 's|"//webrtc/examples",|#"//webrtc/examples",|' BUILD.gn
+  # Force a RTTI build.
+  sed -i.bak 's|"//build/config/compiler:no_rtti",|"//build/config/compiler:rtti",|' \
+    build/config/BUILDCONFIG.gn
   popd >/dev/null
 }
 
