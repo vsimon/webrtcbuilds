@@ -151,15 +151,18 @@ function checkout() {
 # Patches a checkout for building static standalone libs
 # $1: The platform type.
 # $2: The output directory.
+# $3: Enable RTTI or not. '0' or '1'.
 function patch() {
   local platform="$1"
   local outdir="$2"
+  local rtti_enabled="$3"
 
   pushd $outdir/src >/dev/null
   # This removes the examples from being built.
   sed -i.bak 's|"//webrtc/examples",|#"//webrtc/examples",|' BUILD.gn
-  # Force a RTTI build.
-  sed -i.bak 's|"//build/config/compiler:no_rtti",|"//build/config/compiler:rtti",|' \
+  # This configures whether to build with RTTI enabled or not.
+  [ "$rtti_enabled" = 1 ] && sed -i.bak \
+    's|"//build/config/compiler:no_rtti",|"//build/config/compiler:rtti",|' \
     build/config/BUILDCONFIG.gn
   popd >/dev/null
 }
