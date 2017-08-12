@@ -1,4 +1,4 @@
-# webrtcbuilds
+# webrtcbuilds [![Build Status](https://travis-ci.org/vsimon/webrtcbuilds.svg?branch=master)](https://travis-ci.org/vsimon/webrtcbuilds)
 
 The goal of webrtcbuilds is to provide a single standalone static library and
 package for WebRTC.
