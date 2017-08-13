@@ -1,16 +1,20 @@
 language: cpp
 sudo: required
-compiler:
-- gcc
 os:
 - linux
+- osx
 before_script:
-  # To help prevent timeouts, download a 'pickled' .tar.gz archive of the linux
-  # webrtc checkout. PICKLE_URL was created with:
-  # `travis encrypt PICKLE_URL=<the-pickle-url>`
-  - mkdir out && wget -qO- $PICKLE_URL | tar xz -C `pwd`/out
+# To help prevent timeouts, download a 'pickled' .tar.gz archive of the linux
+# webrtc checkout. LINUX_PICKLE_URL was created with:
+# `travis encrypt LINUX_PICKLE_URL=<the-pickle-url>`
+- mkdir out
+- if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then wget -qO- $LINUX_PICKLE_URL | tar xz
+  -C `pwd`/out; fi
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then wget -qO- $OSX_PICKLE_URL | tar xz -C
+  `pwd`/out; fi
 script:
-  - ./build.sh -n Release -d
+- ./build.sh -n Release -d
 env:
   global:
-    - secure: "R8nCPh96tenfhLKSARN9u6vvS4NSAMgS/ElwsLBsHD5lYjNLVxgHwZTt6h7ggjnzpTX4ChWQYErIj6cOM0F/9pC/4fVyOM5C0o6tiMKrDT2CkFRKkw3ZLE7eamEFGa0+CZsMlROrPhOyagouSVeJ9TmM7jSRkpe0UP9ejHolcQg="
+  - secure: FqTsZi9kdMivZrkHJSuLAwCeCGrm8EfULfMpKWDbENYJ//KvUNCNIRXPHO2NaUbvMm5wjzCNtmN/wKxCIv1yByHMNGLxZAvp15toj8tmzXg4KfeppTPI0pKuRxRLzK0QIQGoYZcIFhHVzX/xLKdlmXfqyNFbsnSWuj11EMF67os=
+  - secure: Pr4KZ7yWGjG9MktqhFul6DiF5j5rlgXzuqv805C+kgx4tvwFe96i5gokhpLi2cuJNKuccLenNXoaX+ljRrZVEhh9Psfea+gVx3bhQ+G6HEhZBebINLoa9E2PVuILnxHCthUZ9zxndk1T2K0SUCJ0hxxh/Sgp6uWPnMxcRV0t9do=
