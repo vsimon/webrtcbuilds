@@ -1,4 +1,4 @@
-#include "webrtc/base/thread.h"
+#include "webrtc/rtc_base/thread.h"
 #include "webrtc/p2p/base/basicpacketsocketfactory.h"
 #include "webrtc/api/peerconnectioninterface.h"
 #include "webrtc/api/test/fakeconstraints.h"
@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 
   // something from media/engine
   cricket::WebRtcVideoDeviceCapturerFactory factory;
-  cricket::VideoCapturer* capturer = factory.Create(cricket::Device("", 0));
+  std::unique_ptr<cricket::VideoCapturer> capturer = factory.Create(cricket::Device("", 0));
 
   return 0;
 }
