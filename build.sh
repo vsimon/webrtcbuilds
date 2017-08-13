@@ -27,10 +27,11 @@ OPTIONS:
    -n CONFIGS     Build configurations, space-separated. Default is 'Debug Release'. Other values can be 'Debug', 'Release'.
    -e             Compile WebRTC with RTTI enabled. Default is with RTTI not enabled.
    -g             [Linux] Compile 'Debug' WebRTC with iterator debugging disabled. Default is enabled but it might add significant overhead.
+   -D             [Linux] Generate a debian package
 EOF
 }
 
-while getopts :b:o:r:t:c:n:deg OPTION; do
+while getopts :b:o:r:t:c:n:degD OPTION; do
   case $OPTION in
   o) OUTDIR=$OPTARG ;;
   b) BRANCH=$OPTARG ;;
@@ -41,6 +42,7 @@ while getopts :b:o:r:t:c:n:deg OPTION; do
   d) DEBUG=1 ;;
   e) ENABLE_RTTI=1 ;;
   g) DISABLE_ITERATOR_DEBUG=1 ;;
+  D) PACKAGE_AS_DEBIAN=1 ;;
   ?) usage; exit 1 ;;
   esac
 done
@@ -50,6 +52,7 @@ BRANCH=${BRANCH:-}
 DEBUG=${DEBUG:-0}
 ENABLE_RTTI=${ENABLE_RTTI:-0}
 DISABLE_ITERATOR_DEBUG=${DISABLE_ITERATOR_DEBUG:-0}
+PACKAGE_AS_DEBIAN=${PACKAGE_AS_DEBIAN:-0}
 CONFIGS=${CONFIGS:-Debug Release}
 PROJECT_NAME=webrtcbuilds
 REPO_URL="https://chromium.googlesource.com/external/webrtc"
@@ -105,5 +108,6 @@ echo Packaging WebRTC
 # label is <projectname>-<rev-number>-<short-rev-sha>-<target-os>-<target-cpu>
 LABEL=$PROJECT_NAME-$REVISION_NUMBER-$(short-rev $REVISION)-$TARGET_OS-$TARGET_CPU
 package $PLATFORM $OUTDIR $LABEL $DIR/resource "$CONFIGS"
+[ "$PACKAGE_AS_DEBIAN" = 1 ] && package::debian $OUTDIR $LABEL $REVISION_NUMBER $TARGET_CPU
 
 echo Build successful
