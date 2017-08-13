@@ -1,0 +1,16 @@
+language: cpp
+sudo: required
+compiler:
+- gcc
+os:
+- linux
+before_script:
+  # To help prevent timeouts, download a 'pickled' .tar.gz archive of the linux
+  # webrtc checkout. PICKLE_URL was created with:
+  # `travis encrypt PICKLE_URL=<the-pickle-url>`
+  - mkdir out && wget -qO- $PICKLE_URL | tar xz -C `pwd`/out
+script:
+  - ./build.sh -d
+env:
+  global:
+    - secure: "R8nCPh96tenfhLKSARN9u6vvS4NSAMgS/ElwsLBsHD5lYjNLVxgHwZTt6h7ggjnzpTX4ChWQYErIj6cOM0F/9pC/4fVyOM5C0o6tiMKrDT2CkFRKkw3ZLE7eamEFGa0+CZsMlROrPhOyagouSVeJ9TmM7jSRkpe0UP9ejHolcQg="
