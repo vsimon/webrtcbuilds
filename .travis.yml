@@ -8,13 +8,17 @@ env:
   - LINUX_PICKLE_URL=https://www.dropbox.com/s/yclmzq1n63cminb/linux-pickle.tar.gz?dl=0
   - OSX_PICKLE_URL=https://www.dropbox.com/s/m23s3l9g1s9yw87/osx-pickle.tar.gz?dl=0
 before_script:
+# Update the default 'trusty' linker version for tests to link and pass.
+- if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+  sudo apt-get install -y binutils-2.26 && sudo update-alternatives --install
+  /usr/bin/ld ld /usr/lib/binutils-2.26/bin/ld 90; fi
 # To help prevent timeouts, download a 'pickled' .tar.gz archive of the linux
 # webrtc checkout. LINUX_PICKLE_URL was created with:
 # `GZIP=-9 tar zcvf linux-pickle.tar.gz .`
 - mkdir out
-- if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then wget -qO- $LINUX_PICKLE_URL | tar xz
-  -C `pwd`/out; fi
-- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then wget -qO- $OSX_PICKLE_URL | tar xz -C
-  `pwd`/out; fi
+- if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then travis_retry curl -L $LINUX_PICKLE_URL -o pickle.tar.gz; fi
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then travis_retry curl -L $OSX_PICKLE_URL -o pickle.tar.gz; fi
+- tar xzf pickle.tar.gz -C out
 script:
 - ./build.sh -n Release -d
+- test/run_tests.sh $(ls -d -1 out/webrtc*/) Release
