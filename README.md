@@ -31,6 +31,7 @@ OPTIONS:
    -c TARGET CPU  The target cpu for cross-compilation. Default is 'x64'. Other values can be 'x86', 'arm64', 'arm'.
    -n CONFIGS     Build configurations, space-separated. Default is 'Debug Release'. Other values can be 'Debug', 'Release'.
    -e             Compile WebRTC with RTTI enabled. Default is with RTTI not enabled.
+   -g             [Linux] Compile 'Debug' WebRTC with iterator debugging disabled. Default is enabled but it might add significant overhead.
 ```
 
 ## Where is the package

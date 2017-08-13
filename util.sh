@@ -244,15 +244,18 @@ video_capture_external.o|device_info_external.o"
 # $3: The target os for cross-compilation.
 # $4: The target cpu for cross-compilation.
 # $5: The build configurations.
+# $6: Enable iterator debug or not. '0' or '1'.
 function compile() {
   local platform="$1"
   local outdir="$2"
   local target_os="$3"
   local target_cpu="$4"
   local configs="$5"
+  local disable_iterator_debug="$6"
   local common_args="is_component_build=false rtc_include_tests=false treat_warnings_as_errors=false"
   local target_args="target_os=\"$target_os\" target_cpu=\"$target_cpu\""
 
+  [ "$disable_iterator_debug" = 1 ] && common_args+=' enable_iterator_debugging=false'
   pushd $outdir/src >/dev/null
   for cfg in $configs; do
     [ "$cfg" = 'Release' ] && common_args+=' is_debug=false'
