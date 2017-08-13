@@ -241,40 +241,44 @@ video_capture_external.o|device_info_external.o"
 # This compiles the library.
 # $1: The platform type.
 # $2: The output directory.
+# $3: The target os for cross-compilation.
+# $4: The target cpu for cross-compilation.
+# $5: The build configurations.
 function compile() {
   local platform="$1"
   local outdir="$2"
   local target_os="$3"
   local target_cpu="$4"
+  local configs="$5"
   local common_args="is_component_build=false rtc_include_tests=false treat_warnings_as_errors=false"
   local target_args="target_os=\"$target_os\" target_cpu=\"$target_cpu\""
 
   pushd $outdir/src >/dev/null
-  case $platform in
-  win)
-  # 32-bit build
-    compile-win "out/Debug" "$common_args $target_args"
-    compile-win "out/Release" "$common_args $target_args is_debug=false"
+  for cfg in $configs; do
+    [ "$cfg" = 'Release' ] && common_args+=' is_debug=false'
+    case $platform in
+    win)
+      # 32-bit build
+      compile-win "out/$cfg" "$common_args $target_args"
 
-    # 64-bit build
-    GYP_DEFINES="target_arch=x64 $GYP_DEFINES"
-    compile-win "out/Debug_x64" "$common_args $target_args"
-    compile-win "out/Release_x64" "$common_args $target_args is_debug=false"
-    ;;
-  *)
-    # On Linux, use clang = false and sysroot = false to build using gcc.
-    # Comment this out to use clang.
-    if [ $platform = 'linux' ]; then
-      target_args+=" is_clang=false use_sysroot=false"
-    fi
+      # 64-bit build
+      GYP_DEFINES="target_arch=x64 $GYP_DEFINES"
+      compile-win "out/${cfg}_x64" "$common_args $target_args"
+      ;;
+    *)
+      # On Linux, use clang = false and sysroot = false to build using gcc.
+      # Comment this out to use clang.
+      if [ $platform = 'linux' ]; then
+        target_args+=" is_clang=false use_sysroot=false"
+      fi
 
-    # Debug builds are component builds (shared libraries) by default unless
-    # is_component_build=false is passed to gn gen --args. Release builds are
-    # static by default.
-    compile-unix "out/Debug" "$common_args $target_args"
-    compile-unix "out/Release" "is_debug=false $common_args $target_args"
-    ;;
-  esac
+      # Debug builds are component builds (shared libraries) by default unless
+      # is_component_build=false is passed to gn gen --args. Release builds are
+      # static by default.
+      compile-unix "out/$cfg" "$common_args $target_args"
+      ;;
+    esac
+  done
   popd >/dev/null
 }
 
@@ -283,11 +287,13 @@ function compile() {
 # $2: The output directory.
 # $3: Label of the package.
 # $4: The project's resource dirctory.
+# $5: The build configurations.
 function package() {
   local platform="$1"
   local outdir="$2"
   local label="$3"
   local resourcedir="$4"
+  local configs="$5"
 
   if [ $platform = 'mac' ]; then
     CP='gcp'
@@ -297,7 +303,6 @@ function package() {
   pushd $outdir >/dev/null
   # create directory structure
   mkdir -p $label/include $label/lib
-  local configs="Debug Release"
   for cfg in $configs; do
     mkdir -p $label/lib/$cfg
   done

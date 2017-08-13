@@ -24,17 +24,19 @@ OPTIONS:
    -r REVISION    Git SHA revision. Default is latest revision.
    -t TARGET OS   The target os for cross-compilation. Default is the host OS such as 'linux', 'mac', 'win'. Other values can be 'android', 'ios'.
    -c TARGET CPU  The target cpu for cross-compilation. Default is 'x64'. Other values can be 'x86', 'arm64', 'arm'.
+   -n CONFIGS     Build configurations, space-separated. Default is 'Debug Release'. Other values can be 'Debug', 'Release'.
    -e             Compile WebRTC with RTTI enabled. Default is with RTTI not enabled.
 EOF
 }
 
-while getopts :b:o:r:t:c:de OPTION; do
+while getopts :b:o:r:t:c:n:de OPTION; do
   case $OPTION in
   o) OUTDIR=$OPTARG ;;
   b) BRANCH=$OPTARG ;;
   r) REVISION=$OPTARG ;;
   t) TARGET_OS=$OPTARG ;;
   c) TARGET_CPU=$OPTARG ;;
+  n) CONFIGS=$OPTARG ;;
   d) DEBUG=1 ;;
   e) ENABLE_RTTI=1 ;;
   ?) usage; exit 1 ;;
@@ -45,6 +47,7 @@ OUTDIR=${OUTDIR:-out}
 BRANCH=${BRANCH:-}
 DEBUG=${DEBUG:-0}
 ENABLE_RTTI=${ENABLE_RTTI:-0}
+CONFIGS=${CONFIGS:-Debug Release}
 PROJECT_NAME=webrtcbuilds
 REPO_URL="https://chromium.googlesource.com/external/webrtc"
 DEPOT_TOOLS_URL="https://chromium.googlesource.com/chromium/tools/depot_tools.git"
@@ -93,11 +96,11 @@ echo Patching WebRTC source
 patch $PLATFORM $OUTDIR $ENABLE_RTTI
 
 echo Compiling WebRTC
-compile $PLATFORM $OUTDIR "$TARGET_OS" "$TARGET_CPU"
+compile $PLATFORM $OUTDIR "$TARGET_OS" "$TARGET_CPU" "$CONFIGS"
 
 echo Packaging WebRTC
 # label is <projectname>-<rev-number>-<short-rev-sha>-<target-os>-<target-cpu>
 LABEL=$PROJECT_NAME-$REVISION_NUMBER-$(short-rev $REVISION)-$TARGET_OS-$TARGET_CPU
-package $PLATFORM $OUTDIR $LABEL $DIR/resource
+package $PLATFORM $OUTDIR $LABEL $DIR/resource "$CONFIGS"
 
 echo Build successful
