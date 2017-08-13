@@ -3,10 +3,14 @@ sudo: required
 os:
 - linux
 - osx
+env:
+  global:
+  - LINUX_PICKLE_URL=https://www.dropbox.com/s/yclmzq1n63cminb/linux-pickle.tar.gz?dl=0
+  - OSX_PICKLE_URL=https://www.dropbox.com/s/m23s3l9g1s9yw87/osx-pickle.tar.gz?dl=0
 before_script:
 # To help prevent timeouts, download a 'pickled' .tar.gz archive of the linux
 # webrtc checkout. LINUX_PICKLE_URL was created with:
-# `travis encrypt LINUX_PICKLE_URL=<the-pickle-url>`
+# `GZIP=-9 tar zcvf linux-pickle.tar.gz .`
 - mkdir out
 - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then wget -qO- $LINUX_PICKLE_URL | tar xz
   -C `pwd`/out; fi
@@ -14,7 +18,3 @@ before_script:
   `pwd`/out; fi
 script:
 - ./build.sh -n Release -d
-env:
-  global:
-  - secure: FqTsZi9kdMivZrkHJSuLAwCeCGrm8EfULfMpKWDbENYJ//KvUNCNIRXPHO2NaUbvMm5wjzCNtmN/wKxCIv1yByHMNGLxZAvp15toj8tmzXg4KfeppTPI0pKuRxRLzK0QIQGoYZcIFhHVzX/xLKdlmXfqyNFbsnSWuj11EMF67os=
-  - secure: Pr4KZ7yWGjG9MktqhFul6DiF5j5rlgXzuqv805C+kgx4tvwFe96i5gokhpLi2cuJNKuccLenNXoaX+ljRrZVEhh9Psfea+gVx3bhQ+G6HEhZBebINLoa9E2PVuILnxHCthUZ9zxndk1T2K0SUCJ0hxxh/Sgp6uWPnMxcRV0t9do=
