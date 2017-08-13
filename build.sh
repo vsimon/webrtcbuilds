@@ -26,10 +26,11 @@ OPTIONS:
    -c TARGET CPU  The target cpu for cross-compilation. Default is 'x64'. Other values can be 'x86', 'arm64', 'arm'.
    -n CONFIGS     Build configurations, space-separated. Default is 'Debug Release'. Other values can be 'Debug', 'Release'.
    -e             Compile WebRTC with RTTI enabled. Default is with RTTI not enabled.
+   -g             [Linux] Compile 'Debug' WebRTC with iterator debugging disabled. Default is enabled but it might add significant overhead.
 EOF
 }
 
-while getopts :b:o:r:t:c:n:de OPTION; do
+while getopts :b:o:r:t:c:n:deg OPTION; do
   case $OPTION in
   o) OUTDIR=$OPTARG ;;
   b) BRANCH=$OPTARG ;;
@@ -39,6 +40,7 @@ while getopts :b:o:r:t:c:n:de OPTION; do
   n) CONFIGS=$OPTARG ;;
   d) DEBUG=1 ;;
   e) ENABLE_RTTI=1 ;;
+  g) DISABLE_ITERATOR_DEBUG=1 ;;
   ?) usage; exit 1 ;;
   esac
 done
@@ -47,6 +49,7 @@ OUTDIR=${OUTDIR:-out}
 BRANCH=${BRANCH:-}
 DEBUG=${DEBUG:-0}
 ENABLE_RTTI=${ENABLE_RTTI:-0}
+DISABLE_ITERATOR_DEBUG=${DISABLE_ITERATOR_DEBUG:-0}
 CONFIGS=${CONFIGS:-Debug Release}
 PROJECT_NAME=webrtcbuilds
 REPO_URL="https://chromium.googlesource.com/external/webrtc"
@@ -96,7 +99,7 @@ echo Patching WebRTC source
 patch $PLATFORM $OUTDIR $ENABLE_RTTI
 
 echo Compiling WebRTC
-compile $PLATFORM $OUTDIR "$TARGET_OS" "$TARGET_CPU" "$CONFIGS"
+compile $PLATFORM $OUTDIR "$TARGET_OS" "$TARGET_CPU" "$CONFIGS" "$DISABLE_ITERATOR_DEBUG"
 
 echo Packaging WebRTC
 # label is <projectname>-<rev-number>-<short-rev-sha>-<target-os>-<target-cpu>
