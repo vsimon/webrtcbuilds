@@ -22,3 +22,7 @@ before_script:
 script:
 - ./build.sh -n Release -d
 - test/run_tests.sh $(ls -d -1 out/webrtc*/) Release
+# Allow failures on osx until the travis osx pipeline is more robust.
+matrix:
+  allow_failures:
+  - os: osx
