@@ -28,10 +28,23 @@ OPTIONS:
    -e             Compile WebRTC with RTTI enabled. Default is with RTTI not enabled.
    -g             [Linux] Compile 'Debug' WebRTC with iterator debugging disabled. Default is enabled but it might add significant overhead.
    -D             [Linux] Generate a debian package
+   -F PATTERN     Allow customize package filename through a pattern
+   -P PATTERN     Allow customize package name through a pattern
+   -V PATTERN     Allow customize package version through a pattern
+
+The PATTERN is a string that can use the following tokens:
+   %p%            The system platform.
+   %to%           Target os.
+   %tc%           Target cpu.
+   %b%            The branch if it was specified.
+   %r%            Revision.
+   %sr%           Short revision.
+   %rn%           The associated revision number.
+   %da%           Debian architecture.
 EOF
 }
 
-while getopts :b:o:r:t:c:n:degD OPTION; do
+while getopts :b:o:r:t:c:n:degDF:P:V: OPTION; do
   case $OPTION in
   o) OUTDIR=$OPTARG ;;
   b) BRANCH=$OPTARG ;;
@@ -43,6 +56,9 @@ while getopts :b:o:r:t:c:n:degD OPTION; do
   e) ENABLE_RTTI=1 ;;
   g) DISABLE_ITERATOR_DEBUG=1 ;;
   D) PACKAGE_AS_DEBIAN=1 ;;
+  F) PACKAGE_FILENAME_PATTERN=$OPTARG ;;
+  P) PACKAGE_NAME_PATTERN=$OPTARG ;;
+  V) PACKAGE_VERSION_PATTERN=$OPTARG ;;
   ?) usage; exit 1 ;;
   esac
 done
@@ -53,8 +69,10 @@ DEBUG=${DEBUG:-0}
 ENABLE_RTTI=${ENABLE_RTTI:-0}
 DISABLE_ITERATOR_DEBUG=${DISABLE_ITERATOR_DEBUG:-0}
 PACKAGE_AS_DEBIAN=${PACKAGE_AS_DEBIAN:-0}
+PACKAGE_FILENAME_PATTERN=${PACKAGE_FILENAME_PATTERN:-"webrtcbuilds-%rn%-%sr%-%to%-%tc%"}
+PACKAGE_NAME_PATTERN=${PACKAGE_NAME_PATTERN:-"webrtcbuilds"}
+PACKAGE_VERSION_PATTERN=${PACKAGE_VERSION_PATTERN:-"%rn%"}
 CONFIGS=${CONFIGS:-Debug Release}
-PROJECT_NAME=webrtcbuilds
 REPO_URL="https://chromium.googlesource.com/external/webrtc"
 DEPOT_TOOLS_URL="https://chromium.googlesource.com/chromium/tools/depot_tools.git"
 DEPOT_TOOLS_DIR=$DIR/depot_tools
@@ -105,9 +123,14 @@ echo Compiling WebRTC
 compile $PLATFORM $OUTDIR "$TARGET_OS" "$TARGET_CPU" "$CONFIGS" "$DISABLE_ITERATOR_DEBUG"
 
 echo Packaging WebRTC
-# label is <projectname>-<rev-number>-<short-rev-sha>-<target-os>-<target-cpu>
-LABEL=$PROJECT_NAME-$REVISION_NUMBER-$(short-rev $REVISION)-$TARGET_OS-$TARGET_CPU
-package $PLATFORM $OUTDIR $LABEL $DIR/resource "$CONFIGS"
-[ "$PACKAGE_AS_DEBIAN" = 1 ] && package::debian $OUTDIR $LABEL $REVISION_NUMBER $TARGET_CPU
+PACKAGE_FILENAME=$(interpret-pattern "$PACKAGE_FILENAME_PATTERN" "$PLATFORM" "$OUTDIR" "$TARGET_OS" "$TARGET_CPU" "$BRANCH" "$REVISION" "$REVISION_NUMBER")
+PACKAGE_NAME=$(interpret-pattern "$PACKAGE_NAME_PATTERN" "$PLATFORM" "$OUTDIR" "$TARGET_OS" "$TARGET_CPU" "$BRANCH" "$REVISION" "$REVISION_NUMBER")
+PACKAGE_VERSION=$(interpret-pattern "$PACKAGE_VERSION_PATTERN" "$PLATFORM" "$OUTDIR" "$TARGET_OS" "$TARGET_CPU" "$BRANCH" "$REVISION" "$REVISION_NUMBER")
+package::prepare $PLATFORM $OUTDIR $PACKAGE_FILENAME $DIR/resource "$CONFIGS"
+if [ "$PACKAGE_AS_DEBIAN" = 1 ]; then
+  package::debian $OUTDIR $PACKAGE_FILENAME $PACKAGE_NAME $PACKAGE_VERSION "$(debian-arch $TARGET_CPU)"
+else
+  package::zip $PLATFORM $OUTDIR $PACKAGE_FILENAME
+fi
 
 echo Build successful
