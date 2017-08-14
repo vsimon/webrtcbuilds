@@ -7,7 +7,7 @@ set -o pipefail
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 WEBRTCBUILDS_FOLDER="$1"
 WEBRTCBUILDS_FOLDER=$(cd $WEBRTCBUILDS_FOLDER && pwd -P)
-CONFIGS="Debug Release"
+CONFIGS=${2:-Debug Release}
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT INT TERM HUP
