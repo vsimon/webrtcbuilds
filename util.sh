@@ -341,6 +341,41 @@ function package() {
   popd >/dev/null
 }
 
+# This packages into a debian package in the output directory.
+# $1: The output directory.
+# $2: Label of the package.
+# $3: Revision number.
+# $4: Architecture
+function package::debian() {
+  local outdir="$1"
+  local label="$2"
+  local revision_number="$3"
+  local architecture="$4"
+  local debian_arch="i386"
+  [ "$architecture" = "x64" ] && debian_arch="amd64"
+  local debianize="debianize/webrtc_0.${revision_number}_${debian_arch}"
+
+  echo "Debianize WebRTC"
+  pushd $outdir >/dev/null
+  mkdir -p $debianize/DEBIAN
+  mkdir -p $debianize/opt
+  cp -r $label $debianize/opt/webrtc
+  cat << EOF > $debianize/DEBIAN/control
+Package: webrtc
+Architecture: $debian_arch
+Maintainer: webrtcbuilds manintainers
+Depends: debconf (>= 0.5.00)
+Priority: optional
+Version: 0.$revision_number
+Description: webrtc static library
+ This package provides webrtc library generated with webrtcbuilds
+EOF
+  fakeroot dpkg-deb --build $debianize
+  mv debianize/*.deb .
+  rm -rf debianize
+  popd >/dev/null
+}
+
 # This returns the latest revision from the git repo.
 # $1: The git repo URL
 function latest-rev() {
