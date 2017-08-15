@@ -15,7 +15,7 @@ before_script:
 # To help prevent timeouts, download a 'pickled' .tar.gz archive of the linux
 # webrtc checkout. LINUX_PICKLE_URL was created with:
 # `GZIP=-9 tar zcvf linux-pickle.tar.gz .`
-- mkdir out
+- mkdir -p out
 - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then travis_retry curl -L $LINUX_PICKLE_URL -o pickle.tar.gz; fi
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then travis_retry curl -L $OSX_PICKLE_URL -o pickle.tar.gz; fi
 - tar xzf pickle.tar.gz -C out
@@ -26,3 +26,26 @@ script:
 matrix:
   allow_failures:
   - os: osx
+before_cache:
+# remove any directories other than 'src' to be cached
+- ls -latr
+- ls -latr out
+- ls -latr out/src
+cache:
+  debug: true
+  directories:
+  - out/.gclient
+  - out/.gclient_entries
+  - out/src
+  # - out/src/base
+  # - out/src/build
+  # - out/src/buildtools
+  # - out/src/chromium
+  # - out/src/data
+  # - out/src/infra
+  # - out/src/resources
+  # - out/src/talk
+  # - out/src/testing
+  # - out/src/third_party
+  # - out/src/tools
+  timeout: 1500
