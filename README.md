@@ -33,6 +33,19 @@ OPTIONS:
    -e             Compile WebRTC with RTTI enabled. Default is with RTTI not enabled.
    -g             [Linux] Compile 'Debug' WebRTC with iterator debugging disabled. Default is enabled but it might add significant overhead.
    -D             [Linux] Generate a debian package
+   -F PATTERN     Allow customize package filename through a pattern
+   -P PATTERN     Allow customize package name through a pattern
+   -V PATTERN     Allow customize package version through a pattern
+
+The PATTERN is a string that can use the following tokens:
+   %p%            The system platform.
+   %to%           Target os.
+   %tc%           Target cpu.
+   %b%            The branch if it was specified.
+   %r%            Revision.
+   %sr%           Short revision.
+   %rn%           The associated revision number.
+   %da%           Debian architecture.
 ```
 
 ## Where is the package

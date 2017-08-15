@@ -285,16 +285,16 @@ function compile() {
   popd >/dev/null
 }
 
-# This packages a compiled build into a zip file in the output directory.
+# This prepares artifacts to be packaged.
 # $1: The platform type.
 # $2: The output directory.
-# $3: Label of the package.
+# $3: The package filename.
 # $4: The project's resource dirctory.
 # $5: The build configurations.
-function package() {
+function package::prepare() {
   local platform="$1"
   local outdir="$2"
-  local label="$3"
+  local package_filename="$3"
   local resourcedir="$4"
   local configs="$5"
 
@@ -305,68 +305,80 @@ function package() {
   fi
   pushd $outdir >/dev/null
   # create directory structure
-  mkdir -p $label/include $label/lib
+  mkdir -p $package_filename/include $package_filename/lib
   for cfg in $configs; do
-    mkdir -p $label/lib/$cfg
+    mkdir -p $package_filename/lib/$cfg
   done
 
   # find and copy header files
   pushd src >/dev/null
-  find webrtc -name *.h -exec $CP --parents '{}' $outdir/$label/include ';'
+  find webrtc -name *.h -exec $CP --parents '{}' $outdir/$package_filename/include ';'
   popd >/dev/null
   # find and copy libraries
   pushd src/out >/dev/null
   find . -maxdepth 3 \( -name *.so -o -name *.dll -o -name *webrtc_full* -o -name *.jar \) \
-    -exec $CP --parents '{}' $outdir/$label/lib ';'
+    -exec $CP --parents '{}' $outdir/$package_filename/lib ';'
   popd >/dev/null
 
   # for linux, add pkgconfig files
   if [ $platform = 'linux' ]; then
     for cfg in $configs; do
-      mkdir -p $label/lib/$cfg/pkgconfig
+      mkdir -p $package_filename/lib/$cfg/pkgconfig
       CONFIG=$cfg envsubst '$CONFIG' < $resourcedir/pkgconfig/libwebrtc_full.pc.in > \
-        $label/lib/$cfg/pkgconfig/libwebrtc_full.pc
+        $package_filename/lib/$cfg/pkgconfig/libwebrtc_full.pc
     done
   fi
+  popd >/dev/null
+}
 
+# This packages a compiled build into a zip file in the output directory.
+# $1: The platform type.
+# $2: The output directory.
+# $3: The package filename.
+function package::zip() {
+  local platform="$1"
+  local outdir="$2"
+  local package_filename="$3"
+
+  pushd $outdir >/dev/null
   # remove first for cleaner builds
-  rm -f $label.zip
+  rm -f $package_filename.zip
 
   # zip up the package
   if [ $platform = 'win' ]; then
-    $DEPOT_TOOLS/win_toolchain/7z/7z.exe a -tzip $label.zip $label
+    $DEPOT_TOOLS/win_toolchain/7z/7z.exe a -tzip $package_filename.zip $package_filename
   else
-    zip -r $label.zip $label >/dev/null
+    zip -r $package_filename.zip $package_filename >/dev/null
   fi
   popd >/dev/null
 }
 
 # This packages into a debian package in the output directory.
 # $1: The output directory.
-# $2: Label of the package.
-# $3: Revision number.
-# $4: Architecture
+# $2: The package filename.
+# $3: The package name.
+# $4: The package version.
+# $5: The architecture.
 function package::debian() {
   local outdir="$1"
-  local label="$2"
-  local revision_number="$3"
-  local architecture="$4"
-  local debian_arch="i386"
-  [ "$architecture" = "x64" ] && debian_arch="amd64"
-  local debianize="debianize/webrtc_0.${revision_number}_${debian_arch}"
+  local package_filename="$2"
+  local package_name="$3"
+  local package_version="$4"
+  local arch="$5"
+  local debianize="debianize/$package_filename"
 
   echo "Debianize WebRTC"
   pushd $outdir >/dev/null
   mkdir -p $debianize/DEBIAN
   mkdir -p $debianize/opt
-  cp -r $label $debianize/opt/webrtc
+  mv $package_filename $debianize/opt/webrtc
   cat << EOF > $debianize/DEBIAN/control
-Package: webrtc
-Architecture: $debian_arch
+Package: $package_name
+Architecture: $arch
 Maintainer: webrtcbuilds manintainers
 Depends: debconf (>= 0.5.00)
 Priority: optional
-Version: 0.$revision_number
+Version: $package_version
 Description: webrtc static library
  This package provides webrtc library generated with webrtcbuilds
 EOF
@@ -401,4 +413,49 @@ function revision-number() {
 function short-rev() {
   local revision="$1"
   echo $revision | cut -c -7
+}
+
+# This returns a short revision sha.
+# $1: The target cpu for cross-compilation.
+function debian-arch() {
+  local target_cpu="$1"
+  # set PLATFORM to android on linux host to build android
+  case "$target_cpu" in
+  x86*)         echo "i386" ;;
+  x64*)         echo "amd64" ;;
+  *)            echo "$target_cpu" ;;
+  esac
+}
+
+# This interprets a pattern and returns the interpreted one.
+# $1: The pattern.
+# $2: The output directory.
+# $3: The platform type.
+# $4: The target os for cross-compilation.
+# $5: The target cpu for cross-compilation.
+# $6: The branch.
+# $7: The revision.
+# $8: The revision number.
+function interpret-pattern() {
+  local pattern="$1"
+  local platform="$2"
+  local outdir="$3"
+  local target_os="$4"
+  local target_cpu="$5"
+  local branch="$6"
+  local revision="$7"
+  local revision_number="$8"
+  local debian_arch="$(debian-arch $target_cpu)"
+  local short_revision="$(short-rev $revision)"
+
+  pattern=${pattern//%p%/$platform}
+  pattern=${pattern//%to%/$target_os}
+  pattern=${pattern//%tc%/$target_cpu}
+  pattern=${pattern//%b%/$branch}
+  pattern=${pattern//%r%/$revision}
+  pattern=${pattern//%rn%/$revision_number}
+  pattern=${pattern//%da%/$debian_arch}
+  pattern=${pattern//%sr%/$short_revision}
+
+  echo "$pattern"
 }
