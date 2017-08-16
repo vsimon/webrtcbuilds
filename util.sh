@@ -141,8 +141,10 @@ function checkout() {
       ;;
     esac
   fi
+  # Replace all directories which now must be symlinks
+  # [ -f src/setup_links.py ] && src/setup_links.py --force --no-prompt
   # Checkout the specific revision after fetch
-  gclient sync --force --revision $revision
+  gclient sync --force --revision $revision --no-history --shallow --delete_unversioned_trees
   # Cache the target OS
   echo $target_os > $outdir/.webrtcbuilds_target_os
   popd >/dev/null
