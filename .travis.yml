@@ -15,14 +15,15 @@ before_script:
 # To help prevent timeouts, download a 'pickled' .tar.gz archive of the linux
 # webrtc checkout. LINUX_PICKLE_URL was created with:
 # `GZIP=-9 tar zcvf linux-pickle.tar.gz .`
-- mkdir out
+- mkdir -p out
 - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then travis_retry curl -L $LINUX_PICKLE_URL -o pickle.tar.gz; fi
 - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then travis_retry curl -L $OSX_PICKLE_URL -o pickle.tar.gz; fi
-- tar xzf pickle.tar.gz -C out
+- tar xzf pickle.tar.gz -C out && rm pickle.tar.gz
 script:
 - ./build.sh -n Release -d
 - test/run_tests.sh $(ls -d -1 out/webrtc*/) Release
 # Allow failures on osx until the travis osx pipeline is more robust.
 matrix:
+  fast_finish: true
   allow_failures:
   - os: osx
