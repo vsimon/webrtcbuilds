@@ -272,9 +272,9 @@ function compile() {
       compile-win "out/${cfg}_x64" "$common_args $target_args"
       ;;
     *)
-      # On Linux, use clang = false and sysroot = false to build using gcc.
-      # Comment this out to use clang.
-      if [ $platform = 'linux' ]; then
+      # On Linux when not cross-compiling, use clang = false and sysroot = false
+      # to build using gcc. Comment this out to use clang.
+      if [[ $platform = 'linux' && $target_cpu != amd* ]]; then
         target_args+=" is_clang=false use_sysroot=false"
       fi
 
