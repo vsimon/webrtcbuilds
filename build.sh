@@ -73,7 +73,7 @@ PACKAGE_FILENAME_PATTERN=${PACKAGE_FILENAME_PATTERN:-"webrtcbuilds-%rn%-%sr%-%to
 PACKAGE_NAME_PATTERN=${PACKAGE_NAME_PATTERN:-"webrtcbuilds"}
 PACKAGE_VERSION_PATTERN=${PACKAGE_VERSION_PATTERN:-"%rn%"}
 CONFIGS=${CONFIGS:-Debug Release}
-REPO_URL="https://chromium.googlesource.com/external/webrtc"
+REPO_URL="https://webrtc.googlesource.com/src"
 DEPOT_TOOLS_URL="https://chromium.googlesource.com/chromium/tools/depot_tools.git"
 DEPOT_TOOLS_DIR=$DIR/depot_tools
 DEPOT_TOOLS_WIN_TOOLCHAIN=0
@@ -98,8 +98,9 @@ echo Checking depot-tools
 check::depot-tools $PLATFORM $DEPOT_TOOLS_URL $DEPOT_TOOLS_DIR
 
 if [ ! -z $BRANCH ]; then
-  REVISION=$(git ls-remote $REPO_URL --heads $BRANCH | head --lines 1 | cut --fields 1) || \
-    { echo "Cound not get branch revision" && exit 1; }
+  REVISION=$(git ls-remote $REPO_URL --heads $BRANCH | head -n1 | cut -f1) || \
+    { echo "Cound not get branch revision for $BRANCH" && exit 1; }
+  [ -z $REVISION ] && echo "Cound not get branch revision for $BRANCH" && exit 1
    echo "Building branch: $BRANCH"
 else
   REVISION=${REVISION:-$(latest-rev $REPO_URL)} || \
@@ -126,7 +127,7 @@ echo Packaging WebRTC
 PACKAGE_FILENAME=$(interpret-pattern "$PACKAGE_FILENAME_PATTERN" "$PLATFORM" "$OUTDIR" "$TARGET_OS" "$TARGET_CPU" "$BRANCH" "$REVISION" "$REVISION_NUMBER")
 PACKAGE_NAME=$(interpret-pattern "$PACKAGE_NAME_PATTERN" "$PLATFORM" "$OUTDIR" "$TARGET_OS" "$TARGET_CPU" "$BRANCH" "$REVISION" "$REVISION_NUMBER")
 PACKAGE_VERSION=$(interpret-pattern "$PACKAGE_VERSION_PATTERN" "$PLATFORM" "$OUTDIR" "$TARGET_OS" "$TARGET_CPU" "$BRANCH" "$REVISION" "$REVISION_NUMBER")
-package::prepare $PLATFORM $OUTDIR $PACKAGE_FILENAME $DIR/resource "$CONFIGS"
+package::prepare $PLATFORM $OUTDIR $PACKAGE_FILENAME $DIR/resource "$CONFIGS" $REVISION_NUMBER
 if [ "$PACKAGE_AS_DEBIAN" = 1 ]; then
   package::debian $OUTDIR $PACKAGE_FILENAME $PACKAGE_NAME $PACKAGE_VERSION "$(debian-arch $TARGET_CPU)"
 else

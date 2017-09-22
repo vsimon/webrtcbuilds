@@ -204,7 +204,7 @@ device_info_external.obj"
   local extras=$(find \
     ./obj/third_party/libvpx/libvpx_* \
     ./obj/third_party/libjpeg_turbo/simd_asm \
-    ./obj/third_party/boringssl/boringssl_asm -name *.obj)
+    ./obj/third_party/boringssl/boringssl_asm -name '*.obj')
   echo "$extras" | tr ' ' '\n' >>libwebrtc_full.list
   "$VS140COMNTOOLS../../VC/bin/lib" /OUT:webrtc_full.lib @libwebrtc_full.list
   popd >/dev/null
@@ -294,12 +294,14 @@ function compile() {
 # $3: The package filename.
 # $4: The project's resource dirctory.
 # $5: The build configurations.
+# $6: : The revision number.
 function package::prepare() {
   local platform="$1"
   local outdir="$2"
   local package_filename="$3"
   local resourcedir="$4"
   local configs="$5"
+  local revision_number="$6"
 
   if [ $platform = 'mac' ]; then
     CP='gcp'
@@ -315,11 +317,18 @@ function package::prepare() {
 
   # find and copy header files
   pushd src >/dev/null
-  find webrtc -name *.h -exec $CP --parents '{}' $outdir/$package_filename/include ';'
+  local headersSourceDir=webrtc
+  local headersDestDir=$outdir/$package_filename/include
+  # Revision 19846 is the following, where upstream moved src/webrtc to src/
+  # https://webrtc.googlesource.com/src/+/92ea95e34af5966555903026f45164afbd7e2088
+  if [[ $revision_number -ge 19846 ]]; then
+    headersSourceDir=.
+  fi
+  find $headersSourceDir -name '*.h' -exec $CP --parents '{}' $headersDestDir ';'
   popd >/dev/null
   # find and copy libraries
   pushd src/out >/dev/null
-  find . -maxdepth 3 \( -name *.so -o -name *.dll -o -name *webrtc_full* -o -name *.jar \) \
+  find . -maxdepth 3 \( -name '*.so' -o -name '*.dll' -o -name '*webrtc_full*' -o -name *.jar \) \
     -exec $CP --parents '{}' $outdir/$package_filename/lib ';'
   popd >/dev/null
 
