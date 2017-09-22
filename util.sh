@@ -201,10 +201,12 @@ function compile-win() {
   local blacklist="unittest_main.obj|video_capture_external.obj|\
 device_info_external.obj"
   echo "$objlist" | tr ' ' '\n' | grep -v -E $blacklist >libwebrtc_full.list
+  # On Windows, asm files are compiled to object files that have .obj and .o
+  # extensions.
   local extras=$(find \
     ./obj/third_party/libvpx/libvpx_* \
     ./obj/third_party/libjpeg_turbo/simd_asm \
-    ./obj/third_party/boringssl/boringssl_asm -name '*.obj')
+    ./obj/third_party/boringssl/boringssl_asm -name '*.o' -o -name '*.obj')
   echo "$extras" | tr ' ' '\n' >>libwebrtc_full.list
   "$VS140COMNTOOLS../../VC/bin/lib" /OUT:webrtc_full.lib @libwebrtc_full.list
   popd >/dev/null
@@ -232,7 +234,7 @@ video_capture_external.o|device_info_external.o"
   local extras=$(find \
     ./obj/third_party/libvpx/libvpx_* \
     ./obj/third_party/libjpeg_turbo/simd_asm \
-    ./obj/third_party/boringssl/boringssl_asm -name '*\.o')
+    ./obj/third_party/boringssl/boringssl_asm -name '*.o')
   echo "$extras" | tr ' ' '\n' >>libwebrtc_full.list
   # generate the archive
   cat libwebrtc_full.list | xargs ar -crs libwebrtc_full.a
