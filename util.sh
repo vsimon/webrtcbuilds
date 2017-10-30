@@ -218,7 +218,7 @@ device_info_external.obj"
 function compile-unix() {
   local outputdir="$1"
   local gn_args="$2"
-  local blacklist="unittest|examples|tools|/yasm|protobuf_lite|main.o|\
+  local blacklist="unittest|examples|/yasm|protobuf_lite|main.o|\
 video_capture_external.o|device_info_external.o"
 
   gn gen $outputdir --args="$gn_args"
