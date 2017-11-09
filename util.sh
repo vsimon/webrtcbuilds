@@ -145,7 +145,7 @@ function checkout() {
   # setup_links.py to replace all directories which now must be symlinks then
   # try again.
   gclient sync --force --revision $revision ||
-    (src/setup_links.py --force --no-prompt && gclient sync --force --revision $revision)
+    (test -f src/setup_links.py && src/setup_links.py --force --no-prompt && gclient sync --force --revision $revision)
   # Cache the target OS
   echo $target_os > $outdir/.webrtcbuilds_target_os
   popd >/dev/null
