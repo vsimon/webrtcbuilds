@@ -22,10 +22,6 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<rtc::BasicPacketSocketFactory> socket_factory(
     new rtc::BasicPacketSocketFactory());
 
-  // something from api
-  rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface>
-    peer_connection_factory = webrtc::CreatePeerConnectionFactory();
-
   // something from api/test
   webrtc::FakeConstraints constraints;
 
