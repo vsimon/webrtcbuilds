@@ -276,7 +276,7 @@ function compile() {
     *)
       # On Linux when not cross-compiling, use clang = false and sysroot = false
       # to build using gcc. Comment this out to use clang.
-      if [[ $platform = 'linux' && $target_cpu != amd* ]]; then
+      if [[ $platform = 'linux' && $target_os != 'android' && $target_cpu != amd* ]]; then
         target_args+=" is_clang=false use_sysroot=false"
       fi
 
