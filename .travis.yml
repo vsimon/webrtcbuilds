@@ -8,6 +8,8 @@ env:
   - LINUX_PICKLE_URL=https://www.dropbox.com/s/yclmzq1n63cminb/linux-pickle.tar.gz?dl=0
   - OSX_PICKLE_URL=https://www.dropbox.com/s/m23s3l9g1s9yw87/osx-pickle.tar.gz?dl=0
 before_script:
+# temp fix for issue travis-ci/travis-ci#9037
+- sudo rm /etc/apt/sources.list.d/mongodb*.list
 # Update the default 'trusty' linker version for tests to link and pass.
 - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
   sudo apt-get install -y binutils-2.26 && sudo update-alternatives --install
