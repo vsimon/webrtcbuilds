@@ -91,6 +91,8 @@ echo "Host OS: $PLATFORM"
 echo "Target OS: $TARGET_OS"
 echo "Target CPU: $TARGET_CPU"
 
+check::platform $PLATFORM $TARGET_OS
+
 echo Checking webrtcbuilds dependencies
 check::webrtcbuilds::deps $PLATFORM
 
