@@ -13,6 +13,20 @@ function detect-platform() {
   esac
 }
 
+# Sanity check for the host os/platform supporting cross-compilation with the
+# target os.
+# $1: The platform type.
+# $2: The target os.
+function check::platform() {
+  local platform="$1"
+  local target_os="$2"
+    if [[ $target_os = 'android' && $platform != 'linux' ]]; then
+      # Codifying the webrtc documentation for android compilation support for non-linux platforms
+      echo "Android compilation is only supported on Linux (https://webrtc.org/native-code/android/#getting-the-code)"
+      exit 1
+    fi
+}
+
 # This cleans the output directory.
 # $1: The output directory.
 function clean() {
