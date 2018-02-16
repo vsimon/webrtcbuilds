@@ -213,7 +213,7 @@ function compile-win() {
   rm -f libwebrtc_full.lib
   local objlist=$(strings .ninja_deps | grep -o '.*\.obj')
   local blacklist="unittest_main.obj|video_capture_external.obj|\
-device_info_external.obj"
+device_info_external.obj|platform_thread_types.obj"
   echo "$objlist" | tr ' ' '\n' | grep -v -E $blacklist >libwebrtc_full.list
   # On Windows, asm files are compiled to object files that have .obj and .o
   # extensions.
@@ -233,7 +233,7 @@ function compile-unix() {
   local outputdir="$1"
   local gn_args="$2"
   local blacklist="unittest|examples|/yasm|protobuf_lite|main.o|\
-video_capture_external.o|device_info_external.o"
+video_capture_external.o|device_info_external.o|platform_thread_types.o"
 
   gn gen $outputdir --args="$gn_args"
   pushd $outputdir >/dev/null
