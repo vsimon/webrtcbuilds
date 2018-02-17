@@ -6,6 +6,9 @@
   #include "api/peerconnectioninterface.h"
   #include "api/test/fakeconstraints.h"
   #include "media/engine/webrtcvideocapturerfactory.h"
+  #include "api/audio_codecs/builtin_audio_decoder_factory.h"
+  #include "api/audio_codecs/builtin_audio_encoder_factory.h"
+  #include "modules/audio_device/include/audio_device.h"
 #else
   #include "webrtc/rtc_base/thread.h"
   #include "webrtc/p2p/base/basicpacketsocketfactory.h"
@@ -21,6 +24,18 @@ int main(int argc, char* argv[]) {
   // something from p2p
   std::unique_ptr<rtc::BasicPacketSocketFactory> socket_factory(
     new rtc::BasicPacketSocketFactory());
+
+  // something from api
+  rtc::scoped_refptr<webrtc::PeerConnectionFactoryInterface> peer_connection_factory =
+    webrtc::CreatePeerConnectionFactory(
+      NULL,
+      rtc::Thread::Current(),
+      NULL,
+      webrtc::AudioDeviceModule::Create(0, webrtc::AudioDeviceModule::kDummyAudio),
+      webrtc::CreateBuiltinAudioEncoderFactory(),
+      webrtc::CreateBuiltinAudioDecoderFactory(),
+      NULL,
+      NULL);
 
   // something from api/test
   webrtc::FakeConstraints constraints;
