@@ -3,15 +3,23 @@ sudo: required
 os:
 - linux
 - osx
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      # Update the default 'trusty' linker and gcc version for tests to link and pass.
+      - g++-5
+      - binutils-2.26
 env:
   global:
   - LINUX_PICKLE_URL=https://www.dropbox.com/s/yclmzq1n63cminb/linux-pickle.tar.gz?dl=0
   - OSX_PICKLE_URL=https://www.dropbox.com/s/m23s3l9g1s9yw87/osx-pickle.tar.gz?dl=0
 before_script:
-# Update the default 'trusty' linker version for tests to link and pass.
+# Update the default 'trusty' linker and gcc version for tests to link and pass.
 - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-  sudo apt-get install -y binutils-2.26 && sudo update-alternatives --install
-  /usr/bin/ld ld /usr/lib/binutils-2.26/bin/ld 90; fi
+  sudo update-alternatives --install /usr/bin/ld ld /usr/lib/binutils-2.26/bin/ld 90;
+  fi
 # To help prevent timeouts, download a 'pickled' .tar.gz archive of the linux
 # webrtc checkout. LINUX_PICKLE_URL was created with:
 # `GZIP=-9 tar zcvf linux-pickle.tar.gz .`
@@ -21,6 +29,10 @@ before_script:
 - tar xzf pickle.tar.gz -C out && rm pickle.tar.gz
 script:
 - ./build.sh -n Release -d
+# Run again since build.sh installation of dependencies sets back defaults
+- if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+  sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-5 90 --slave /usr/bin/g++ g++ /usr/bin/g++-5;
+  fi
 - test/run_tests.sh $(ls -d -1 out/webrtc*/) Release
 # Allow failures on osx until the travis osx pipeline is more robust.
 matrix:
