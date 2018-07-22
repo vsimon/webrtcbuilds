@@ -332,6 +332,8 @@ function package::prepare() {
   done
 
   # find and copy header files
+  # copy all non third-party header files first then copy only the third-party
+  # header files that are required such as abseil-cpp for optional.h
   pushd src >/dev/null
   local headersSourceDir=webrtc
   local headersDestDir=$outdir/$package_filename/include
@@ -340,7 +342,10 @@ function package::prepare() {
   if [[ $revision_number -ge 19846 ]]; then
     headersSourceDir=.
   fi
-  find $headersSourceDir -name '*.h' -exec $CP --parents '{}' $headersDestDir ';'
+  find $headersSourceDir -path './third_party*' -prune -o -name '*.h' -exec $CP --parents '{}' $headersDestDir ';'
+  pushd $headersSourceDir/third_party/abseil-cpp >/dev/null
+  find . -name '*.h' -exec $CP --parents '{}' $headersDestDir ';'
+  popd >/dev/null
   popd >/dev/null
   # find and copy libraries
   pushd src/out >/dev/null
