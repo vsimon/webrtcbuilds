@@ -343,9 +343,12 @@ function package::prepare() {
     headersSourceDir=.
   fi
   find $headersSourceDir -path './third_party*' -prune -o -name '*.h' -exec $CP --parents '{}' $headersDestDir ';'
-  pushd $headersSourceDir/third_party/abseil-cpp >/dev/null
-  find . -name '*.h' -exec $CP --parents '{}' $headersDestDir ';'
-  popd >/dev/null
+  # Revision 23941 introduced absl::optional from abseil-cpp
+  if [[ $revision_number -ge 23941 ]]; then
+    pushd $headersSourceDir/third_party/abseil-cpp >/dev/null
+    find . -name '*.h' -exec $CP --parents '{}' $headersDestDir ';'
+    popd >/dev/null
+  fi
   popd >/dev/null
   # find and copy libraries
   pushd src/out >/dev/null
